@@ -122,7 +122,7 @@ use types.{
 /// spending validator (`spend`) runs because the UTxO is at this script's
 /// address. The `else(_)` handler rejects any other purpose (e.g.,
 /// withdrawal, certify).
-validator mpfCage {
+validator mpfCage(_version: Int) {
   /// Minting policy: validates creation and destruction of caged tokens.
   ///
   /// - `Minting`: Creates a new caged token with an empty MPF root.
@@ -830,7 +830,7 @@ const output =
 //
 // The test uses && to combine both assertions. Both must pass for the test to succeed.
 test canCage() {
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -840,7 +840,7 @@ test canCage() {
       extra_signatories: ["owner"],
       inputs: [update, request],
     },
-  ) && mpfCage.spend(
+  ) && mpfCage.spend(0,
     Some(aRequest),
     Contribute(testStateRef),
     testRequestRef,
@@ -897,7 +897,7 @@ const consumed_utxo =
 // - The output goes to the correct script address
 // - The output datum has an empty MPF root
 test canMint() {
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(minting),
     "policy_id",
     Transaction {
@@ -924,7 +924,7 @@ fn mint_tx() -> Transaction {
 }
 
 test mint_missing_input() fail {
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), inputs: [] },
@@ -932,7 +932,7 @@ test mint_missing_input() fail {
 }
 
 test mint_quantity_two() fail {
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(minting),
     "policy_id",
     Transaction {
@@ -945,7 +945,7 @@ test mint_quantity_two() fail {
 test mint_to_wallet() fail {
   let wallet_output =
     Output { ..minted, address: address.from_verification_key("someone") }
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [wallet_output] },
@@ -955,7 +955,7 @@ test mint_to_wallet() fail {
 test mint_to_wrong_script() fail {
   let wrong_output =
     Output { ..minted, address: address.from_script("other_script") }
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [wrong_output] },
@@ -970,7 +970,7 @@ test mint_nonempty_root() fail {
         StateDatum(State { owner: "owner", root: "nonempty_root" }),
       ),
     }
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
@@ -992,7 +992,7 @@ test mint_request_datum() fail {
         ),
       ),
     }
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
@@ -1001,7 +1001,7 @@ test mint_request_datum() fail {
 
 test mint_no_datum() fail {
   let bad_output = Output { ..minted, datum: NoDatum }
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
@@ -1013,7 +1013,7 @@ test mint_no_datum() fail {
 // ============================================================================
 
 test retract_happy() {
-  mpfCage.spend(
+  mpfCage.spend(0,
     Some(aRequest),
     Retract,
     testRequestRef,
@@ -1025,7 +1025,7 @@ test retract_happy() {
 }
 
 test retract_wrong_signer() fail {
-  mpfCage.spend(
+  mpfCage.spend(0,
     Some(aRequest),
     Retract,
     testRequestRef,
@@ -1050,7 +1050,7 @@ test contribute_wrong_token() fail {
         requestOwner: "owner",
       },
     )
-  mpfCage.spend(
+  mpfCage.spend(0,
     Some(wrong_request),
     Contribute(testStateRef),
     testRequestRef,
@@ -1061,7 +1061,7 @@ test contribute_wrong_token() fail {
 test contribute_missing_ref() fail {
   let missing_ref =
     OutputReference { transaction_id: "nonexistent", output_index: 0 }
-  mpfCage.spend(
+  mpfCage.spend(0,
     Some(aRequest),
     Contribute(missing_ref),
     testRequestRef,
@@ -1074,7 +1074,7 @@ test contribute_missing_ref() fail {
 // ============================================================================
 
 test modify_missing_signature() fail {
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -1093,7 +1093,7 @@ test modify_wrong_address() fail {
       ..output,
       address: address.from_script("different_script"),
     }
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -1108,7 +1108,7 @@ test modify_wrong_address() fail {
 
 test modify_owner_transfer() {
   // output already has owner: "new-owner", this should succeed
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -1132,7 +1132,7 @@ test modify_no_requests() {
       ),
       reference_script: None,
     }
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([]),
     testStateRef,
@@ -1178,7 +1178,7 @@ test modify_skip_other_token() {
       ),
       reference_script: None,
     }
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([]),
     testStateRef,
@@ -1193,7 +1193,7 @@ test modify_skip_other_token() {
 
 test modify_too_few_proofs() fail {
   // One matching request but zero proofs
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([]),
     testStateRef,
@@ -1208,7 +1208,7 @@ test modify_too_few_proofs() fail {
 
 test modify_extra_proofs() {
   // One matching request, two proofs — extra proof is ignored
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([[], []]),
     testStateRef,
@@ -1231,7 +1231,7 @@ test modify_wrong_root() fail {
       ),
       reference_script: None,
     }
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -1252,7 +1252,7 @@ test modify_wrong_root() fail {
 const burn_value = valueFromToken("policy_id", testToken)
 
 test end_happy() {
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     End,
     testStateRef,
@@ -1266,7 +1266,7 @@ test end_happy() {
 }
 
 test end_missing_signature() fail {
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     End,
     testStateRef,
@@ -1281,7 +1281,7 @@ test end_missing_signature() fail {
 
 test end_wrong_token_in_mint() fail {
   let wrong_burn = valueFromToken("policy_id", TokenId { assetName: "wrong" })
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     End,
     testStateRef,
@@ -1299,7 +1299,7 @@ test end_wrong_token_in_mint() fail {
 // ============================================================================
 
 test retract_on_state_datum() fail {
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Retract,
     testStateRef,
@@ -1311,7 +1311,7 @@ test retract_on_state_datum() fail {
 }
 
 test contribute_on_state_datum() fail {
-  mpfCage.spend(
+  mpfCage.spend(0,
     stateDatum,
     Contribute(testStateRef),
     testStateRef,
@@ -1323,7 +1323,7 @@ test contribute_on_state_datum() fail {
 }
 
 test modify_on_request_datum() fail {
-  mpfCage.spend(
+  mpfCage.spend(0,
     Some(aRequest),
     Modify([]),
     testRequestRef,
@@ -1336,7 +1336,7 @@ test modify_on_request_datum() fail {
 }
 
 test end_on_request_datum() fail {
-  mpfCage.spend(
+  mpfCage.spend(0,
     Some(aRequest),
     End,
     testRequestRef,
@@ -1354,7 +1354,7 @@ test end_on_request_datum() fail {
 // ============================================================================
 
 test spend_no_datum() fail {
-  mpfCage.spend(
+  mpfCage.spend(0,
     None,
     Retract,
     testRequestRef,
@@ -1382,7 +1382,7 @@ test prop_retract_requires_owner(
         requestOwner: "the_real_owner_key_aaaaaaaaaa",
       },
     )
-  mpfCage.spend(
+  mpfCage.spend(0,
     Some(req),
     Retract,
     testRequestRef,
@@ -1416,7 +1416,7 @@ test prop_modify_requires_owner(
         reference_script: None,
       },
     }
-  mpfCage.spend(
+  mpfCage.spend(0,
     Some(StateDatum(s)),
     Modify([]),
     testStateRef,
@@ -1457,7 +1457,7 @@ test prop_mint_roundtrip(
       datum: NoDatum,
       reference_script: None,
     }
-  mpfCage.mint(
+  mpfCage.mint(0,
     Minting(mint_redeemer),
     "policy_id",
     Transaction {
