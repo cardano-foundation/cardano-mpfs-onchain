@@ -1,0 +1,30 @@
+services:
+  yaci-cli:
+    image: bloxbean/yaci-cli:0.10.6-beta
+    ports:
+      - "8080:8080"   # yaci-store (Blockfrost-compatible API)
+      - "10000:10000" # admin API
+      - "1337:1337"   # ogmios
+    env_file: yaci.env
+    volumes:
+      - ./node.properties:/app/config/node.properties
+    entrypoint: ["/bin/bash", "-c", "yaci-cli.sh create-node -o --start"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/api/v1/epochs/latest"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  test-runner:
+    image: node:22-slim
+    depends_on:
+      yaci-cli:
+        condition: service_healthy
+    environment:
+      YACI_HOST: yaci-cli
+    volumes:
+      - ./:/app/e2e
+      - ../plutus.json:/app/plutus.json:ro
+    working_dir: /app/e2e
+    entrypoint: ["/bin/bash", "-c", "npm ci && npm test"]
