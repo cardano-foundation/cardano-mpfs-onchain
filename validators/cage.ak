@@ -12,6 +12,11 @@
 /// - The token is sent to this script's address
 /// - The initial MPF root is empty
 ///
+/// Alternatively, a token can be minted via `Migrating` to support contract
+/// migration. In this case the MPF root may be non-empty (carried over from
+/// the old validator) and uniqueness is guaranteed by atomically burning the
+/// old token in the same transaction.
+///
 /// ## Spending Validator
 ///
 /// The validator supports four operations:
@@ -99,14 +104,16 @@ use aiken/option.{is_some}
 use aiken/fuzz
 use cardano/address.{from_script}
 use cardano/address
+use cardano/assets
 use cardano/assets.{PolicyId, from_asset, from_lovelace, zero}
 use cardano/transaction.{
   InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
 }
 use lib.{TokenId, assetName, quantity, tokenFromValue, valueFromToken}
 use types.{
-  Burning, CageDatum, Contribute, Delete, End, Insert, Mint, MintRedeemer, Minting,
-  Modify, Request, RequestDatum, Retract, State, StateDatum, Update, UpdateRedeemer,
+  Burning, CageDatum, Contribute, Delete, End, Insert, Migrating, Migration, Mint,
+  MintRedeemer, Minting, Modify, Request, RequestDatum, Retract, State, StateDatum,
+  Update, UpdateRedeemer,
 }
 
 /// The main validator for caged MPF tokens.
@@ -122,7 +129,7 @@ use types.{
 /// spending validator (`spend`) runs because the UTxO is at this script's
 /// address. The `else(_)` handler rejects any other purpose (e.g.,
 /// withdrawal, certify).
-validator mpfCage {
+validator mpfCage(_version: Int) {
   /// Minting policy: validates creation and destruction of caged tokens.
   ///
   /// - `Minting`: Creates a new caged token with an empty MPF root.
@@ -144,7 +151,11 @@ validator mpfCage {
       Minting(mint) -> {
         trace "minting": mint
         validateMint(mint, policyId, tx)
-        }
+      }
+      Migrating(migration) -> {
+        trace "migrating": migration
+        validateMigration(migration, policyId, tx)
+      }
       Burning -> True
     }
   }
@@ -251,7 +262,11 @@ validator mpfCage {
         let (input, tokenId) = extractToken(self, tx)
         when redeemer is {
           Modify(proofs) -> validRootUpdate(state, input, tokenId, tx, proofs)
-          End -> validateEnd(tokenId, tx)
+          End -> {
+            expect address.Script(policyId) =
+              input.output.address.payment_credential
+            validateEnd(policyId, tokenId, tx)
+          }
           // Defensive: should never reach here since Retract and Contribute
           // are handled above. Included for exhaustiveness.
           _ -> fail
@@ -305,43 +320,20 @@ pub fn extractToken(what: OutputReference, tx: Transaction) {
 
 /// Validate that the token is being burned.
 ///
-/// Checks that the mint field contains the same token as the one being spent.
-/// The minting policy and ledger ensure the quantity is exactly -1.
-///
-/// ## How It Works
-/// 1. Extract the single non-ADA token from the transaction's mint field
-///    (the mint field acts like a Value, with negative quantities for burns)
-/// 2. Compare the extracted token ID with the token from the State UTxO
-/// 3. If they match, the burn is valid
-///
-/// ## Why This Is Sufficient
-/// The Cardano ledger enforces that if a token appears in the mint field
-/// with quantity -1, then that many tokens are destroyed. The minting
-/// policy (`Burning` redeemer) has already been invoked and approved.
-/// Combined with `validateOwnership` (called before this function), we
-/// know the cage owner authorized the burn.
-///
-/// ## What About tokenFromValue on the Mint Field?
-/// The mint field is treated as a Value, but it contains only minted/burned
-/// tokens (no ADA). `tokenFromValue` removes the ADA policy ("") and expects
-/// exactly one remaining policy with one asset name. For a valid End
-/// transaction, the mint field should contain exactly one burned token.
+/// Checks that the mint field contains the token with quantity -1 under the
+/// given policy ID. Uses `quantity` to look up the specific token, which
+/// works even when the mint field contains additional policies (e.g., during
+/// migration where a new token is minted under a different policy).
 ///
 /// ## Test Hints
-/// - Mint field contains the same token (quantity -1) -> success
+/// - Mint field contains the token with quantity -1 -> success
 /// - Mint field contains a different token -> fail
-/// - Mint field is empty -> fail (tokenFromValue returns None)
-/// - Mint field contains multiple tokens -> fail (tokenFromValue returns None)
-/// - Mint field contains the token with quantity -2 -> tokenFromValue still
-///   succeeds (it ignores quantity), but the ledger would reject the tx
-fn validateEnd(tokenId, tx) {
+/// - Mint field is empty -> fail
+/// - Mint field has additional policies (migration) -> still succeeds
+fn validateEnd(policyId, tokenId, tx) {
   let Transaction { mint, .. } = tx
-  // Extract the single token from the mint field. Fails if there isn't
-  // exactly one non-ADA token being minted/burned.
-  expect Some(mintToken) = tokenFromValue(mint)
-  // Ensure the burned token is the same as the one in the State UTxO.
-  // This prevents burning a different token while keeping the caged one.
-  expect tokenId == mintToken
+  expect Some(q) = quantity(policyId, mint, tokenId)
+  expect q == -1
   True
 }
 
@@ -742,12 +734,48 @@ pub fn validateMint(minting: Mint, policyId: PolicyId, tx: Transaction) {
   True
 }
 
+/// Validate migration of a caged token from an old validator.
+///
+/// This function mints a new token under the new policy while verifying
+/// that the old token is burned atomically. The MPF root is carried over
+/// (no empty root check), preserving the existing data.
+///
+/// Uniqueness is guaranteed by the burn: the old token can only be burned
+/// once, so this migration mint can only succeed once.
+pub fn validateMigration(
+  migration: Migration,
+  policyId: PolicyId,
+  tx: Transaction,
+) {
+  let Migration { oldPolicy, tokenId } = migration
+  let Transaction { outputs, mint, .. } = tx
+  // Verify the old token is burned (quantity -1 under old policy)
+  expect
+    when quantity(oldPolicy, mint, tokenId) is {
+      Some(qty) -> qty == -1
+      None -> False
+    }
+  // Verify exactly one new token is minted (quantity +1 under new policy)
+  expect
+    when quantity(policyId, mint, tokenId) is {
+      Some(qty) -> qty == 1
+      None -> False
+    }
+  // Standard boot checks (same as validateMint, minus root check)
+  expect Some(output) = head(outputs)
+  expect address.Script(targetScriptHash) = output.address.payment_credential
+  expect targetScriptHash == policyId
+  expect InlineDatum(tokenState) = output.datum
+  expect StateDatum(State { root: _, owner: _ }) = tokenState
+  True
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
 
 // Test constants: a script address used for all test UTxOs
-const testScriptAddress = from_script("counter_cage")
+const testScriptAddress = from_script("policy_id")
 
 // Test constants: output references for State and Request UTxOs
 const testStateRef =
@@ -831,6 +859,7 @@ const output =
 // The test uses && to combine both assertions. Both must pass for the test to succeed.
 test canCage() {
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -841,6 +870,7 @@ test canCage() {
       inputs: [update, request],
     },
   ) && mpfCage.spend(
+    0,
     Some(aRequest),
     Contribute(testStateRef),
     testRequestRef,
@@ -898,6 +928,7 @@ const consumed_utxo =
 // - The output datum has an empty MPF root
 test canMint() {
   mpfCage.mint(
+    0,
     Minting(minting),
     "policy_id",
     Transaction {
@@ -925,6 +956,7 @@ fn mint_tx() -> Transaction {
 
 test mint_missing_input() fail {
   mpfCage.mint(
+    0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), inputs: [] },
@@ -933,6 +965,7 @@ test mint_missing_input() fail {
 
 test mint_quantity_two() fail {
   mpfCage.mint(
+    0,
     Minting(minting),
     "policy_id",
     Transaction {
@@ -946,6 +979,7 @@ test mint_to_wallet() fail {
   let wallet_output =
     Output { ..minted, address: address.from_verification_key("someone") }
   mpfCage.mint(
+    0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [wallet_output] },
@@ -956,6 +990,7 @@ test mint_to_wrong_script() fail {
   let wrong_output =
     Output { ..minted, address: address.from_script("other_script") }
   mpfCage.mint(
+    0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [wrong_output] },
@@ -971,6 +1006,7 @@ test mint_nonempty_root() fail {
       ),
     }
   mpfCage.mint(
+    0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
@@ -993,6 +1029,7 @@ test mint_request_datum() fail {
       ),
     }
   mpfCage.mint(
+    0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
@@ -1002,6 +1039,7 @@ test mint_request_datum() fail {
 test mint_no_datum() fail {
   let bad_output = Output { ..minted, datum: NoDatum }
   mpfCage.mint(
+    0,
     Minting(minting),
     "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
@@ -1014,6 +1052,7 @@ test mint_no_datum() fail {
 
 test retract_happy() {
   mpfCage.spend(
+    0,
     Some(aRequest),
     Retract,
     testRequestRef,
@@ -1026,6 +1065,7 @@ test retract_happy() {
 
 test retract_wrong_signer() fail {
   mpfCage.spend(
+    0,
     Some(aRequest),
     Retract,
     testRequestRef,
@@ -1051,6 +1091,7 @@ test contribute_wrong_token() fail {
       },
     )
   mpfCage.spend(
+    0,
     Some(wrong_request),
     Contribute(testStateRef),
     testRequestRef,
@@ -1062,6 +1103,7 @@ test contribute_missing_ref() fail {
   let missing_ref =
     OutputReference { transaction_id: "nonexistent", output_index: 0 }
   mpfCage.spend(
+    0,
     Some(aRequest),
     Contribute(missing_ref),
     testRequestRef,
@@ -1075,6 +1117,7 @@ test contribute_missing_ref() fail {
 
 test modify_missing_signature() fail {
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -1094,6 +1137,7 @@ test modify_wrong_address() fail {
       address: address.from_script("different_script"),
     }
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -1109,6 +1153,7 @@ test modify_wrong_address() fail {
 test modify_owner_transfer() {
   // output already has owner: "new-owner", this should succeed
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -1133,6 +1178,7 @@ test modify_no_requests() {
       reference_script: None,
     }
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([]),
     testStateRef,
@@ -1179,6 +1225,7 @@ test modify_skip_other_token() {
       reference_script: None,
     }
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([]),
     testStateRef,
@@ -1194,6 +1241,7 @@ test modify_skip_other_token() {
 test modify_too_few_proofs() fail {
   // One matching request but zero proofs
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([]),
     testStateRef,
@@ -1209,6 +1257,7 @@ test modify_too_few_proofs() fail {
 test modify_extra_proofs() {
   // One matching request, two proofs — extra proof is ignored
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([[], []]),
     testStateRef,
@@ -1232,6 +1281,7 @@ test modify_wrong_root() fail {
       reference_script: None,
     }
   mpfCage.spend(
+    0,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -1248,11 +1298,12 @@ test modify_wrong_root() fail {
 // End tests
 // ============================================================================
 
-// End needs: owner signs + mint field contains the token being burned
-const burn_value = valueFromToken("policy_id", testToken)
+// End needs: owner signs + mint field contains the token with quantity -1
+const burn_value = from_asset("policy_id", testToken.assetName, -1)
 
 test end_happy() {
   mpfCage.spend(
+    0,
     stateDatum,
     End,
     testStateRef,
@@ -1267,6 +1318,7 @@ test end_happy() {
 
 test end_missing_signature() fail {
   mpfCage.spend(
+    0,
     stateDatum,
     End,
     testStateRef,
@@ -1282,6 +1334,7 @@ test end_missing_signature() fail {
 test end_wrong_token_in_mint() fail {
   let wrong_burn = valueFromToken("policy_id", TokenId { assetName: "wrong" })
   mpfCage.spend(
+    0,
     stateDatum,
     End,
     testStateRef,
@@ -1300,6 +1353,7 @@ test end_wrong_token_in_mint() fail {
 
 test retract_on_state_datum() fail {
   mpfCage.spend(
+    0,
     stateDatum,
     Retract,
     testStateRef,
@@ -1312,6 +1366,7 @@ test retract_on_state_datum() fail {
 
 test contribute_on_state_datum() fail {
   mpfCage.spend(
+    0,
     stateDatum,
     Contribute(testStateRef),
     testStateRef,
@@ -1324,6 +1379,7 @@ test contribute_on_state_datum() fail {
 
 test modify_on_request_datum() fail {
   mpfCage.spend(
+    0,
     Some(aRequest),
     Modify([]),
     testRequestRef,
@@ -1337,6 +1393,7 @@ test modify_on_request_datum() fail {
 
 test end_on_request_datum() fail {
   mpfCage.spend(
+    0,
     Some(aRequest),
     End,
     testRequestRef,
@@ -1355,6 +1412,7 @@ test end_on_request_datum() fail {
 
 test spend_no_datum() fail {
   mpfCage.spend(
+    0,
     None,
     Retract,
     testRequestRef,
@@ -1383,6 +1441,7 @@ test prop_retract_requires_owner(
       },
     )
   mpfCage.spend(
+    0,
     Some(req),
     Retract,
     testRequestRef,
@@ -1417,6 +1476,7 @@ test prop_modify_requires_owner(
       },
     }
   mpfCage.spend(
+    0,
     Some(StateDatum(s)),
     Modify([]),
     testStateRef,
@@ -1458,6 +1518,7 @@ test prop_mint_roundtrip(
       reference_script: None,
     }
   mpfCage.mint(
+    0,
     Minting(mint_redeemer),
     "policy_id",
     Transaction {
@@ -1465,6 +1526,116 @@ test prop_mint_roundtrip(
       outputs: [out],
       mint: val,
       inputs: [Input { output_reference: ref, output: utxo }],
+    },
+  )
+}
+
+// ============================================================================
+// Migration tests
+// ============================================================================
+
+const old_policy = "old_policy_id"
+
+const new_policy = "new_policy_id"
+
+const migrate_token = TokenId { assetName: "migrated_asset" }
+
+const migrate_redeemer =
+  Migration { oldPolicy: old_policy, tokenId: migrate_token }
+
+// Mint field: old token burned (-1) + new token minted (+1)
+const migrate_mint =
+  from_asset(old_policy, migrate_token.assetName, -1)
+    |> assets.merge(from_asset(new_policy, migrate_token.assetName, 1))
+
+const migrate_output =
+  Output {
+    address: address.from_script(new_policy),
+    value: from_asset(new_policy, migrate_token.assetName, 1),
+    datum: InlineDatum(
+      StateDatum(State { owner: "owner", root: "nonempty_root_hash_aaaaaaaaa" }),
+    ),
+    reference_script: None,
+  }
+
+test canMigrate() {
+  mpfCage.mint(
+    0,
+    Migrating(migrate_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [migrate_output],
+      mint: migrate_mint,
+    },
+  )
+}
+
+test migrate_no_burn() fail {
+  // No old token burn in mint field — only new token minted
+  let mint_no_burn = from_asset(new_policy, migrate_token.assetName, 1)
+  mpfCage.mint(
+    0,
+    Migrating(migrate_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [migrate_output],
+      mint: mint_no_burn,
+    },
+  )
+}
+
+test migrate_to_wallet() fail {
+  let wallet_output =
+    Output {
+      ..migrate_output,
+      address: address.from_verification_key("someone"),
+    }
+  mpfCage.mint(
+    0,
+    Migrating(migrate_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [wallet_output],
+      mint: migrate_mint,
+    },
+  )
+}
+
+test migrate_wrong_old_policy() fail {
+  // Redeemer says oldPolicy is "old_policy_id" but burn is under "wrong_old"
+  let wrong_mint =
+    from_asset("wrong_old", migrate_token.assetName, -1)
+      |> assets.merge(from_asset(new_policy, migrate_token.assetName, 1))
+  mpfCage.mint(
+    0,
+    Migrating(migrate_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [migrate_output],
+      mint: wrong_mint,
+    },
+  )
+}
+
+// End succeeds when mint field has additional policy (simulates migration)
+test end_with_extra_mint_policy() {
+  let extra_mint =
+    from_asset("policy_id", testToken.assetName, -1)
+      |> assets.merge(from_asset("other_policy", "other_asset", 1))
+  mpfCage.spend(
+    0,
+    stateDatum,
+    End,
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [update],
+      mint: extra_mint,
     },
   )
 }

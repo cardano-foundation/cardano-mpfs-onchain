@@ -1,0 +1,16 @@
+{
+  "name": "mpf-cage-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --reporter=verbose"
+  },
+  "dependencies": {
+    "@lucid-evolution/lucid": "^0.4.34",
+    "@lucid-evolution/provider": "^0.1.44"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

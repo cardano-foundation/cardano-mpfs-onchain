@@ -59,6 +59,7 @@
 
 use aiken/crypto.{VerificationKeyHash}
 use aiken/merkle_patricia_forestry.{Proof}
+use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference}
 use lib.{TokenId}
 
@@ -81,10 +82,28 @@ pub type Mint {
   asset: OutputReference,
 }
 
+/// Parameters for migrating a caged token from an old validator to a new one.
+///
+/// During migration, the old token is burned (under `oldPolicy`) and a new
+/// token is minted (under the new policy) in the same transaction. The
+/// `tokenId` is preserved across migration (same asset name).
+///
+/// Uniqueness of the new token is guaranteed by the atomic burn of the old
+/// one -- no `OutputReference` consumption is needed.
+pub type Migration {
+  /// The policy ID of the old validator whose token is being burned.
+  oldPolicy: PolicyId,
+  /// The token identity (asset name) being migrated.
+  tokenId: TokenId,
+}
+
 /// Redeemer for the minting policy.
 ///
-/// The minting policy handles two cases:
+/// The minting policy handles three cases:
 /// - `Minting`: Full validation is applied (see `validateMint` in `cage.ak`).
+/// - `Migrating`: Mints a token with a carried-over (possibly non-empty) root,
+///   validated by `validateMigration` in `cage.ak`. Requires the old token to
+///   be burned atomically in the same transaction.
 /// - `Burning`: No additional validation beyond what the ledger enforces.
 ///   The ledger already ensures the minting policy script runs, so the fact
 ///   that we reach the `Burning` branch means the policy was invoked. The
@@ -96,13 +115,11 @@ pub type Mint {
 /// 1. You can only burn tokens you possess (they must be in a transaction input).
 /// 2. The `End` spending validator ensures the State UTxO owner signed the tx.
 /// 3. The `End` validator checks the mint field contains the token being burned.
-///
-/// ## Test Hints
-/// - Burning with the token in an input and owner signature -> should succeed
-/// - Verify that `Burning` alone does not bypass spending validator checks
 pub type MintRedeemer {
   /// Mint a new caged token with the given parameters
   Minting(Mint)
+  /// Migrate a caged token from an old validator to this one
+  Migrating(Migration)
   /// Burn an existing caged token (no additional validation)
   Burning
 }
@@ -186,8 +203,9 @@ pub type UpdateRedeemer {
 ///
 /// ## Root Hash
 /// The `root` field is a raw `ByteArray` (32 bytes for SHA2-256) representing
-/// the MPF root hash. It starts as `root(empty)` (the hash of an empty trie)
-/// when minted, and is updated each time `Modify` processes requests.
+/// the MPF root hash. It starts as `root(empty)` when freshly minted, or can
+/// be non-empty when migrated from an old validator. It is updated each time
+/// `Modify` processes requests.
 ///
 /// ## Owner Mutability
 /// Note that the `Modify` validator does NOT check that the owner field is

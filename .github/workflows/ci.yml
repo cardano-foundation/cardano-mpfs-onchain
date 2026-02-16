@@ -24,3 +24,34 @@ jobs:
 
       - name: Run aiken tests
         run: nix develop --command aiken check
+
+      - name: Upload plutus.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: plutus-json
+          path: result
+
+  e2e:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download plutus.json
+        uses: actions/download-artifact@v4
+        with:
+          name: plutus-json
+
+      - name: Prepare plutus.json
+        run: |
+          # The artifact is the blueprint file itself (named "result" from nix symlink)
+          # Rename to plutus.json for the docker-compose mount
+          if [ -f result ]; then mv result plutus.json; fi
+          ls -la plutus.json
+
+      - name: Run E2E tests
+        run: docker compose -f e2e/docker-compose.yml up --build --abort-on-container-exit test-runner
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f e2e/docker-compose.yml down -v
