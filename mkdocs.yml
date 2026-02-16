@@ -1,6 +1,6 @@
 site_name: Cardano MPFS Onchain
-site_url: https://paolino.github.io/cardano-mpfs-onchain/
-repo_url: https://github.com/paolino/cardano-mpfs-onchain
+site_url: https://cardano-foundation.github.io/cardano-mpfs-onchain/
+repo_url: https://github.com/cardano-foundation/cardano-mpfs-onchain
 
 theme:
   name: material
