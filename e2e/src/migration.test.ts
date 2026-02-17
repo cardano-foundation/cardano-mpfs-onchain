@@ -232,6 +232,7 @@ describe("MPF Cage Migration E2E", () => {
         { kind: "inline", value: modifiedDatum },
         { [v0Unit]: 1n, lovelace: 2_000_000n },
       )
+      .pay.ToAddress(walletAddress, { lovelace: 2_000_000n })
       .attach.SpendingValidator(v0.spendValidator)
       .addSignerKey(ownerKeyHash)
       .complete(COMPLETE_OPTS);
@@ -348,6 +349,7 @@ describe("MPF Cage Migration E2E", () => {
         { kind: "inline", value: deletedDatum },
         { [v1Unit]: 1n, lovelace: 2_000_000n },
       )
+      .pay.ToAddress(walletAddress, { lovelace: 2_000_000n })
       .attach.SpendingValidator(v1.spendValidator)
       .addSignerKey(ownerKeyHash)
       .complete(COMPLETE_OPTS);

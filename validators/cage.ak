@@ -97,7 +97,9 @@
 ///   still validates via End)
 /// - Using wrong redeemer for datum type (e.g., Modify on RequestDatum) -> fail
 
+use aiken/collection/list
 use aiken/collection/list.{find, foldl, has, head}
+use aiken/crypto.{VerificationKeyHash}
 use aiken/merkle_patricia_forestry.{MerklePatriciaForestry, Proof, empty, root}
 use aiken/merkle_patricia_forestry as mpf
 use aiken/option.{is_some}
@@ -500,30 +502,34 @@ fn uncons(list: List<a>, cont: fn(a, List<a>) -> b) -> b {
 /// - Request with Insert on existing key -> mpf.insert fails
 /// - Request with Delete on non-existent key -> mpf.delete fails
 /// - Request with Update with wrong old value -> mpf.update fails
-fn mkUpdate(tokenId) {
-  fn(input: Input, acc: (MerklePatriciaForestry, List<Proof>)) -> (
+fn mkUpdate(tokenId, max_fee) {
+  fn(
+    input: Input,
+    acc: (
+      MerklePatriciaForestry,
+      List<Proof>,
+      List<Pair<VerificationKeyHash, Int>>,
+    ),
+  ) -> (
     MerklePatriciaForestry,
     List<Proof>,
+    List<Pair<VerificationKeyHash, Int>>,
   ) {
     when input.output.datum is {
       InlineDatum(datum) ->
-        // Try to interpret the datum as a CageDatum with a RequestDatum variant.
-        // If the datum is not a CageDatum or is a StateDatum, the `if` fails
-        // and we skip this input (fall through to `else -> acc`).
         if datum is RequestDatum(request): CageDatum {
-          let Request { requestToken, requestKey, requestValue, .. } = request
-          // Only process requests that target THIS specific caged token.
-          // Requests for other tokens are silently skipped.
+          let Request {
+            requestToken,
+            requestKey,
+            requestValue,
+            requestOwner,
+            fee,
+          } = request
           if requestToken == tokenId {
-            let (root, proofs) = acc
-            // Consume the next proof from the list. If no proofs remain,
-            // this fails and the entire transaction is rejected. This
-            // enforces the invariant: one proof per matching request.
+            // Fee must match the state's max_fee
+            expect fee == max_fee
+            let (root, proofs, refunds) = acc
             let proof, proofsTail <- uncons(proofs)
-            // Apply the MPF operation using the consumed proof.
-            // Each mpf.* function verifies the proof against the current
-            // root and returns the new root. If the proof is invalid
-            // (doesn't match the current trie state), it fails.
             let newRoot =
               when requestValue is {
                 Insert(value) -> mpf.insert(root, requestKey, value, proof)
@@ -531,17 +537,44 @@ fn mkUpdate(tokenId) {
                 Update(oldValue, newValue) ->
                   mpf.update(root, requestKey, proof, oldValue, newValue)
               }
-            (newRoot, proofsTail)
+            // Compute refund: input lovelace minus fee
+            let inputLovelace = assets.lovelace_of(input.output.value)
+            let refundAmount = inputLovelace - fee
+            let newRefunds =
+              if refundAmount > 0 {
+                [Pair(requestOwner, refundAmount), ..refunds]
+              } else {
+                refunds
+              }
+            (newRoot, proofsTail, newRefunds)
           } else {
-            // Request targets a different token -- skip without consuming a proof
             acc
           }
         } else {
-          // Datum is not a RequestDatum (e.g., StateDatum or foreign datum) -- skip
           acc
         }
-      // Input has no inline datum (e.g., NoDatum or DatumHash) -- skip
       _ -> acc
+    }
+  }
+}
+
+/// Verify that refund outputs match the expected refunds.
+///
+/// Walks the output list in parallel with the refunds list.
+/// For each refund, checks that the output pays at least
+/// the refund amount to the correct owner address.
+fn verifyRefunds(
+  outputs: List<Output>,
+  refunds: List<Pair<VerificationKeyHash, Int>>,
+) -> Bool {
+  when refunds is {
+    [] -> True
+    [Pair(owner, amount), ..rest] -> {
+      expect [output, ..remaining] = outputs
+      expect address.VerificationKey(vkh) = output.address.payment_credential
+      expect vkh == owner
+      expect assets.lovelace_of(output.value) >= amount
+      verifyRefunds(remaining, rest)
     }
   }
 }
@@ -616,26 +649,22 @@ fn validRootUpdate(
   proofs: List<Proof>,
 ) {
   let Transaction { outputs, inputs, .. } = tx
-  let State { root, .. } = state
-  // Get the first output and extract the new state from its datum.
-  // The transaction builder must put the State UTxO as the first output.
+  let State { root, max_fee, .. } = state
   expect Some(output) = head(outputs)
   expect InlineDatum(state) = output.datum
   expect StateDatum(State { root: newRoot, .. }) = state
 
-  // Fold all transaction inputs, applying matching requests to the MPF.
-  // Starting state: current MPF root + all proofs.
-  // After fold: computed new root + remaining (unconsumed) proofs.
-  let (expectedNewRoot, _) =
-    inputs |> foldl((mpf.from_root(root), proofs), mkUpdate(tokenId))
-  // Verify the output's claimed root matches our computation.
-  // mpf.root() extracts the raw ByteArray hash from the MerklePatriciaForestry.
+  let (expectedNewRoot, _, refunds) =
+    inputs
+      |> foldl((mpf.from_root(root), proofs, []), mkUpdate(tokenId, max_fee))
   expect (mpf.root(expectedNewRoot) == newRoot)?
-  // Ensure the token stays at the same script address.
-  // Compares payment credentials (script hashes) between input and output.
-  // This prevents redirecting the State UTxO to a different address.
   expect
     output.address.payment_credential == input.output.address.payment_credential
+
+  // Verify refund outputs (starting after the State UTxO at index 0)
+  expect [_, ..refundOutputs] = outputs
+  let orderedRefunds = list.reverse(refunds)
+  expect verifyRefunds(refundOutputs, orderedRefunds)
   True
 }
 
@@ -727,7 +756,7 @@ pub fn validateMint(minting: Mint, policyId: PolicyId, tx: Transaction) {
   expect InlineDatum(tokenState) = output.datum
   // Verify the datum is a StateDatum with an empty MPF root.
   // The owner field is unconstrained (any VerificationKeyHash is fine).
-  expect StateDatum(State { root: tokenRoot, owner: _ }) = tokenState
+  expect StateDatum(State { root: tokenRoot, owner: _, max_fee: _ }) = tokenState
   // The initial MPF root must be the hash of an empty trie.
   // `root(empty)` computes this known constant value.
   expect tokenRoot == root(empty)
@@ -766,7 +795,7 @@ pub fn validateMigration(
   expect address.Script(targetScriptHash) = output.address.payment_credential
   expect targetScriptHash == policyId
   expect InlineDatum(tokenState) = output.datum
-  expect StateDatum(State { root: _, owner: _ }) = tokenState
+  expect StateDatum(State { root: _, owner: _, max_fee: _ }) = tokenState
   True
 }
 
@@ -790,7 +819,7 @@ const testToken = TokenId { assetName: "asset_name" }
 const testValue = valueFromToken("policy_id", testToken)
 
 // Test constants: a State with the owner "owner" and an empty MPF root
-const state = State { owner: "owner", root: root(mpf.empty) }
+const state = State { owner: "owner", root: root(mpf.empty), max_fee: 0 }
 
 const stateDatum = Some(StateDatum(state))
 
@@ -802,6 +831,7 @@ const aRequest =
       requestKey: "42",
       requestValue: Insert("42"),
       requestOwner: "owner",
+      fee: 0,
     },
   )
 
@@ -842,6 +872,7 @@ const output =
         State {
           owner: "new-owner",
           root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
+          max_fee: 0,
         },
       ),
     ),
@@ -900,7 +931,7 @@ const minted =
     address: output_address,
     value: minted_value,
     datum: InlineDatum(
-      StateDatum(State { owner: "owner", root: root(empty) }),
+      StateDatum(State { owner: "owner", root: root(empty), max_fee: 0 }),
     ),
     reference_script: None,
   }
@@ -1002,7 +1033,7 @@ test mint_nonempty_root() fail {
     Output {
       ..minted,
       datum: InlineDatum(
-        StateDatum(State { owner: "owner", root: "nonempty_root" }),
+        StateDatum(State { owner: "owner", root: "nonempty_root", max_fee: 0 }),
       ),
     }
   mpfCage.mint(
@@ -1024,6 +1055,7 @@ test mint_request_datum() fail {
             requestKey: "k",
             requestValue: Insert("v"),
             requestOwner: "owner",
+            fee: 0,
           },
         ),
       ),
@@ -1088,6 +1120,7 @@ test contribute_wrong_token() fail {
         requestKey: "42",
         requestValue: Insert("42"),
         requestOwner: "owner",
+        fee: 0,
       },
     )
   mpfCage.spend(
@@ -1173,7 +1206,7 @@ test modify_no_requests() {
       address: testScriptAddress,
       value: testValue,
       datum: InlineDatum(
-        StateDatum(State { owner: "owner", root: root(empty) }),
+        StateDatum(State { owner: "owner", root: root(empty), max_fee: 0 }),
       ),
       reference_script: None,
     }
@@ -1200,6 +1233,7 @@ test modify_skip_other_token() {
         requestKey: "42",
         requestValue: Insert("42"),
         requestOwner: "someone",
+        fee: 0,
       },
     )
   let other_request =
@@ -1220,7 +1254,7 @@ test modify_skip_other_token() {
       address: testScriptAddress,
       value: testValue,
       datum: InlineDatum(
-        StateDatum(State { owner: "owner", root: root(empty) }),
+        StateDatum(State { owner: "owner", root: root(empty), max_fee: 0 }),
       ),
       reference_script: None,
     }
@@ -1276,7 +1310,9 @@ test modify_wrong_root() fail {
       address: testScriptAddress,
       value: testValue,
       datum: InlineDatum(
-        StateDatum(State { owner: "new-owner", root: "wrong_root_hash" }),
+        StateDatum(
+          State { owner: "new-owner", root: "wrong_root_hash", max_fee: 0 },
+        ),
       ),
       reference_script: None,
     }
@@ -1438,6 +1474,7 @@ test prop_retract_requires_owner(
         requestKey: "k",
         requestValue: Insert("v"),
         requestOwner: "the_real_owner_key_aaaaaaaaaa",
+        fee: 0,
       },
     )
   mpfCage.spend(
@@ -1455,13 +1492,24 @@ test prop_retract_requires_owner(
 test prop_modify_requires_owner(
   signer via owner_fuzzer(),
 ) fail once {
-  let s = State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty) }
+  let s =
+    State {
+      owner: "the_real_owner_key_aaaaaaaaaa",
+      root: root(empty),
+      max_fee: 0,
+    }
   let unchanged_output =
     Output {
       address: testScriptAddress,
       value: testValue,
       datum: InlineDatum(
-        StateDatum(State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty) }),
+        StateDatum(
+          State {
+            owner: "the_real_owner_key_aaaaaaaaaa",
+            root: root(empty),
+            max_fee: 0,
+          },
+        ),
       ),
       reference_script: None,
     }
@@ -1506,7 +1554,7 @@ test prop_mint_roundtrip(
       address: addr,
       value: val,
       datum: InlineDatum(
-        StateDatum(State { owner: "owner", root: root(empty) }),
+        StateDatum(State { owner: "owner", root: root(empty), max_fee: 0 }),
       ),
       reference_script: None,
     }
@@ -1553,7 +1601,13 @@ const migrate_output =
     address: address.from_script(new_policy),
     value: from_asset(new_policy, migrate_token.assetName, 1),
     datum: InlineDatum(
-      StateDatum(State { owner: "owner", root: "nonempty_root_hash_aaaaaaaaa" }),
+      StateDatum(
+        State {
+          owner: "owner",
+          root: "nonempty_root_hash_aaaaaaaaa",
+          max_fee: 0,
+        },
+      ),
     ),
     reference_script: None,
   }
@@ -1617,6 +1671,255 @@ test migrate_wrong_old_policy() fail {
       ..transaction.placeholder,
       outputs: [migrate_output],
       mint: wrong_mint,
+    },
+  )
+}
+
+// ============================================================================
+// Refund enforcement tests
+// ============================================================================
+
+// Test fee: 500_000 lovelace. Request input has 2_000_000 lovelace.
+// Refund expected: 2_000_000 - 500_000 = 1_500_000 lovelace to request owner.
+const testFee = 500_000
+
+const feeState =
+  State { owner: "owner", root: root(mpf.empty), max_fee: testFee }
+
+const feeStateDatum = Some(StateDatum(feeState))
+
+const feeRequest =
+  RequestDatum(
+    Request {
+      requestToken: testToken,
+      requestKey: "42",
+      requestValue: Insert("42"),
+      requestOwner: "requester_key_aaaaaaaaaaaaaaa",
+      fee: testFee,
+    },
+  )
+
+const feeRequestInput =
+  Input {
+    output_reference: testRequestRef,
+    output: Output {
+      address: testScriptAddress,
+      value: from_lovelace(2_000_000),
+      datum: InlineDatum(feeRequest),
+      reference_script: None,
+    },
+  }
+
+const feeStateInput =
+  Input {
+    output_reference: testStateRef,
+    output: Output {
+      address: testScriptAddress,
+      value: testValue,
+      datum: InlineDatum(feeStateDatum),
+      reference_script: None,
+    },
+  }
+
+const feeStateOutput =
+  Output {
+    address: testScriptAddress,
+    value: testValue,
+    datum: InlineDatum(
+      StateDatum(
+        State {
+          owner: "new-owner",
+          root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
+          max_fee: testFee,
+        },
+      ),
+    ),
+    reference_script: None,
+  }
+
+const refundOutput =
+  Output {
+    address: address.from_verification_key("requester_key_aaaaaaaaaaaaaaa"),
+    value: from_lovelace(1_500_000),
+    datum: NoDatum,
+    reference_script: None,
+  }
+
+test modify_with_refund() {
+  mpfCage.spend(
+    0,
+    feeStateDatum,
+    Modify([[]]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [feeStateOutput, refundOutput],
+      extra_signatories: ["owner"],
+      inputs: [feeStateInput, feeRequestInput],
+    },
+  )
+}
+
+test modify_missing_refund() fail {
+  // Fee > 0 but no refund output after state output
+  mpfCage.spend(
+    0,
+    feeStateDatum,
+    Modify([[]]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [feeStateOutput],
+      extra_signatories: ["owner"],
+      inputs: [feeStateInput, feeRequestInput],
+    },
+  )
+}
+
+test modify_insufficient_refund() fail {
+  // Refund output has less than required lovelace
+  let bad_refund =
+    Output {
+      ..refundOutput,
+      value: from_lovelace(1_000_000),
+    }
+  mpfCage.spend(
+    0,
+    feeStateDatum,
+    Modify([[]]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [feeStateOutput, bad_refund],
+      extra_signatories: ["owner"],
+      inputs: [feeStateInput, feeRequestInput],
+    },
+  )
+}
+
+test modify_wrong_refund_address() fail {
+  // Refund to wrong address
+  let wrong_addr_refund =
+    Output {
+      ..refundOutput,
+      address: address.from_verification_key("wrong_key_aaaaaaaaaaaaaaaa"),
+    }
+  mpfCage.spend(
+    0,
+    feeStateDatum,
+    Modify([[]]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [feeStateOutput, wrong_addr_refund],
+      extra_signatories: ["owner"],
+      inputs: [feeStateInput, feeRequestInput],
+    },
+  )
+}
+
+test modify_zero_fee() {
+  // fee = 0, request has 2_000_000 lovelace -> full refund required
+  let zf_state =
+    State { owner: "owner", root: root(mpf.empty), max_fee: 0 }
+  let zf_request =
+    RequestDatum(
+      Request {
+        requestToken: testToken,
+        requestKey: "42",
+        requestValue: Insert("42"),
+        requestOwner: "requester_key_aaaaaaaaaaaaaaa",
+        fee: 0,
+      },
+    )
+  let zf_request_input =
+    Input {
+      output_reference: testRequestRef,
+      output: Output {
+        address: testScriptAddress,
+        value: from_lovelace(2_000_000),
+        datum: InlineDatum(zf_request),
+        reference_script: None,
+      },
+    }
+  let zf_state_input =
+    Input {
+      output_reference: testStateRef,
+      output: Output {
+        address: testScriptAddress,
+        value: testValue,
+        datum: InlineDatum(Some(StateDatum(zf_state))),
+        reference_script: None,
+      },
+    }
+  let zf_state_output =
+    Output {
+      address: testScriptAddress,
+      value: testValue,
+      datum: InlineDatum(
+        StateDatum(
+          State {
+            owner: "new-owner",
+            root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
+            max_fee: 0,
+          },
+        ),
+      ),
+      reference_script: None,
+    }
+  let zf_refund =
+    Output {
+      address: address.from_verification_key("requester_key_aaaaaaaaaaaaaaa"),
+      value: from_lovelace(2_000_000),
+      datum: NoDatum,
+      reference_script: None,
+    }
+  mpfCage.spend(
+    0,
+    Some(StateDatum(zf_state)),
+    Modify([[]]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [zf_state_output, zf_refund],
+      extra_signatories: ["owner"],
+      inputs: [zf_state_input, zf_request_input],
+    },
+  )
+}
+
+test modify_fee_mismatch() fail {
+  // request.fee != state.max_fee
+  let mismatch_request =
+    RequestDatum(
+      Request {
+        requestToken: testToken,
+        requestKey: "42",
+        requestValue: Insert("42"),
+        requestOwner: "requester_key_aaaaaaaaaaaaaaa",
+        fee: 100_000,
+      },
+    )
+  let mismatch_input =
+    Input {
+      output_reference: testRequestRef,
+      output: Output {
+        address: testScriptAddress,
+        value: from_lovelace(2_000_000),
+        datum: InlineDatum(mismatch_request),
+        reference_script: None,
+      },
+    }
+  mpfCage.spend(
+    0,
+    feeStateDatum,
+    Modify([[]]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [feeStateOutput, refundOutput],
+      extra_signatories: ["owner"],
+      inputs: [feeStateInput, mismatch_input],
     },
   )
 }

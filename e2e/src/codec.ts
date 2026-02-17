@@ -5,9 +5,10 @@ import { Constr, Data, type UTxO } from "@lucid-evolution/lucid";
 export function encodeStateDatum(
   owner: string,
   root: string,
+  maxFee: bigint = 0n,
 ): string {
   return Data.to(
-    new Constr(1, [new Constr(0, [owner, root])]),
+    new Constr(1, [new Constr(0, [owner, root, maxFee])]),
   );
 }
 
@@ -69,10 +70,11 @@ export function encodeRequestDatum(
   ownerHash: string,
   key: string,
   value: string,
+  fee: bigint = 0n,
 ): string {
   const tokenId = new Constr(0, [assetName]);
   const operation = new Constr(0, [value]); // Insert
-  const request = new Constr(0, [tokenId, ownerHash, key, operation]);
+  const request = new Constr(0, [tokenId, ownerHash, key, operation, fee]);
   return Data.to(new Constr(0, [request]));
 }
 
@@ -82,9 +84,10 @@ export function encodeDeleteRequestDatum(
   ownerHash: string,
   key: string,
   value: string,
+  fee: bigint = 0n,
 ): string {
   const tokenId = new Constr(0, [assetName]);
   const operation = new Constr(1, [value]); // Delete
-  const request = new Constr(0, [tokenId, ownerHash, key, operation]);
+  const request = new Constr(0, [tokenId, ownerHash, key, operation, fee]);
   return Data.to(new Constr(0, [request]));
 }
