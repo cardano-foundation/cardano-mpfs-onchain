@@ -182,13 +182,14 @@ pub type UpdateRedeemer {
   Modify(List<Proof>)
   /// Allow the request owner to reclaim their Request UTxO. Requires Request datum.
   /// Only the `requestOwner` (from the Request datum) can sign this transaction.
-  /// This lets contributors withdraw unprocessed requests and recover their ADA.
+  /// The `OutputReference` points to the State UTxO (included as a reference input)
+  /// so the validator can read `process_time` and `retract_time` from its datum.
   ///
   /// ## Test Hints
   /// - Retract signed by requestOwner -> should succeed
   /// - Retract signed by someone else -> should fail
   /// - Retract on an already-processed request -> impossible (UTxO already consumed)
-  Retract
+  Retract(OutputReference)
   /// Discard requests that are past their retract window (Phase 3) or have
   /// a dishonest (future) `submitted_at` timestamp. Requires State datum.
   /// The oracle keeps the fee and refunds the remaining lovelace.
@@ -233,6 +234,12 @@ pub type State {
   /// The maximum fee (in lovelace) the oracle charges per request.
   /// Requesters must agree to this fee by recording it in their Request datum.
   max_fee: Int,
+  /// Duration (in milliseconds) of Phase 1 — the oracle processing window.
+  /// Set at mint time; enforced immutable across Modify/Reject operations.
+  process_time: Int,
+  /// Duration (in milliseconds) of Phase 2 — the requester retract window.
+  /// Set at mint time; enforced immutable across Modify/Reject operations.
+  retract_time: Int,
 }
 
 /// Operations that can be performed on the MPF.

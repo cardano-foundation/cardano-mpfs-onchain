@@ -130,7 +130,7 @@ use types.{
 /// spending validator (`spend`) runs because the UTxO is at this script's
 /// address. The `else(_)` handler rejects any other purpose (e.g.,
 /// withdrawal, certify).
-validator mpfCage(_version: Int, process_time: Int, retract_time: Int) {
+validator mpfCage(_version: Int) {
   /// Minting policy: validates creation and destruction of caged tokens.
   ///
   /// - `Minting`: Creates a new caged token with an empty MPF root.
@@ -211,13 +211,30 @@ validator mpfCage(_version: Int, process_time: Int, retract_time: Int) {
     expect Some(datum) = maybeDatum
     // Dispatch based on redeemer type
     when redeemer is {
-      Retract -> {
+      Retract(stateRef) -> {
         // --- RETRACT PATH ---
         // Only valid for Request UTxOs during Phase 2 (retract window).
+        // The State UTxO must be included as a reference input so we can
+        // read the time params (process_time, retract_time) from its datum.
         expect RequestDatum(request) = datum
-        let Request { requestOwner, submitted_at, .. } = request
-        let Transaction { extra_signatories, validity_range, .. } = tx
+        let Request { requestOwner, requestToken, submitted_at, .. } = request
+        let Transaction {
+          extra_signatories,
+          validity_range,
+          reference_inputs,
+          ..
+        } = tx
         expect has(extra_signatories, requestOwner)
+        // Find State UTxO in reference inputs and read time params
+        expect Some(stateInput) =
+          find(
+            reference_inputs,
+            fn(input) { input.output_reference == stateRef },
+          )
+        expect Some(tokenId) = tokenFromValue(stateInput.output.value)
+        expect requestToken == tokenId
+        let State { process_time, retract_time, .. } =
+          readState(stateInput)
         // Phase 2: retract window is open
         expect
           in_phase2(validity_range, submitted_at, process_time, retract_time)
@@ -226,8 +243,9 @@ validator mpfCage(_version: Int, process_time: Int, retract_time: Int) {
       Contribute(tokenRef) -> {
         // --- CONTRIBUTE PATH ---
         // Valid for Request UTxOs in Phase 1 or when rejectable.
+        // Time params are read from the State UTxO's datum.
         expect RequestDatum(request) = datum
-        validRequest(request, tokenRef, tx, process_time, retract_time)
+        validRequest(request, tokenRef, tx)
       }
       _ -> {
         // --- MODIFY / END PATH ---
@@ -246,23 +264,8 @@ validator mpfCage(_version: Int, process_time: Int, retract_time: Int) {
         let (input, tokenId) = extractToken(self, tx)
         when redeemer is {
           Modify(proofs) ->
-            validRootUpdate(
-              state,
-              input,
-              tokenId,
-              tx,
-              proofs,
-              process_time,
-            )
-          Reject ->
-            validReject(
-              state,
-              input,
-              tokenId,
-              tx,
-              process_time,
-              retract_time,
-            )
+            validRootUpdate(state, input, tokenId, tx, proofs)
+          Reject -> validReject(state, input, tokenId, tx)
           End -> {
             expect address.Script(policyId) =
               input.output.address.payment_credential
@@ -368,6 +371,20 @@ fn validateOwnership(state: State, tx: Transaction) {
   True
 }
 
+/// Read the State from a transaction input's inline datum.
+/// Fails if the datum is not an InlineDatum containing a StateDatum.
+fn readState(input: Input) -> State {
+  when input.output.datum is {
+    InlineDatum(datum) ->
+      if datum is StateDatum(state): CageDatum {
+        state
+      } else {
+        fail
+      }
+    _ -> fail
+  }
+}
+
 /// Validate that a request matches the token being updated.
 ///
 /// Ensures the request's target token matches the token at the given
@@ -401,12 +418,12 @@ fn validRequest(
   request: Request,
   tokenRef: OutputReference,
   tx: Transaction,
-  process_time: Int,
-  retract_time: Int,
 ) {
   let Request { requestToken, submitted_at, .. } = request
-  let (_input, tokenId) = extractToken(tokenRef, tx)
+  let (input, tokenId) = extractToken(tokenRef, tx)
   expect requestToken == tokenId
+  // Read time params from the State UTxO's datum
+  let State { process_time, retract_time, .. } = readState(input)
   let Transaction { validity_range, .. } = tx
   // Phase 1 or rejectable (NOT Phase 2 — requester-exclusive)
   expect
@@ -707,13 +724,23 @@ fn validRootUpdate(
   tokenId: TokenId,
   tx: Transaction,
   proofs: List<Proof>,
-  process_time: Int,
 ) {
   let Transaction { outputs, inputs, validity_range, .. } = tx
-  let State { root, max_fee, .. } = state
+  let State { root, max_fee, process_time, retract_time, .. } = state
   expect Some(output) = head(outputs)
-  expect InlineDatum(state) = output.datum
-  expect StateDatum(State { root: newRoot, .. }) = state
+  expect InlineDatum(outState) = output.datum
+  expect
+    StateDatum(
+      State {
+        root: newRoot,
+        process_time: outProcessTime,
+        retract_time: outRetractTime,
+        ..
+      },
+    ) = outState
+  // Enforce time params immutability
+  expect process_time == outProcessTime
+  expect retract_time == outRetractTime
 
   let (expectedNewRoot, _, refunds) =
     inputs
@@ -786,16 +813,25 @@ fn validReject(
   input: Input,
   tokenId: TokenId,
   tx: Transaction,
-  process_time: Int,
-  retract_time: Int,
 ) {
   let Transaction { outputs, inputs, validity_range, .. } = tx
-  let State { root, max_fee, .. } = state
+  let State { root, max_fee, process_time, retract_time, .. } = state
 
   expect Some(output) = head(outputs)
   expect InlineDatum(outState) = output.datum
-  expect StateDatum(State { root: newRoot, .. }) = outState
+  expect
+    StateDatum(
+      State {
+        root: newRoot,
+        process_time: outProcessTime,
+        retract_time: outRetractTime,
+        ..
+      },
+    ) = outState
   expect newRoot == root
+  // Enforce time params immutability
+  expect process_time == outProcessTime
+  expect retract_time == outRetractTime
 
   expect
     output.address.payment_credential == input.output.address.payment_credential
@@ -907,7 +943,7 @@ pub fn validateMint(minting: Mint, policyId: PolicyId, tx: Transaction) {
   expect InlineDatum(tokenState) = output.datum
   // Verify the datum is a StateDatum with an empty MPF root.
   // The owner field is unconstrained (any VerificationKeyHash is fine).
-  expect StateDatum(State { root: tokenRoot, owner: _, max_fee: _ }) = tokenState
+  expect StateDatum(State { root: tokenRoot, .. }) = tokenState
   // The initial MPF root must be the hash of an empty trie.
   // `root(empty)` computes this known constant value.
   expect tokenRoot == root(empty)
@@ -946,7 +982,7 @@ pub fn validateMigration(
   expect address.Script(targetScriptHash) = output.address.payment_credential
   expect targetScriptHash == policyId
   expect InlineDatum(tokenState) = output.datum
-  expect StateDatum(State { root: _, owner: _, max_fee: _ }) = tokenState
+  expect StateDatum(State { .. }) = tokenState
   True
 }
 

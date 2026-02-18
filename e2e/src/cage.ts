@@ -17,6 +17,7 @@ import {
   encodeEndRedeemer,
   encodeModifyRedeemer,
   encodeContributeRedeemer,
+  encodeRetractRedeemer,
   encodeRejectRedeemer,
 } from "./codec.js";
 import { onChainTimeOffset } from "./setup.js";
@@ -69,6 +70,8 @@ class Cage implements PromiseLike<void> {
   private stateUtxo: UTxO | undefined;
   private root = EMPTY_ROOT;
   private maxFee = 0n;
+  private processTime: bigint;
+  private retractTime: bigint;
   private pendingRequests: PendingRequest[] = [];
 
   private chain: Promise<void>;
@@ -78,11 +81,15 @@ class Cage implements PromiseLike<void> {
     validator: Validator,
     ownerKeyHash: string,
     walletAddress: string,
+    processTime: bigint = 60_000n,
+    retractTime: bigint = 60_000n,
   ) {
     this.lucid = lucid;
     this.validator = validator;
     this.ownerKeyHash = ownerKeyHash;
     this.walletAddress = walletAddress;
+    this.processTime = processTime;
+    this.retractTime = retractTime;
     this.chain = Promise.resolve();
   }
 
@@ -141,9 +148,7 @@ class Cage implements PromiseLike<void> {
 
   waitForPhase3(): this {
     this.chain = this.chain.then(async () => {
-      const processTime = Number(this.validator.processTime);
-      const retractTime = Number(this.validator.retractTime);
-      const waitMs = processTime + retractTime + 1_000;
+      const waitMs = Number(this.processTime) + Number(this.retractTime) + 1_000;
       await new Promise((r) => setTimeout(r, waitMs));
     });
     return this;
@@ -174,6 +179,8 @@ class Cage implements PromiseLike<void> {
       this.ownerKeyHash,
       EMPTY_ROOT,
       this.maxFee,
+      this.processTime,
+      this.retractTime,
     );
     const redeemer = encodeMintRedeemer(seedUtxo);
 
@@ -255,6 +262,8 @@ class Cage implements PromiseLike<void> {
       this.ownerKeyHash,
       newRoot,
       this.maxFee,
+      this.processTime,
+      this.retractTime,
     );
 
     const now = BigInt(Date.now());
@@ -309,6 +318,8 @@ class Cage implements PromiseLike<void> {
       this.ownerKeyHash,
       this.root,
       this.maxFee,
+      this.processTime,
+      this.retractTime,
     );
 
     const tx = await this.lucid
@@ -348,6 +359,8 @@ class Cage implements PromiseLike<void> {
       this.ownerKeyHash,
       this.root,
       this.maxFee,
+      this.processTime,
+      this.retractTime,
     );
 
     const now = BigInt(Date.now());
@@ -459,6 +472,8 @@ export function cage(
   validator: Validator,
   ownerKeyHash: string,
   walletAddress: string,
+  processTime: bigint = 60_000n,
+  retractTime: bigint = 60_000n,
 ): Cage {
-  return new Cage(lucid, validator, ownerKeyHash, walletAddress);
+  return new Cage(lucid, validator, ownerKeyHash, walletAddress, processTime, retractTime);
 }
