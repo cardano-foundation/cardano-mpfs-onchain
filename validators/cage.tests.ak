@@ -75,9 +75,20 @@ const testToken = TokenId { assetName: "asset_name" }
 const testValue = valueFromToken("policy_id", testToken)
 
 // Test constants: a State with the owner "owner" and an empty MPF root
-const state = State { owner: "owner", root: root(mpf.empty), max_fee: 0 }
+const state =
+  State {
+    owner: "owner",
+    root: root(mpf.empty),
+    max_fee: 0,
+    process_time: testProcessTime,
+    retract_time: testRetractTime,
+  }
 
-const stateDatum = Some(StateDatum(state))
+// Raw datum for input/output UTxOs (no Option wrapper)
+const rawStateDatum = StateDatum(state)
+
+// Option-wrapped datum for the validator's maybeDatum parameter
+const stateDatum = Some(rawStateDatum)
 
 // Test constants: a Request that inserts key "42" with value "42"
 const aRequest =
@@ -99,7 +110,7 @@ const update =
     output: Output {
       address: testScriptAddress,
       value: testValue,
-      datum: InlineDatum(stateDatum),
+      datum: InlineDatum(rawStateDatum),
       reference_script: None,
     },
   }
@@ -127,6 +138,8 @@ const output =
           owner: "new-owner",
           root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
           max_fee: 0,
+          process_time: testProcessTime,
+          retract_time: testRetractTime,
         },
       ),
     ),
@@ -143,8 +156,6 @@ const output =
 test canCage() {
   cage.mpfCage.spend(
     0,
-    testProcessTime,
-    testRetractTime,
     stateDatum,
     Modify([[]]),
     testStateRef,
@@ -157,8 +168,6 @@ test canCage() {
     },
   ) && cage.mpfCage.spend(
     0,
-    testProcessTime,
-    testRetractTime,
     Some(aRequest),
     Contribute(testStateRef),
     testRequestRef,
@@ -190,7 +199,15 @@ const minted =
     address: output_address,
     value: minted_value,
     datum: InlineDatum(
-      StateDatum(State { owner: "owner", root: root(empty), max_fee: 0 }),
+      StateDatum(
+        State {
+          owner: "owner",
+          root: root(empty),
+          max_fee: 0,
+          process_time: testProcessTime,
+          retract_time: testRetractTime,
+        },
+      ),
     ),
     reference_script: None,
   }
@@ -213,8 +230,6 @@ const consumed_utxo =
 test canMint() {
   cage.mpfCage.mint(
     0,
-    testProcessTime,
-    testRetractTime,
     Minting(minting),
     "policy_id",
     Transaction {
@@ -243,7 +258,7 @@ fn mint_tx() -> Transaction {
 /// Without this check, anyone could mint arbitrary asset names.
 test mint_missing_input() fail {
   cage.mpfCage.mint(
-    0, testProcessTime, testRetractTime,
+    0,
     Minting(minting), "policy_id",
     Transaction { ..mint_tx(), inputs: [] },
   )
@@ -252,7 +267,7 @@ test mint_missing_input() fail {
 /// Exactly 1 token must be minted. Minting 2 would break the NFT invariant.
 test mint_quantity_two() fail {
   cage.mpfCage.mint(
-    0, testProcessTime, testRetractTime,
+    0,
     Minting(minting), "policy_id",
     Transaction { ..mint_tx(), mint: from_asset("policy_id", assetName(reference), 2) },
   )
@@ -263,7 +278,7 @@ test mint_quantity_two() fail {
 test mint_to_wallet() fail {
   let wallet_output = Output { ..minted, address: address.from_verification_key("someone") }
   cage.mpfCage.mint(
-    0, testProcessTime, testRetractTime,
+    0,
     Minting(minting), "policy_id",
     Transaction { ..mint_tx(), outputs: [wallet_output] },
   )
@@ -274,7 +289,7 @@ test mint_to_wallet() fail {
 test mint_to_wrong_script() fail {
   let wrong_output = Output { ..minted, address: address.from_script("other_script") }
   cage.mpfCage.mint(
-    0, testProcessTime, testRetractTime,
+    0,
     Minting(minting), "policy_id",
     Transaction { ..mint_tx(), outputs: [wrong_output] },
   )
@@ -284,9 +299,9 @@ test mint_to_wrong_script() fail {
 /// A non-empty root would mean data exists without ever being inserted.
 test mint_nonempty_root() fail {
   let bad_output =
-    Output { ..minted, datum: InlineDatum(StateDatum(State { owner: "owner", root: "nonempty_root", max_fee: 0 })) }
+    Output { ..minted, datum: InlineDatum(StateDatum(State { owner: "owner", root: "nonempty_root", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })) }
   cage.mpfCage.mint(
-    0, testProcessTime, testRetractTime,
+    0,
     Minting(minting), "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
   )
@@ -304,7 +319,7 @@ test mint_request_datum() fail {
       })),
     }
   cage.mpfCage.mint(
-    0, testProcessTime, testRetractTime,
+    0,
     Minting(minting), "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
   )
@@ -315,7 +330,7 @@ test mint_request_datum() fail {
 test mint_no_datum() fail {
   let bad_output = Output { ..minted, datum: NoDatum }
   cage.mpfCage.mint(
-    0, testProcessTime, testRetractTime,
+    0,
     Minting(minting), "policy_id",
     Transaction { ..mint_tx(), outputs: [bad_output] },
   )
@@ -327,30 +342,32 @@ test mint_no_datum() fail {
 
 /// Happy path: the request owner retracts their own request during Phase 2.
 /// Phase 2 is the exclusive retract window where only the requester can act.
+/// The State UTxO is included as a reference input so the validator can read
+/// the time params from its datum.
 test retract_happy() {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), Retract, testRequestRef,
-    Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: ["owner"] })
+  cage.mpfCage.spend(0, Some(aRequest), Retract(testStateRef), testRequestRef,
+    Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: ["owner"], reference_inputs: [update] })
 }
 
 /// Only the request owner can retract. A different signer must be rejected
 /// to prevent theft of the request's locked ADA.
 test retract_wrong_signer() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), Retract, testRequestRef,
-    Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: ["someone_else"] })
+  cage.mpfCage.spend(0, Some(aRequest), Retract(testStateRef), testRequestRef,
+    Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: ["someone_else"], reference_inputs: [update] })
 }
 
 /// Retract is forbidden in Phase 1 (the oracle processing window).
 /// The oracle needs time to process the request undisturbed.
 test retract_in_phase1() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), Retract, testRequestRef,
-    Transaction { ..transaction.placeholder, validity_range: phase1Range, extra_signatories: ["owner"] })
+  cage.mpfCage.spend(0, Some(aRequest), Retract(testStateRef), testRequestRef,
+    Transaction { ..transaction.placeholder, validity_range: phase1Range, extra_signatories: ["owner"], reference_inputs: [update] })
 }
 
 /// Retract is forbidden in Phase 3 (after the retract window expires).
 /// Once Phase 3 begins, the request becomes rejectable by the cage owner instead.
 test retract_in_phase3() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), Retract, testRequestRef,
-    Transaction { ..transaction.placeholder, validity_range: phase3Range, extra_signatories: ["owner"] })
+  cage.mpfCage.spend(0, Some(aRequest), Retract(testStateRef), testRequestRef,
+    Transaction { ..transaction.placeholder, validity_range: phase3Range, extra_signatories: ["owner"], reference_inputs: [update] })
 }
 
 // ============================================================================
@@ -364,7 +381,7 @@ test contribute_wrong_token() fail {
     requestToken: TokenId { assetName: "different_asset" },
     requestKey: "42", requestValue: Insert("42"), requestOwner: "owner", fee: 0, submitted_at: 0,
   })
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(wrong_request), Contribute(testStateRef), testRequestRef,
+  cage.mpfCage.spend(0, Some(wrong_request), Contribute(testStateRef), testRequestRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, inputs: [update, request] })
 }
 
@@ -372,21 +389,21 @@ test contribute_wrong_token() fail {
 /// Without this, the request-token binding can't be verified.
 test contribute_missing_ref() fail {
   let missing_ref = OutputReference { transaction_id: "nonexistent", output_index: 0 }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), Contribute(missing_ref), testRequestRef,
+  cage.mpfCage.spend(0, Some(aRequest), Contribute(missing_ref), testRequestRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, inputs: [update, request] })
 }
 
 /// Contribute is forbidden in Phase 2 (the retract window).
 /// During Phase 2, only the requester can act on their request (via Retract).
 test contribute_in_phase2() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), Contribute(testStateRef), testRequestRef,
+  cage.mpfCage.spend(0, Some(aRequest), Contribute(testStateRef), testRequestRef,
     Transaction { ..transaction.placeholder, validity_range: phase2Range, inputs: [update, request] })
 }
 
 /// Contribute IS allowed in Phase 3 (rejectable window).
 /// This lets the oracle process late requests alongside a Reject operation.
 test contribute_in_phase3() {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), Contribute(testStateRef), testRequestRef,
+  cage.mpfCage.spend(0, Some(aRequest), Contribute(testStateRef), testRequestRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, inputs: [update, request] })
 }
 
@@ -397,7 +414,7 @@ test contribute_in_phase3() {
 /// Only the cage owner can Modify. Without the owner's signature, anyone
 /// could update the MPF root with arbitrary data.
 test modify_missing_signature() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [output], extra_signatories: [], inputs: [update, request] })
 }
 
@@ -406,7 +423,7 @@ test modify_missing_signature() fail {
 /// the output to a different script they control.
 test modify_wrong_address() fail {
   let bad_output = Output { ..output, address: address.from_script("different_script") }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [bad_output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
@@ -414,7 +431,7 @@ test modify_wrong_address() fail {
 /// a different owner than the input. This is intentional: it allows the
 /// current owner to hand off the cage to someone else.
 test modify_owner_transfer() {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
@@ -423,10 +440,10 @@ test modify_owner_transfer() {
 test modify_no_requests() {
   let unchanged_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0 })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [unchanged_output], extra_signatories: ["owner"], inputs: [update] })
 }
 
@@ -444,24 +461,24 @@ test modify_skip_other_token() {
   }
   let unchanged_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0 })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [unchanged_output], extra_signatories: ["owner"], inputs: [update, other_request] })
 }
 
 /// Each matching request must have a corresponding proof. Providing zero
 /// proofs for one request triggers `uncons` on an empty list, which fails.
 test modify_too_few_proofs() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
 /// Extra proofs beyond what's needed are silently ignored. The fold consumes
 /// one proof per matching request; leftover proofs are discarded.
 test modify_extra_proofs() {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([[], []]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([[], []]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
@@ -470,17 +487,17 @@ test modify_extra_proofs() {
 test modify_wrong_root() fail {
   let bad_root_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "new-owner", root: "wrong_root_hash", max_fee: 0 })),
+    datum: InlineDatum(StateDatum(State { owner: "new-owner", root: "wrong_root_hash", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [bad_root_output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
 /// Modify is forbidden in Phase 2 (the retract window). The oracle can only
 /// process requests during Phase 1 to give requesters a fair retract window.
 test modify_in_phase2() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase2Range, outputs: [output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
@@ -493,14 +510,14 @@ const burn_value = from_asset("policy_id", testToken.assetName, -1)
 /// Happy path: the cage owner burns the token, destroying the cage.
 /// Requires the owner's signature and the token in the mint field with qty -1.
 test end_happy() {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, End, testStateRef,
+  cage.mpfCage.spend(0, stateDatum, End, testStateRef,
     Transaction { ..transaction.placeholder, extra_signatories: ["owner"], inputs: [update], mint: burn_value })
 }
 
 /// Only the cage owner can End the cage. Without this, anyone could burn
 /// someone else's caged token and destroy their data.
 test end_missing_signature() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, End, testStateRef,
+  cage.mpfCage.spend(0, stateDatum, End, testStateRef,
     Transaction { ..transaction.placeholder, extra_signatories: [], inputs: [update], mint: burn_value })
 }
 
@@ -509,7 +526,7 @@ test end_missing_signature() fail {
 /// cage's token in limbo.
 test end_wrong_token_in_mint() fail {
   let wrong_burn = valueFromToken("policy_id", TokenId { assetName: "wrong" })
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, End, testStateRef,
+  cage.mpfCage.spend(0, stateDatum, End, testStateRef,
     Transaction { ..transaction.placeholder, extra_signatories: ["owner"], inputs: [update], mint: wrong_burn })
 }
 
@@ -525,28 +542,28 @@ test end_wrong_token_in_mint() fail {
 /// Retract requires a RequestDatum. Using it on a StateDatum must fail —
 /// you can't retract a cage's state, only a pending request.
 test retract_on_state_datum() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Retract, testStateRef,
-    Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: ["owner"] })
+  cage.mpfCage.spend(0, stateDatum, Retract(testStateRef), testStateRef,
+    Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: ["owner"], reference_inputs: [update] })
 }
 
 /// Contribute requires a RequestDatum. Using it on a StateDatum must fail —
 /// you can't contribute a cage's state, only link a request to a cage.
 test contribute_on_state_datum() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, Contribute(testStateRef), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Contribute(testStateRef), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, inputs: [update] })
 }
 
 /// Modify requires a StateDatum. Using it on a RequestDatum must fail —
 /// you can't modify a request's MPF root (requests don't have one).
 test modify_on_request_datum() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), Modify([]), testRequestRef,
+  cage.mpfCage.spend(0, Some(aRequest), Modify([]), testRequestRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, extra_signatories: ["owner"], inputs: [request] })
 }
 
 /// End requires a StateDatum. Using it on a RequestDatum must fail —
 /// you can only burn the cage's token from a State UTxO.
 test end_on_request_datum() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(aRequest), End, testRequestRef,
+  cage.mpfCage.spend(0, Some(aRequest), End, testRequestRef,
     Transaction { ..transaction.placeholder, extra_signatories: ["owner"], inputs: [request], mint: burn_value })
 }
 
@@ -558,7 +575,7 @@ test end_on_request_datum() fail {
 /// (both State and Request) require inline datums. This catches ADA sent
 /// to the script without a datum.
 test spend_no_datum() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, None, Retract, testRequestRef, transaction.placeholder)
+  cage.mpfCage.spend(0, None, Retract(testStateRef), testRequestRef, transaction.placeholder)
 }
 
 // ============================================================================
@@ -587,8 +604,8 @@ test prop_retract_requires_owner(signer via owner_fuzzer()) fail once {
     requestToken: testToken, requestKey: "k", requestValue: Insert("v"),
     requestOwner: "the_real_owner_key_aaaaaaaaaa", fee: 0, submitted_at: 0,
   })
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(req), Retract, testRequestRef,
-    Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: [signer] })
+  cage.mpfCage.spend(0, Some(req), Retract(testStateRef), testRequestRef,
+    Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: [signer], reference_inputs: [update] })
 }
 
 /// **Property: Modify requires the exact owner key.**
@@ -598,17 +615,17 @@ test prop_retract_requires_owner(signer via owner_fuzzer()) fail once {
 /// doesn't match the state owner. This verifies `has(extra_signatories, owner)`
 /// protects the MPF state from unauthorized modifications.
 test prop_modify_requires_owner(signer via owner_fuzzer()) fail once {
-  let s = State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty), max_fee: 0 }
+  let s = State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime }
   let unchanged_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty), max_fee: 0 })),
+    datum: InlineDatum(StateDatum(State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   let state_input = Input {
     output_reference: testStateRef,
-    output: Output { address: testScriptAddress, value: testValue, datum: InlineDatum(Some(StateDatum(s))), reference_script: None },
+    output: Output { address: testScriptAddress, value: testValue, datum: InlineDatum(StateDatum(s)), reference_script: None },
   }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(StateDatum(s)), Modify([]), testStateRef,
+  cage.mpfCage.spend(0, Some(StateDatum(s)), Modify([]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [unchanged_output], extra_signatories: [signer], inputs: [state_input] })
 }
 
@@ -630,11 +647,11 @@ test prop_mint_roundtrip(params via fuzz.tuple(fuzz.bytearray_fixed(32), fuzz.in
   let addr = address.from_script("policy_id")
   let out = Output {
     address: addr, value: val,
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0 })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   let utxo = Output { address: paying_address, value: zero, datum: NoDatum, reference_script: None }
-  cage.mpfCage.mint(0, testProcessTime, testRetractTime, Minting(mint_redeemer), "policy_id",
+  cage.mpfCage.mint(0, Minting(mint_redeemer), "policy_id",
     Transaction { ..transaction.placeholder, outputs: [out], mint: val, inputs: [Input { output_reference: ref, output: utxo }] })
 }
 
@@ -662,7 +679,7 @@ const migrate_output =
   Output {
     address: address.from_script(new_policy),
     value: from_asset(new_policy, migrate_token.assetName, 1),
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: "nonempty_root_hash_aaaaaaaaa", max_fee: 0 })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: "nonempty_root_hash_aaaaaaaaa", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
 
@@ -670,7 +687,7 @@ const migrate_output =
 /// Burns old token (-1) and mints new token (+1) atomically.
 /// The MPF root is non-empty (carried over from the old cage).
 test canMigrate() {
-  cage.mpfCage.mint(0, testProcessTime, testRetractTime, Migrating(migrate_redeemer), new_policy,
+  cage.mpfCage.mint(0, Migrating(migrate_redeemer), new_policy,
     Transaction { ..transaction.placeholder, outputs: [migrate_output], mint: migrate_mint })
 }
 
@@ -678,7 +695,7 @@ test canMigrate() {
 /// duplicate a cage by minting a new token without destroying the old one.
 test migrate_no_burn() fail {
   let mint_no_burn = from_asset(new_policy, migrate_token.assetName, 1)
-  cage.mpfCage.mint(0, testProcessTime, testRetractTime, Migrating(migrate_redeemer), new_policy,
+  cage.mpfCage.mint(0, Migrating(migrate_redeemer), new_policy,
     Transaction { ..transaction.placeholder, outputs: [migrate_output], mint: mint_no_burn })
 }
 
@@ -686,7 +703,7 @@ test migrate_no_burn() fail {
 /// Same rationale as mint_to_wallet: wallet addresses bypass the cage validator.
 test migrate_to_wallet() fail {
   let wallet_output = Output { ..migrate_output, address: address.from_verification_key("someone") }
-  cage.mpfCage.mint(0, testProcessTime, testRetractTime, Migrating(migrate_redeemer), new_policy,
+  cage.mpfCage.mint(0, Migrating(migrate_redeemer), new_policy,
     Transaction { ..transaction.placeholder, outputs: [wallet_output], mint: migrate_mint })
 }
 
@@ -694,7 +711,7 @@ test migrate_to_wallet() fail {
 /// different policy doesn't prove ownership of the original cage.
 test migrate_wrong_old_policy() fail {
   let wrong_mint = from_asset("wrong_old", migrate_token.assetName, -1) |> assets.merge(from_asset(new_policy, migrate_token.assetName, 1))
-  cage.mpfCage.mint(0, testProcessTime, testRetractTime, Migrating(migrate_redeemer), new_policy,
+  cage.mpfCage.mint(0, Migrating(migrate_redeemer), new_policy,
     Transaction { ..transaction.placeholder, outputs: [migrate_output], mint: wrong_mint })
 }
 
@@ -708,7 +725,7 @@ test migrate_wrong_old_policy() fail {
 
 const testFee = 500_000
 
-const feeState = State { owner: "owner", root: root(mpf.empty), max_fee: testFee }
+const feeState = State { owner: "owner", root: root(mpf.empty), max_fee: testFee, process_time: testProcessTime, retract_time: testRetractTime }
 
 const feeStateDatum = Some(StateDatum(feeState))
 
@@ -724,13 +741,14 @@ const feeRequestInput = Input {
 
 const feeStateInput = Input {
   output_reference: testStateRef,
-  output: Output { address: testScriptAddress, value: testValue, datum: InlineDatum(feeStateDatum), reference_script: None },
+  output: Output { address: testScriptAddress, value: testValue, datum: InlineDatum(StateDatum(feeState)), reference_script: None },
 }
 
 const feeStateOutput = Output {
   address: testScriptAddress, value: testValue,
   datum: InlineDatum(StateDatum(State {
     owner: "new-owner", root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea", max_fee: testFee,
+    process_time: testProcessTime, retract_time: testRetractTime,
   })),
   reference_script: None,
 }
@@ -743,14 +761,14 @@ const refundOutput = Output {
 /// Happy path: Modify with fee. Request has 2 ADA, fee is 0.5 ADA,
 /// so refund of 1.5 ADA goes to the requester's address.
 test modify_with_refund() {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
 /// A refund output must be present for each processed request.
 /// Omitting it steals the requester's locked ADA.
 test modify_missing_refund() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
@@ -758,7 +776,7 @@ test modify_missing_refund() fail {
 /// the requester.
 test modify_insufficient_refund() fail {
   let bad_refund = Output { ..refundOutput, value: from_lovelace(1_000_000) }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput, bad_refund], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
@@ -766,14 +784,14 @@ test modify_insufficient_refund() fail {
 /// is theft even if the amount is correct.
 test modify_wrong_refund_address() fail {
   let wrong_addr_refund = Output { ..refundOutput, address: address.from_verification_key("wrong_key_aaaaaaaaaaaaaaaa") }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput, wrong_addr_refund], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
 /// When fee is 0, the full input ADA is refunded. No ADA is retained by the
 /// cage owner. This is the "free service" case.
 test modify_zero_fee() {
-  let zf_state = State { owner: "owner", root: root(mpf.empty), max_fee: 0 }
+  let zf_state = State { owner: "owner", root: root(mpf.empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime }
   let zf_request = RequestDatum(Request {
     requestToken: testToken, requestKey: "42", requestValue: Insert("42"),
     requestOwner: "requester_key_aaaaaaaaaaaaaaa", fee: 0, submitted_at: 0,
@@ -784,18 +802,18 @@ test modify_zero_fee() {
   }
   let zf_state_input = Input {
     output_reference: testStateRef,
-    output: Output { address: testScriptAddress, value: testValue, datum: InlineDatum(Some(StateDatum(zf_state))), reference_script: None },
+    output: Output { address: testScriptAddress, value: testValue, datum: InlineDatum(StateDatum(zf_state)), reference_script: None },
   }
   let zf_state_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "new-owner", root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea", max_fee: 0 })),
+    datum: InlineDatum(StateDatum(State { owner: "new-owner", root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   let zf_refund = Output {
     address: address.from_verification_key("requester_key_aaaaaaaaaaaaaaa"),
     value: from_lovelace(2_000_000), datum: NoDatum, reference_script: None,
   }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, Some(StateDatum(zf_state)), Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, Some(StateDatum(zf_state)), Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [zf_state_output, zf_refund], extra_signatories: ["owner"], inputs: [zf_state_input, zf_request_input] })
 }
 
@@ -810,7 +828,7 @@ test modify_fee_mismatch() fail {
     output_reference: testRequestRef,
     output: Output { address: testScriptAddress, value: from_lovelace(2_000_000), datum: InlineDatum(mismatch_request), reference_script: None },
   }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, mismatch_input] })
 }
 
@@ -819,7 +837,7 @@ test modify_fee_mismatch() fail {
 /// minted under a different policy in the same transaction.
 test end_with_extra_mint_policy() {
   let extra_mint = from_asset("policy_id", testToken.assetName, -1) |> assets.merge(from_asset("other_policy", "other_asset", 1))
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, stateDatum, End, testStateRef,
+  cage.mpfCage.spend(0, stateDatum, End, testStateRef,
     Transaction { ..transaction.placeholder, extra_signatories: ["owner"], inputs: [update], mint: extra_mint })
 }
 
@@ -834,28 +852,28 @@ test end_with_extra_mint_policy() {
 
 const rejectStateOutput = Output {
   address: testScriptAddress, value: testValue,
-  datum: InlineDatum(StateDatum(State { owner: "owner", root: root(mpf.empty), max_fee: testFee })),
+  datum: InlineDatum(StateDatum(State { owner: "owner", root: root(mpf.empty), max_fee: testFee, process_time: testProcessTime, retract_time: testRetractTime })),
   reference_script: None,
 }
 
 /// Happy path: reject an expired request in Phase 3.
 /// Root stays the same, requester gets refunded (input ADA minus fee).
 test reject_happy() {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
 /// Reject is forbidden in Phase 1 — requests are still being processed.
 /// Rejecting a valid, in-progress request would violate the service agreement.
 test reject_in_phase1() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
 /// Reject is forbidden in Phase 2 — the retract window belongs exclusively
 /// to the requester. The cage owner must wait for Phase 3.
 test reject_in_phase2() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase2Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
@@ -871,14 +889,14 @@ test reject_future_submitted_at() {
     output_reference: testRequestRef,
     output: Output { address: testScriptAddress, value: from_lovelace(2_000_000), datum: InlineDatum(future_request), reference_script: None },
   }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, future_request_input] })
 }
 
 /// Only the cage owner can reject requests. Without this, anyone could
 /// discard valid requests and disrupt the service.
 test reject_missing_signature() fail {
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: [], inputs: [feeStateInput, feeRequestInput] })
 }
 
@@ -888,10 +906,10 @@ test reject_missing_signature() fail {
 test reject_root_changes() fail {
   let bad_reject_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: "different_root_aaaaaaaaaaaaa", max_fee: testFee })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: "different_root_aaaaaaaaaaaaa", max_fee: testFee, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, outputs: [bad_reject_output, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
@@ -899,6 +917,6 @@ test reject_root_changes() fail {
 /// Providing an insufficient refund shortchanges the requester.
 test reject_wrong_refund() fail {
   let bad_refund = Output { ..refundOutput, value: from_lovelace(500_000) }
-  cage.mpfCage.spend(0, testProcessTime, testRetractTime, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, outputs: [rejectStateOutput, bad_refund], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }

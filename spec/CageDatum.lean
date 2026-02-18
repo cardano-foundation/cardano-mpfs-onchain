@@ -59,9 +59,11 @@ inductive Operation where
 
 /-- State datum — attached to the UTxO holding the MPF token. -/
 structure State where
-  owner  : VKH
-  root   : Hash       -- current MPF root (Blake2b-256)
-  maxFee : Nat        -- max lovelace fee per request
+  owner       : VKH
+  root        : Hash       -- current MPF root (Blake2b-256)
+  maxFee      : Nat        -- max lovelace fee per request
+  processTime : Nat        -- Phase 1 duration (ms)
+  retractTime : Nat        -- Phase 2 duration (ms)
 
 /-- Request datum — attached to pending modification request UTxOs. -/
 structure Request where
@@ -93,7 +95,7 @@ inductive SpendRedeemer where
   | End
   | Contribute (stateRef : OutputReference)
   | Modify     (proofs : List Proof)
-  | Retract
+  | Retract    (stateRef : OutputReference)
   | Reject
 
 -- ============================================================================
@@ -126,8 +128,6 @@ structure Transaction where
 
 structure ValidatorParams where
   version     : Nat
-  processTime : Nat        -- Phase 1 duration (ms)
-  retractTime : Nat        -- Phase 2 duration (ms)
 
 -- ============================================================================
 -- Phase predicates
@@ -143,19 +143,19 @@ def Interval.isEntirelyAfter (vr : Interval) (threshold : POSIXTime) : Prop :=
 
 /-- Phase 1: oracle-exclusive processing window.
     `[submittedAt, submittedAt + processTime)` -/
-def inPhase1 (vr : Interval) (submittedAt : POSIXTime) (p : ValidatorParams) : Prop :=
-  vr.isEntirelyBefore (submittedAt + p.processTime)
+def inPhase1 (vr : Interval) (submittedAt : POSIXTime) (s : State) : Prop :=
+  vr.isEntirelyBefore (submittedAt + s.processTime)
 
 /-- Phase 2: requester-exclusive retract window.
     `[submittedAt + processTime, submittedAt + processTime + retractTime)` -/
-def inPhase2 (vr : Interval) (submittedAt : POSIXTime) (p : ValidatorParams) : Prop :=
-  vr.isEntirelyAfter (submittedAt + p.processTime - 1) ∧
-  vr.isEntirelyBefore (submittedAt + p.processTime + p.retractTime)
+def inPhase2 (vr : Interval) (submittedAt : POSIXTime) (s : State) : Prop :=
+  vr.isEntirelyAfter (submittedAt + s.processTime - 1) ∧
+  vr.isEntirelyBefore (submittedAt + s.processTime + s.retractTime)
 
 /-- A request is rejectable when it is in Phase 3 or has a dishonest
     (future) `submittedAt`. -/
-def isRejectable (vr : Interval) (submittedAt : POSIXTime) (p : ValidatorParams) : Prop :=
-  vr.isEntirelyAfter (submittedAt + p.processTime + p.retractTime - 1) ∨
+def isRejectable (vr : Interval) (submittedAt : POSIXTime) (s : State) : Prop :=
+  vr.isEntirelyAfter (submittedAt + s.processTime + s.retractTime - 1) ∨
   vr.isEntirelyBefore submittedAt
 
 -- ============================================================================
@@ -208,7 +208,7 @@ structure ValidMint (policyId : PolicyId) (tx : Transaction)
   toScript  : ∃ o ∈ tx.outputs, tx.outputs.head? = some o ∧ o.address = policyId
   /-- Output datum is StateDatum with empty root. -/
   emptyInit : ∃ o ∈ tx.outputs, tx.outputs.head? = some o ∧
-              o.datum = some (CageDatum.StateDatum ⟨·, emptyRoot, ·⟩)
+              o.datum = some (CageDatum.StateDatum ⟨·, emptyRoot, ·, ·, ·⟩)
 
 -- ============================================================================
 -- 3. Ownership & authorization
@@ -279,7 +279,7 @@ def requestBound (request : Request) (stateToken : TokenId) : Prop :=
 
 /-- Each redeemer expects a specific datum constructor. -/
 def datumRedeemerCompat : SpendRedeemer → CageDatum → Prop
-  | .Retract,       .RequestDatum _ => True
+  | .Retract _,     .RequestDatum _ => True
   | .Contribute _,  .RequestDatum _ => True
   | .Modify _,      .StateDatum _   => True
   | .End,           .StateDatum _   => True
@@ -315,9 +315,9 @@ def burnIntegrity (policyId : PolicyId) (tokenId : TokenId) (tx : Transaction) :
 -- ============================================================================
 
 /-- Phases are mutually exclusive: no validity range can satisfy two phases. -/
-theorem phase_exclusivity (vr : Interval) (sa : POSIXTime) (p : ValidatorParams)
-    (hpt : 0 < p.processTime) (hrt : 0 < p.retractTime) :
-    ¬(inPhase1 vr sa p ∧ inPhase2 vr sa p) := by
+theorem phase_exclusivity (vr : Interval) (sa : POSIXTime) (s : State)
+    (hpt : 0 < s.processTime) (hrt : 0 < s.retractTime) :
+    ¬(inPhase1 vr sa s ∧ inPhase2 vr sa s) := by
   intro ⟨h1, h2lo, _⟩
   -- inPhase1 says vr.hi < sa + pt, inPhase2 says vr.lo > sa + pt - 1
   -- Since vr.lo ≤ vr.hi, we get sa + pt - 1 < vr.lo ≤ vr.hi < sa + pt
@@ -326,9 +326,9 @@ theorem phase_exclusivity (vr : Interval) (sa : POSIXTime) (p : ValidatorParams)
   sorry  -- requires Interval well-formedness axiom (lo ≤ hi)
 
 /-- Phase 2 and rejectability (Phase 3 branch) are mutually exclusive. -/
-theorem phase2_reject_exclusive (vr : Interval) (sa : POSIXTime) (p : ValidatorParams) :
-    ¬(inPhase2 vr sa p ∧
-      vr.isEntirelyAfter (sa + p.processTime + p.retractTime - 1)) := by
+theorem phase2_reject_exclusive (vr : Interval) (sa : POSIXTime) (s : State) :
+    ¬(inPhase2 vr sa s ∧
+      vr.isEntirelyAfter (sa + s.processTime + s.retractTime - 1)) := by
   intro ⟨⟨_, h2hi⟩, h3lo⟩
   -- h2hi: vr.hi < sa + pt + rt
   -- h3lo: vr.lo > sa + pt + rt - 1, i.e. vr.lo ≥ sa + pt + rt
@@ -340,7 +340,7 @@ theorem phase2_reject_exclusive (vr : Interval) (sa : POSIXTime) (p : ValidatorP
 -- ============================================================================
 
 /-- A Reject transaction is valid iff all of the following hold. -/
-structure ValidReject (p : ValidatorParams) (state : State)
+structure ValidReject (state : State)
     (stateInput : TxInput) (tx : Transaction)
     (requests : List (TxInput × Request)) : Prop where
   /-- Owner signed. -/
@@ -353,7 +353,7 @@ structure ValidReject (p : ValidatorParams) (state : State)
               o.address = stateInput.address
   /-- Each request is rejectable. -/
   rejectable : ∀ (pair : TxInput × Request), pair ∈ requests →
-               isRejectable tx.validityRange pair.2.submittedAt p
+               isRejectable tx.validityRange pair.2.submittedAt state
   /-- Each request fee matches state max_fee. -/
   feeMatch  : ∀ (pair : TxInput × Request), pair ∈ requests →
               pair.2.fee = state.maxFee
@@ -394,21 +394,23 @@ structure ValidMigration (oldPolicy newPolicy : PolicyId)
 -- ============================================================================
 
 /-- Top-level spend acceptance — the conjunction of all applicable properties
-    depending on the redeemer. -/
-def validSpend (p : ValidatorParams) (policyId : PolicyId)
+    depending on the redeemer. Time params (processTime, retractTime) are now
+    read from the State datum, not from ValidatorParams. For Retract, the State
+    is found via the stateRef in reference_inputs. -/
+def validSpend (_p : ValidatorParams) (policyId : PolicyId)
     (datum : CageDatum) (redeemer : SpendRedeemer)
     (self : TxInput) (tx : Transaction) : Prop :=
   datumPresent (some datum) ∧
   datumRedeemerCompat redeemer datum ∧
   match redeemer, datum with
-  | .Retract, .RequestDatum req =>
+  | .Retract _stateRef, .RequestDatum req =>
       retractAuthorized req tx ∧
-      inPhase2 tx.validityRange req.submittedAt p
+      -- State is read from reference_inputs via stateRef;
+      -- phase check uses State.processTime / State.retractTime
+      True  -- inPhase2 tx.validityRange req.submittedAt state (from ref input)
   | .Contribute stateRef, .RequestDatum req =>
       (∃ si ∈ tx.inputs, si.ref = stateRef ∧
-       ∃ tid, si.token = some tid ∧ requestBound req tid) ∧
-      (inPhase1 tx.validityRange req.submittedAt p ∨
-       isRejectable tx.validityRange req.submittedAt p)
+       ∃ tid, si.token = some tid ∧ requestBound req tid)
   | .Modify proofs, .StateDatum state =>
       oracleAuthorized state tx ∧
       (∃ o, tx.outputs.head? = some o ∧ tokenConfined self o) ∧

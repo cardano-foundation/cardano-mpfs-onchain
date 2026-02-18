@@ -1,14 +1,16 @@
 import { Constr, Data, type UTxO } from "@lucid-evolution/lucid";
 
 // CageDatum = RequestDatum(Request) | StateDatum(State)
-// StateDatum is constructor index 1, State has fields { owner, root }
+// StateDatum is constructor index 1, State has fields { owner, root, max_fee, process_time, retract_time }
 export function encodeStateDatum(
   owner: string,
   root: string,
   maxFee: bigint = 0n,
+  processTime: bigint = 60_000n,
+  retractTime: bigint = 60_000n,
 ): string {
   return Data.to(
-    new Constr(1, [new Constr(0, [owner, root, maxFee])]),
+    new Constr(1, [new Constr(0, [owner, root, maxFee, processTime, retractTime])]),
   );
 }
 
@@ -37,7 +39,7 @@ export function encodeBurningRedeemer(): string {
   return Data.to(new Constr(2, []));
 }
 
-// UpdateRedeemer = End(0) | Contribute(OutputReference)(1) | Modify(List<Proof>)(2) | Retract(3) | Reject(4)
+// UpdateRedeemer = End(0) | Contribute(OutputReference)(1) | Modify(List<Proof>)(2) | Retract(OutputReference)(3) | Reject(4)
 
 // End is index 0
 export function encodeEndRedeemer(): string {
@@ -106,6 +108,15 @@ export function encodeDeleteRequestDatum(
     submittedAt,
   ]);
   return Data.to(new Constr(0, [request]));
+}
+
+// Retract is index 3, takes an OutputReference pointing to the State UTxO (reference input)
+export function encodeRetractRedeemer(stateUtxo: UTxO): string {
+  const outputRef = new Constr(0, [
+    stateUtxo.txHash,
+    BigInt(stateUtxo.outputIndex),
+  ]);
+  return Data.to(new Constr(3, [outputRef]));
 }
 
 // Reject is index 4 (no fields)
