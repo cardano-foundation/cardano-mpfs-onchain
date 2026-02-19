@@ -68,7 +68,8 @@ stateDiagram-v2
 Each request passes through three exclusive time phases,
 enforced on-chain via `tx.validity_range`. The phase boundaries
 are determined by the request's `submitted_at` timestamp and the
-validator's immutable `process_time` and `retract_time` parameters.
+State datum's `process_time` and `retract_time` fields (set at
+mint time and enforced immutable across Modify/Reject operations).
 
 ```mermaid
 gantt
@@ -150,7 +151,7 @@ sequenceDiagram
 ## Security Properties
 
 The validators enforce invariants across 16 categories, each
-verified by the inline test suite (67 tests):
+verified by the inline test suite (80 tests):
 
 1. **Ownership** — only the oracle (token owner) can modify, reject, or destroy a token.
 2. **Integrity** — every MPF modification carries a cryptographic proof

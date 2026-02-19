@@ -23,4 +23,4 @@ requesters, and a Reject mechanism enables DDoS protection.
 - [Validators](architecture/validators.md) — minting policy and spending validator logic
 - [Types & Encodings](architecture/types.md) — datum, redeemer, and operation structures
 - [Proof System](architecture/proofs.md) — MPF proof format, verification, and performance
-- [Security Properties](architecture/properties.md) — 16 categories verified by 67 tests
+- [Security Properties](architecture/properties.md) — 16 categories verified by 80 tests
