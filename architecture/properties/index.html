@@ -1,0 +1,1699 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/properties/">
+      
+      
+        <link rel="prev" href="../proofs/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Security Properties - Cardano MPFS Onchain</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#security-properties" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Cardano MPFS Onchain" class="md-header__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Cardano MPFS Onchain
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Security Properties
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Cardano MPFS Onchain" class="md-nav__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Cardano MPFS Onchain
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types & Encodings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proofs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proof System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Properties
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Properties
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-chain-vs-off-chain-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On-chain vs Off-chain Guarantees
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-token-uniqueness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Token Uniqueness
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-minting-integrity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Minting Integrity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-ownership-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Ownership &amp; Authorization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-token-confinement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Token Confinement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-ownership-transfer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Ownership Transfer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-state-integrity-mpf-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. State Integrity (MPF Root)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-proof-consumption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Proof Consumption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-request-binding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Request Binding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-datum-redeemer-type-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Datum-Redeemer Type Safety
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-datum-presence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Datum Presence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-end-burn-integrity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. End / Burn Integrity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-token-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Token Extraction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-time-gated-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Time-Gated Phases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-reject-ddos-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Reject (DDoS Protection)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-fee-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Fee Enforcement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Migration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../overview/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="security-properties">Security Properties</h1>
+<p>This page documents the on-chain security properties of the MPF Cage
+validators. Each property is stated as an invariant and cross-referenced
+with the test(s) that verify it.</p>
+<p>The properties are derived from the
+<a href="https://cardano-foundation.github.io/mpfs/">upstream MPFS specification</a>
+(<a href="https://cardano-foundation.github.io/mpfs/architecture/">architecture</a>,
+<a href="https://cardano-foundation.github.io/mpfs/code/on-chain/">on-chain code docs</a>)
+and verified by the inline test suite in
+<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/cage.ak"><code>cage.ak</code></a>
+and
+<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/lib.ak"><code>lib.ak</code></a>.
+Run <code>aiken check</code> (or <code>just test</code>) to check all 80 tests.</p>
+<hr />
+<h2 id="roles">Roles</h2>
+<p>The upstream MPFS documentation defines three roles:</p>
+<ul>
+<li><strong>Oracle</strong> (token owner): controls which facts are added or removed
+  from an MPF token. Maps to the <code>State.owner</code> field.</li>
+<li><strong>Requester</strong>: proposes fact changes via <code>RequestDatum</code> UTxOs. Maps
+  to <code>Request.requestOwner</code>.</li>
+<li><strong>Observer</strong>: reads the MPF state from the blockchain. No on-chain
+  role; all knowledge is reconstructable from the chain history.</li>
+</ul>
+<p>The on-chain validators enforce the boundaries between these roles.</p>
+<hr />
+<h2 id="on-chain-vs-off-chain-guarantees">On-chain vs Off-chain Guarantees</h2>
+<p>The validators enforce <strong>what must hold on-chain</strong>. Some guarantees
+depend on off-chain behaviour:</p>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>Enforced by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Token identity is unique</td>
+<td>On-chain (UTxO consumption)</td>
+</tr>
+<tr>
+<td>Only the oracle can update the MPF root</td>
+<td>On-chain (signature check)</td>
+</tr>
+<tr>
+<td>Every modification carries a valid Merkle proof</td>
+<td>On-chain (proof verification)</td>
+</tr>
+<tr>
+<td>Output root matches proof computation</td>
+<td>On-chain (fold + compare)</td>
+</tr>
+<tr>
+<td>Token stays at the script address</td>
+<td>On-chain (address check)</td>
+</tr>
+<tr>
+<td>Requesters can reclaim locked ADA in Phase 2</td>
+<td>On-chain (Retract + phase check)</td>
+</tr>
+<tr>
+<td>Expired requests are cleaned up</td>
+<td>On-chain (Reject + phase check)</td>
+</tr>
+<tr>
+<td>Oracle fees are enforced</td>
+<td>On-chain (fee == max_fee check)</td>
+</tr>
+<tr>
+<td>Refunds are paid correctly</td>
+<td>On-chain (verifyRefunds)</td>
+</tr>
+<tr>
+<td>Time phases are exclusive</td>
+<td>On-chain (validity_range checks)</td>
+</tr>
+<tr>
+<td>The oracle honestly processes matching requests</td>
+<td>Off-chain (oracle behaviour)</td>
+</tr>
+<tr>
+<td>Proofs are computed against the correct trie state</td>
+<td>Off-chain (proof generation)</td>
+</tr>
+<tr>
+<td>All knowledge is reconstructable from history</td>
+<td>Blockchain (ledger property)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-token-uniqueness">1. Token Uniqueness</h2>
+<blockquote>
+<p><em>Upstream: "The new token-id is unique"</em></p>
+</blockquote>
+<p><strong>Invariant:</strong> Two distinct <code>OutputReference</code> values always produce
+different token asset names.</p>
+<p>The asset name is <code>SHA2-256(tx_id ++ output_index)</code>. Since an
+<code>OutputReference</code> can only be consumed once, the minting policy
+guarantees that no two tokens share the same identity.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Same reference yields same hash (deterministic)</td>
+<td><code>assetName_deterministic</code></td>
+<td><code>lib.ak</code></td>
+</tr>
+<tr>
+<td>Different <code>tx_id</code> yields different hash</td>
+<td><code>assetName_different_txid</code></td>
+<td><code>lib.ak</code></td>
+</tr>
+<tr>
+<td>Different <code>output_index</code> yields different hash</td>
+<td><code>assetName_different_index</code></td>
+<td><code>lib.ak</code></td>
+</tr>
+<tr>
+<td>Determinism holds for arbitrary references</td>
+<td><code>prop_assetName_deterministic</code></td>
+<td><code>lib.ak</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-minting-integrity">2. Minting Integrity</h2>
+<blockquote>
+<p><em>Upstream: "The hash in the token is null" (at boot)</em></p>
+</blockquote>
+<p><strong>Invariant:</strong> A token can only be minted when all of the following
+hold simultaneously:</p>
+<ol>
+<li>The <code>OutputReference</code> is consumed in the transaction.</li>
+<li>Exactly one token is minted (quantity = 1).</li>
+<li>The output goes to the validator's own script address.</li>
+<li>The output carries a <code>StateDatum</code> with <code>root = root(empty)</code>.</li>
+</ol>
+<p>Violating any single condition causes the minting policy to reject
+the transaction.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+<th>Violated condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Happy path (all conditions met)</td>
+<td><code>canMint</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td>Reference not consumed</td>
+<td><code>mint_missing_input</code></td>
+<td>(1)</td>
+</tr>
+<tr>
+<td>Quantity = 2</td>
+<td><code>mint_quantity_two</code></td>
+<td>(2)</td>
+</tr>
+<tr>
+<td>Output to wallet address</td>
+<td><code>mint_to_wallet</code></td>
+<td>(3)</td>
+</tr>
+<tr>
+<td>Output to different script</td>
+<td><code>mint_to_wrong_script</code></td>
+<td>(3)</td>
+</tr>
+<tr>
+<td>Non-empty initial root</td>
+<td><code>mint_nonempty_root</code></td>
+<td>(4)</td>
+</tr>
+<tr>
+<td>Datum is <code>RequestDatum</code></td>
+<td><code>mint_request_datum</code></td>
+<td>(4)</td>
+</tr>
+<tr>
+<td>Output has <code>NoDatum</code></td>
+<td><code>mint_no_datum</code></td>
+<td>(4)</td>
+</tr>
+<tr>
+<td>Roundtrip: any valid reference produces a valid mint</td>
+<td><code>prop_mint_roundtrip</code></td>
+<td>--</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-ownership-authorization">3. Ownership &amp; Authorization</h2>
+<blockquote>
+<p><em>Upstream: "MPF tokens can be modified only by their owner"</em></p>
+</blockquote>
+<p><strong>Invariant:</strong> Only the holder of the correct verification key can
+perform privileged operations.</p>
+<ul>
+<li><strong>Modify / Reject / End</strong> (oracle operations): require the
+  <code>State.owner</code> signature.</li>
+<li><strong>Retract</strong> (requester operation): requires the
+  <code>Request.requestOwner</code> signature.</li>
+<li><strong>Contribute</strong>: permissionless — anyone can link a request to a
+  state UTxO.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+<th>Operation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Oracle signs Modify</td>
+<td><code>canCage</code></td>
+<td>Modify</td>
+</tr>
+<tr>
+<td>Missing oracle signature blocks Modify</td>
+<td><code>modify_missing_signature</code></td>
+<td>Modify</td>
+</tr>
+<tr>
+<td>Missing oracle signature blocks End</td>
+<td><code>end_missing_signature</code></td>
+<td>End</td>
+</tr>
+<tr>
+<td>Missing oracle signature blocks Reject</td>
+<td><code>reject_missing_signature</code></td>
+<td>Reject</td>
+</tr>
+<tr>
+<td>Requester signs Retract</td>
+<td><code>retract_happy</code></td>
+<td>Retract</td>
+</tr>
+<tr>
+<td>Wrong signer blocks Retract</td>
+<td><code>retract_wrong_signer</code></td>
+<td>Retract</td>
+</tr>
+<tr>
+<td>Random signer != requester fails Retract</td>
+<td><code>prop_retract_requires_owner</code></td>
+<td>Retract</td>
+</tr>
+<tr>
+<td>Random signer != oracle fails Modify</td>
+<td><code>prop_modify_requires_owner</code></td>
+<td>Modify</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-token-confinement">4. Token Confinement</h2>
+<p><strong>Invariant:</strong> The caged token must remain at the same script
+address after a <code>Modify</code> or <code>Reject</code> operation. The output's
+payment credential must equal the input's payment credential.</p>
+<p>This prevents the oracle from extracting the token to a wallet or
+redirecting it to a different script during an update.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Output to different script address is rejected</td>
+<td><code>modify_wrong_address</code></td>
+</tr>
+<tr>
+<td>Output to same address succeeds</td>
+<td><code>canCage</code>, <code>modify_owner_transfer</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-ownership-transfer">5. Ownership Transfer</h2>
+<p><strong>Invariant:</strong> The <code>owner</code> field in the output datum is <strong>not</strong>
+checked against the input datum during <code>Modify</code>. The current oracle
+can transfer ownership to a new key by changing the <code>owner</code> field.</p>
+<p>This is intentional: it enables oracle rotation and delegation
+without burning and re-minting.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Owner changes from <code>"owner"</code> to <code>"new-owner"</code></td>
+<td><code>modify_owner_transfer</code></td>
+</tr>
+<tr>
+<td>Existing happy path demonstrates transfer</td>
+<td><code>canCage</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-state-integrity-mpf-root">6. State Integrity (MPF Root)</h2>
+<blockquote>
+<p><em>Upstream: "All modifications to an MPF root have to appear
+on-chain" and "All modifications must be consumed under a smart
+contract validation"</em></p>
+</blockquote>
+<p><strong>Invariant:</strong> The output root must exactly match the result of
+folding all matching request operations over the input root using
+the provided Merkle proofs. A wrong claimed root is rejected.</p>
+<p>This is the core cryptographic guarantee: every state transition
+is provably correct.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Correct root after one Insert</td>
+<td><code>canCage</code></td>
+</tr>
+<tr>
+<td>Wrong root in output datum</td>
+<td><code>modify_wrong_root</code></td>
+</tr>
+<tr>
+<td>No requests: root must stay unchanged</td>
+<td><code>modify_no_requests</code></td>
+</tr>
+<tr>
+<td>Requests for other tokens are skipped</td>
+<td><code>modify_skip_other_token</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-proof-consumption">7. Proof Consumption</h2>
+<p><strong>Invariant:</strong> Exactly one Merkle proof is consumed per matching
+request input. Too few proofs causes failure (<code>uncons</code> on empty
+list). Extra proofs are silently ignored.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One proof per request (happy path)</td>
+<td><code>canCage</code></td>
+</tr>
+<tr>
+<td>Zero proofs for one request</td>
+<td><code>modify_too_few_proofs</code></td>
+</tr>
+<tr>
+<td>Two proofs for one request (extra ignored)</td>
+<td><code>modify_extra_proofs</code></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The validator does not reject extra proofs. This is a design
+choice: it simplifies transaction building when the exact
+number of matching requests is uncertain at construction time.</p>
+</div>
+<h2 id="8-request-binding">8. Request Binding</h2>
+<blockquote>
+<p><em>Upstream: "All consumed requests reference the token being updated"</em></p>
+</blockquote>
+<p><strong>Invariant:</strong> A <code>Contribute</code> transaction validates that the
+request's <code>requestToken</code> matches the actual token at the referenced
+State UTxO. Requests targeting a different token are rejected.</p>
+<p>This prevents a request intended for token A from being applied
+to token B.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Matching token succeeds</td>
+<td><code>canCage</code></td>
+</tr>
+<tr>
+<td>Mismatched token</td>
+<td><code>contribute_wrong_token</code></td>
+</tr>
+<tr>
+<td>Referenced UTxO not in inputs</td>
+<td><code>contribute_missing_ref</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-datum-redeemer-type-safety">9. Datum-Redeemer Type Safety</h2>
+<p><strong>Invariant:</strong> Each redeemer expects a specific datum constructor.
+Using the wrong combination causes the <code>expect</code> pattern match to
+fail, rejecting the transaction.</p>
+<p>This enforces a clean separation between State UTxOs (oracle
+operations) and Request UTxOs (requester operations).</p>
+<table>
+<thead>
+<tr>
+<th>Redeemer</th>
+<th>Required datum</th>
+<th>Wrong datum test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Retract</code></td>
+<td><code>RequestDatum</code></td>
+<td><code>retract_on_state_datum</code></td>
+</tr>
+<tr>
+<td><code>Contribute</code></td>
+<td><code>RequestDatum</code></td>
+<td><code>contribute_on_state_datum</code></td>
+</tr>
+<tr>
+<td><code>Modify</code></td>
+<td><code>StateDatum</code></td>
+<td><code>modify_on_request_datum</code></td>
+</tr>
+<tr>
+<td><code>End</code></td>
+<td><code>StateDatum</code></td>
+<td><code>end_on_request_datum</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-datum-presence">10. Datum Presence</h2>
+<p><strong>Invariant:</strong> The spending validator requires <code>Some(datum)</code>. A
+UTxO with no datum (e.g. accidentally sent ADA to the script
+address) cannot be spent through any redeemer.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>None</code> datum rejected</td>
+<td><code>spend_no_datum</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="11-end-burn-integrity">11. End / Burn Integrity</h2>
+<p><strong>Invariant:</strong> The <code>End</code> redeemer verifies that the mint field
+contains exactly the same token being burned. Burning a different
+token while keeping the caged one is rejected.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Correct token burned</td>
+<td><code>end_happy</code></td>
+</tr>
+<tr>
+<td>Different token in mint field</td>
+<td><code>end_wrong_token_in_mint</code></td>
+</tr>
+<tr>
+<td>End with unrelated extra minting policy</td>
+<td><code>end_with_extra_mint_policy</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="12-token-extraction">12. Token Extraction</h2>
+<p><strong>Invariant:</strong> <code>tokenFromValue</code> returns <code>Some(TokenId)</code> only when
+the value contains exactly one non-ADA policy with exactly one
+asset name. All other shapes return <code>None</code>.</p>
+<p>This is a safety function used throughout the validators to
+identify the caged NFT. If a UTxO somehow contains multiple tokens,
+extraction fails and the validator rejects.</p>
+<table>
+<thead>
+<tr>
+<th>Shape</th>
+<th>Test</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ADA + 1 NFT</td>
+<td><code>tokenFromValue_single_nft</code></td>
+<td><code>Some(TokenId)</code></td>
+</tr>
+<tr>
+<td>ADA only</td>
+<td><code>tokenFromValue_ada_only</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td>2 non-ADA policies</td>
+<td><code>tokenFromValue_multi_policy</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td>1 policy, 2 asset names</td>
+<td><code>tokenFromValue_multi_asset</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td>Roundtrip via <code>valueFromToken</code></td>
+<td><code>tokenFromValue_roundtrip</code></td>
+<td><code>Some(TokenId)</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="13-time-gated-phases">13. Time-Gated Phases</h2>
+<p><strong>Invariant:</strong> Each request passes through three exclusive time
+phases. The validator enforces phase boundaries using
+<code>tx.validity_range</code> and the State datum's <code>process_time</code> /
+<code>retract_time</code> fields (set at mint time, enforced immutable).
+No operation can execute outside its designated phase.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>submitted_at          + process_time       + process_time + retract_time
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    |                        |                        |
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    |   Phase 1: Oracle      |   Phase 2: Requester   |   Phase 3: Oracle
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    |   Modify only          |   Retract only         |   Reject only
+</span></code></pre></div>
+<p>This eliminates the race condition where a requester retracts while
+the oracle is building a Modify transaction.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Retract blocked in Phase 1</td>
+<td><code>retract_in_phase1</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Retract allowed in Phase 2</td>
+<td><code>retract_happy</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>Retract blocked in Phase 3</td>
+<td><code>retract_in_phase3</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Contribute blocked in Phase 2</td>
+<td><code>contribute_in_phase2</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Contribute allowed in Phase 3 (for Reject)</td>
+<td><code>contribute_in_phase3</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>Modify blocked in Phase 2</td>
+<td><code>modify_in_phase2</code></td>
+<td>fail</td>
+</tr>
+</tbody>
+</table>
+<h2 id="14-reject-ddos-protection">14. Reject (DDoS Protection)</h2>
+<p><strong>Invariant:</strong> The oracle can discard requests that are past their
+retract window (Phase 3) or have a dishonest <code>submitted_at</code>
+timestamp. The oracle keeps the fee and refunds the remaining
+lovelace. The MPF root must <strong>not</strong> change during a Reject.</p>
+<p>This prevents DDoS attacks where requesters spam requests and
+retract them before the oracle can process them.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reject in Phase 3 (happy path)</td>
+<td><code>reject_happy</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>Reject blocked in Phase 1</td>
+<td><code>reject_in_phase1</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Reject blocked in Phase 2</td>
+<td><code>reject_in_phase2</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Reject with future <code>submitted_at</code> (dishonest)</td>
+<td><code>reject_future_submitted_at</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>Reject without owner signature</td>
+<td><code>reject_missing_signature</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Reject must not change root</td>
+<td><code>reject_root_changes</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Reject with insufficient refund</td>
+<td><code>reject_wrong_refund</code></td>
+<td>fail</td>
+</tr>
+</tbody>
+</table>
+<h2 id="15-fee-enforcement">15. Fee Enforcement</h2>
+<p><strong>Invariant:</strong> When the oracle processes requests via <code>Modify</code>,
+each request's <code>fee</code> must equal <code>state.max_fee</code>. The oracle
+receives the fee and the requester is refunded <code>lovelace - fee</code>.
+Refunds are verified on-chain: correct amount, correct address.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Modify with fee and correct refund</td>
+<td><code>modify_with_refund</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>Modify with missing refund output</td>
+<td><code>modify_missing_refund</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Modify with insufficient refund</td>
+<td><code>modify_insufficient_refund</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Modify with wrong refund address</td>
+<td><code>modify_wrong_refund_address</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Modify with zero fee (no refund deduction)</td>
+<td><code>modify_zero_fee</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>Request fee != state max_fee</td>
+<td><code>modify_fee_mismatch</code></td>
+<td>fail</td>
+</tr>
+</tbody>
+</table>
+<h2 id="16-migration">16. Migration</h2>
+<p><strong>Invariant:</strong> A token can be migrated from an old validator to
+a new one by atomically burning the old token and minting a new
+one. The token identity (asset name) and MPF root are preserved.
+The old token must be burned (-1) in the same transaction.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Test</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Migration happy path (burn old, mint new)</td>
+<td><code>canMigrate</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>Migration without burning old token</td>
+<td><code>migrate_no_burn</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Migration to wallet instead of script</td>
+<td><code>migrate_to_wallet</code></td>
+<td>fail</td>
+</tr>
+<tr>
+<td>Migration with wrong old policy ID</td>
+<td><code>migrate_wrong_old_policy</code></td>
+<td>fail</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="summary">Summary</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Category</th>
+<th>Tests</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Token uniqueness</td>
+<td>4</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Minting integrity</td>
+<td>9</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Ownership &amp; authorization</td>
+<td>8</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Token confinement</td>
+<td>2</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Ownership transfer</td>
+<td>2</td>
+</tr>
+<tr>
+<td>6</td>
+<td>State integrity (MPF root)</td>
+<td>4</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Proof consumption</td>
+<td>3</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Request binding</td>
+<td>3</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Datum-redeemer type safety</td>
+<td>4</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Datum presence</td>
+<td>1</td>
+</tr>
+<tr>
+<td>11</td>
+<td>End / burn integrity</td>
+<td>3</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Token extraction</td>
+<td>5</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Time-gated phases</td>
+<td>6</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Reject (DDoS protection)</td>
+<td>7</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Fee enforcement</td>
+<td>6</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Migration</td>
+<td>4</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>Total</strong></td>
+<td><strong>80</strong></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.sections", "navigation.path", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
