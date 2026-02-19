@@ -12,7 +12,7 @@ and verified by the inline test suite in
 [`cage.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/cage.ak)
 and
 [`lib.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/lib.ak).
-Run `aiken check` (or `just test`) to check all 67 tests.
+Run `aiken check` (or `just test`) to check all 80 tests.
 
 ---
 
@@ -266,8 +266,9 @@ extraction fails and the validator rejects.
 
 **Invariant:** Each request passes through three exclusive time
 phases. The validator enforces phase boundaries using
-`tx.validity_range` and the immutable `process_time` / `retract_time`
-parameters. No operation can execute outside its designated phase.
+`tx.validity_range` and the State datum's `process_time` /
+`retract_time` fields (set at mint time, enforced immutable).
+No operation can execute outside its designated phase.
 
 ```
 submitted_at          + process_time       + process_time + retract_time
@@ -360,4 +361,4 @@ The old token must be burned (-1) in the same transaction.
 | 14 | Reject (DDoS protection) | 7 |
 | 15 | Fee enforcement | 6 |
 | 16 | Migration | 4 |
-| | **Total** | **67** |
+| | **Total** | **80** |

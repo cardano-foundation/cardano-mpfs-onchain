@@ -8,22 +8,27 @@ Helper functions are in
 
 ## Validator Parameters
 
-The cage validator is parameterized by three immutable values,
+The cage validator is parameterized by a single immutable value,
 set at deployment time:
 
 ```aiken
-validator mpfCage(_version: Int, process_time: Int, retract_time: Int) {
+validator mpfCage(_version: Int) {
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
 | `_version` | `Int` | Version tag (enables migration between validator versions) |
-| `process_time` | `Int` | Duration (ms) of Phase 1 — oracle-exclusive processing window |
-| `retract_time` | `Int` | Duration (ms) of Phase 2 — requester-exclusive retract window |
 
 Different parameter values produce different script hashes and
-addresses. The parameters are baked into the compiled script, so
-they cannot be changed after deployment.
+addresses. The parameter is baked into the compiled script, so
+it cannot be changed after deployment.
+
+!!! note "Time parameters in datum"
+    `process_time` and `retract_time` are stored in the `State`
+    datum rather than as validator parameters. This ensures all
+    oracle configurations share a single script hash and address,
+    which is critical for the off-chain indexer. See
+    [Types & Encodings](types.md#state) for details.
 
 ---
 
@@ -109,6 +114,8 @@ Only allowed during **Phase 1** of each request.
 - The proofs are folded left-to-right over the current root to
   compute the new root.
 - The output datum's root must equal the computed new root.
+- The output datum's `process_time` and `retract_time` must equal
+  the input values (immutability enforced).
 - The token remains at the script address.
 - Each requester receives a refund of `lovelace - fee`.
 
@@ -158,9 +165,17 @@ state UTxO being updated.
 Allows a request owner to cancel a pending request and reclaim
 their locked ADA. Only allowed during **Phase 2**.
 
+**Redeemer:** `Retract(OutputReference)` — points to the State UTxO,
+which must be included as a **reference input** (not consumed). The
+validator reads `process_time` and `retract_time` from the State
+datum to enforce phase boundaries.
+
 **Validation rules:**
 
 - The request owner must sign the transaction.
+- The State UTxO referenced by the `OutputReference` must be present
+  in the transaction's reference inputs.
+- The request's `requestToken` must match the token in the State UTxO.
 - The transaction validity range must be entirely within Phase 2
   (`tx valid after submitted_at + process_time - 1` and
   `tx valid before submitted_at + process_time + retract_time`).
@@ -181,6 +196,8 @@ UTxO uses `Contribute`.
   (`tx valid after submitted_at + process_time + retract_time - 1`)
   or have a dishonest `submitted_at` (in the future).
 - The output root must equal the input root (no MPF changes).
+- The output datum's `process_time` and `retract_time` must equal
+  the input values (immutability enforced).
 - The token remains at the script address.
 - Each requester receives a refund of `lovelace - fee`.
 

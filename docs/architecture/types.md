@@ -38,8 +38,10 @@ Attached to the UTxO that holds the MPF token.
 ```aiken
 type State {
     owner: VerificationKeyHash
-    root: ByteArray    -- 32-byte MPF root hash
-    max_fee: Int       -- max lovelace fee per request
+    root: ByteArray      -- 32-byte MPF root hash
+    max_fee: Int         -- max lovelace fee per request
+    process_time: Int    -- Phase 1 duration (ms)
+    retract_time: Int    -- Phase 2 duration (ms)
 }
 ```
 
@@ -48,6 +50,8 @@ type State {
 | `owner` | 28 bytes | Ed25519 public key hash of the token owner |
 | `root` | 32 bytes | Current MPF root (Blake2b-256). Empty trie has a well-known null hash |
 | `max_fee` | integer | Maximum fee (in lovelace) the oracle charges per request. Requesters must agree to this fee |
+| `process_time` | integer | Duration (ms) of Phase 1 — oracle-exclusive processing window. Set at mint time; enforced immutable across Modify/Reject |
+| `retract_time` | integer | Duration (ms) of Phase 2 — requester-exclusive retract window. Set at mint time; enforced immutable across Modify/Reject |
 
 ### Request
 
@@ -123,7 +127,7 @@ type UpdateRedeemer {
     End
     Contribute(OutputReference)
     Modify(List<Proof>)
-    Retract
+    Retract(OutputReference)
     Reject
 }
 ```
@@ -133,7 +137,7 @@ type UpdateRedeemer {
 | `End` | 0 | — | Destroy the MPF instance |
 | `Contribute` | 1 | `OutputReference` | Spend a request during update or reject; points to the state UTxO |
 | `Modify` | 2 | `List<Proof>` | Update the MPF root; one proof per request. Phase 1 only |
-| `Retract` | 3 | — | Cancel a request and reclaim ADA. Phase 2 only |
+| `Retract` | 3 | `OutputReference` | Cancel a request and reclaim ADA. Points to the State UTxO (included as reference input). Phase 2 only |
 | `Reject` | 4 | — | Discard expired/dishonest requests, refund ADA minus fee. Phase 3 or dishonest `submitted_at` |
 
 ## Plutus Data Encoding
@@ -149,6 +153,8 @@ Constr(1,           -- CageDatum.StateDatum
       [ Bytes(owner_pkh)
       , Bytes(root_hash)
       , Int(max_fee)
+      , Int(process_time)
+      , Int(retract_time)
       ])
   ])
 ```
