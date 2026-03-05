@@ -4,12 +4,14 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    cardano-mpfs-cage.url = "github:cardano-foundation/cardano-mpfs-cage/feat/aiken-vectors";
   };
 
   outputs =
     {
       nixpkgs,
       flake-utils,
+      cardano-mpfs-cage,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -57,8 +59,17 @@
           source = "github"
         '';
 
+        test-vectors =
+          cardano-mpfs-cage.packages.${system}.cage-test-vectors;
+
+        cage-vectors-ak = pkgs.runCommand "cage-vectors.ak" { } ''
+          ${test-vectors}/bin/cage-test-vectors --aiken > $out
+        '';
+
       in
       {
+        packages.test-vectors = cage-vectors-ak;
+
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "mpf-plutus-blueprint";
           version = "0.0.0";
@@ -87,6 +98,7 @@
         devShells.default = pkgs.mkShell {
           packages = [
             pkgs.aiken
+            pkgs.just
             pkgs.lean4
           ];
         };

@@ -10,6 +10,22 @@ develop:
 aiken-build:
     aiken build
 
+# Generate cage test vectors from Haskell reference
+generate-vectors:
+    nix build .#test-vectors --quiet
+    cp -f result validators/cage_vectors.ak
+    aiken fmt validators/cage_vectors.ak
+
+# Check that committed vectors are up to date
+vectors-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just generate-vectors
+    if ! git diff --exit-code validators/cage_vectors.ak; then
+        echo "ERROR: committed vectors are stale — run 'just generate-vectors' and commit"
+        exit 1
+    fi
+
 # Run aiken tests
 test:
     aiken check
