@@ -19,6 +19,9 @@ jobs:
         with:
           cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
+      - name: Check cage test vectors freshness
+        run: nix develop --command just vectors-check
+
       - name: Build plutus.json
         run: nix build
 
