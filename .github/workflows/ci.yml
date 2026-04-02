@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: paolino/dev-assets/setup-nix@v0.0.1
         with:
@@ -29,7 +29,7 @@ jobs:
         run: nix develop --command aiken check
 
       - name: Upload plutus.json
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: plutus-json
           path: result
@@ -40,7 +40,7 @@ jobs:
       run:
         working-directory: lean
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: paolino/dev-assets/setup-nix@v0.0.1
         with:
@@ -55,9 +55,9 @@ jobs:
       run:
         working-directory: e2e
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -71,10 +71,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download plutus.json
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: plutus-json
 
