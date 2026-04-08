@@ -61,7 +61,7 @@ inductive Operation where
 structure State where
   owner       : VKH
   root        : Hash       -- current MPF root (Blake2b-256)
-  maxFee      : Nat        -- max lovelace fee per request
+  tip         : Nat        -- oracle tip per request (lovelace)
   processTime : Nat        -- Phase 1 duration (ms)
   retractTime : Nat        -- Phase 2 duration (ms)
 
@@ -71,7 +71,7 @@ structure Request where
   requestOwner : VKH
   requestKey   : Bytes
   requestValue : Operation
-  fee          : Nat
+  tip          : Nat        -- requester agrees to oracle's tip
   submittedAt  : POSIXTime
 
 /-- Datum discriminator for UTxOs at the script address. -/
@@ -118,6 +118,7 @@ structure TxOutput where
 structure Transaction where
   inputs          : List TxInput
   outputs         : List TxOutput
+  fee             : Nat              -- actual transaction fee (Plutus V3)
   mint            : PolicyId → TokenId → Int   -- (policy, token) → quantity
   extraSignatories : List VKH
   validityRange   : Interval
@@ -354,26 +355,35 @@ structure ValidReject (state : State)
   /-- Each request is rejectable. -/
   rejectable : ∀ (pair : TxInput × Request), pair ∈ requests →
                isRejectable tx.validityRange pair.2.submittedAt state
-  /-- Each request fee matches state max_fee. -/
-  feeMatch  : ∀ (pair : TxInput × Request), pair ∈ requests →
-              pair.2.fee = state.maxFee
-  /-- Refunds: each requester receives inputLovelace - fee. -/
-  refunds   : ∀ (pair : TxInput × Request), pair ∈ requests →
-              ∃ o ∈ tx.outputs,
-                o.address = sorry ∧  -- requestOwner's address
-                o.value ≥ pair.1.value - pair.2.fee
+  /-- Each request tip matches state tip. -/
+  tipMatch  : ∀ (pair : TxInput × Request), pair ∈ requests →
+              pair.2.tip = state.tip
+  /-- Conservation: total refunded = total input - tx.fee - N * tip. -/
+  conservation :
+    ∀ refundOutputs : List TxOutput,
+      (refundOutputs.map (·.value)).sum
+        = (requests.map (·.1.value)).sum - tx.fee - requests.length * state.tip
 
 -- ============================================================================
 -- 15. Fee enforcement
 -- ============================================================================
 
-/-- During Modify, each request's fee must equal the state's max_fee,
-    and the requester is refunded inputLovelace - fee. -/
-structure FeeEnforced (state : State) (reqInput : TxInput)
-    (request : Request) (tx : Transaction) : Prop where
-  feeMatch : request.fee = state.maxFee
-  refund   : ∃ o ∈ tx.outputs,
-             o.value ≥ reqInput.value - request.fee
+/-- During Modify, the oracle collects exactly the tx fee plus tips.
+    Each request's tip must match the state's declared tip. The total
+    refunded equals total input lovelace minus tx fee minus N × tip. -/
+structure FeeEnforced (state : State)
+    (requests : List (TxInput × Request))
+    (refundOutputs : List TxOutput)
+    (tx : Transaction) : Prop where
+  /-- Each request's tip matches the state's declared tip. -/
+  tipMatch : ∀ (pair : TxInput × Request), pair ∈ requests →
+             pair.2.tip = state.tip
+  /-- One refund output per request (with lovelace > 0). -/
+  refundCount : refundOutputs.length = requests.length
+  /-- Conservation: sum of refunds = sum of inputs - tx.fee - N * tip. -/
+  conservation :
+    (refundOutputs.map (·.value)).sum
+      = (requests.map (·.1.value)).sum - tx.fee - requests.length * state.tip
 
 -- ============================================================================
 -- 16. Migration
