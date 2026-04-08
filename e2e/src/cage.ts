@@ -35,7 +35,7 @@ export type Validator = ReturnType<
 interface PendingRequest {
   utxo: UTxO;
   datum: string;
-  fee: bigint;
+  tip: bigint;
   lovelace: bigint;
   submittedAt: bigint;
 }
@@ -69,7 +69,7 @@ class Cage implements PromiseLike<void> {
   private unit = "";
   private stateUtxo: UTxO | undefined;
   private root = EMPTY_ROOT;
-  private maxFee = 0n;
+  private tip = 0n;
   private processTime: bigint;
   private retractTime: bigint;
   private pendingRequests: PendingRequest[] = [];
@@ -108,12 +108,12 @@ class Cage implements PromiseLike<void> {
 
   // --- Public DSL methods ---
 
-  mint(opts?: { maxFee?: bigint }): this {
+  mint(opts?: { tip?: bigint }): this {
     this.chain = this.chain.then(() => this.doMint(opts));
     return this;
   }
 
-  request(key: string, value: string, opts?: { fee?: bigint }): this {
+  request(key: string, value: string, opts?: { tip?: bigint }): this {
     this.chain = this.chain.then(() =>
       this.doRequest(key, value, false, opts),
     );
@@ -123,7 +123,7 @@ class Cage implements PromiseLike<void> {
   deleteRequest(
     key: string,
     value: string,
-    opts?: { fee?: bigint },
+    opts?: { tip?: bigint },
   ): this {
     this.chain = this.chain.then(() =>
       this.doRequest(key, value, true, opts),
@@ -161,8 +161,8 @@ class Cage implements PromiseLike<void> {
 
   // --- Private step implementations ---
 
-  private async doMint(opts?: { maxFee?: bigint }): Promise<void> {
-    this.maxFee = opts?.maxFee ?? 0n;
+  private async doMint(opts?: { tip?: bigint }): Promise<void> {
+    this.tip = opts?.tip ?? 0n;
 
     const utxos = await this.lucid.wallet().getUtxos();
     expect(utxos.length).toBeGreaterThan(0);
@@ -178,7 +178,7 @@ class Cage implements PromiseLike<void> {
     const datum = encodeStateDatum(
       this.ownerKeyHash,
       EMPTY_ROOT,
-      this.maxFee,
+      this.tip,
       this.processTime,
       this.retractTime,
     );
@@ -205,9 +205,9 @@ class Cage implements PromiseLike<void> {
     key: string,
     value: string,
     isDelete: boolean,
-    opts?: { fee?: bigint },
+    opts?: { tip?: bigint },
   ): Promise<void> {
-    const fee = opts?.fee ?? 0n;
+    const tip = opts?.tip ?? 0n;
     const lovelace = 2_000_000n;
     const submittedAt = BigInt(Date.now()) + onChainTimeOffset;
     const encode = isDelete
@@ -218,7 +218,7 @@ class Cage implements PromiseLike<void> {
       this.ownerKeyHash,
       key,
       value,
-      fee,
+      tip,
       submittedAt,
     );
 
@@ -248,7 +248,7 @@ class Cage implements PromiseLike<void> {
     this.pendingRequests.push({
       utxo: requestUtxo!,
       datum,
-      fee,
+      tip,
       lovelace,
       submittedAt,
     });
@@ -261,39 +261,55 @@ class Cage implements PromiseLike<void> {
     const newDatum = encodeStateDatum(
       this.ownerKeyHash,
       newRoot,
-      this.maxFee,
+      this.tip,
       this.processTime,
       this.retractTime,
     );
 
     const now = BigInt(Date.now());
+    const n = BigInt(this.pendingRequests.length);
+    const totalInputLovelace = this.pendingRequests.reduce(
+      (sum, r) => sum + r.lovelace,
+      0n,
+    );
 
-    let txBuilder = this.lucid
-      .newTx()
-      .validFrom(Number(now))
-      .validTo(Number(now + 60_000n))
-      .collectFrom([this.stateUtxo!], modifyRedeemer)
-      .collectFrom(
-        this.pendingRequests.map((r) => r.utxo),
-        contributeRedeemer,
-      )
-      .pay.ToContract(
-        this.validator.scriptAddress,
-        { kind: "inline", value: newDatum },
-        { [this.unit]: 1n, lovelace: 2_000_000n },
-      );
+    // Two-pass: estimate fee, then set exact refunds
+    const tx = await this.buildWithConservation(
+      (estimatedFee: bigint) => {
+        const totalRefund = totalInputLovelace - estimatedFee - n * this.tip;
+        const perRequest = n > 0n ? totalRefund / n : 0n;
+        const remainder = n > 0n ? totalRefund % n : 0n;
 
-    // Refund each requester
-    for (const req of this.pendingRequests) {
-      txBuilder = txBuilder.pay.ToAddress(this.walletAddress, {
-        lovelace: req.lovelace - req.fee,
-      });
-    }
+        let txBuilder = this.lucid
+          .newTx()
+          .validFrom(Number(now))
+          .validTo(Number(now + 60_000n))
+          .collectFrom([this.stateUtxo!], modifyRedeemer)
+          .collectFrom(
+            this.pendingRequests.map((r) => r.utxo),
+            contributeRedeemer,
+          )
+          .pay.ToContract(
+            this.validator.scriptAddress,
+            { kind: "inline", value: newDatum },
+            { [this.unit]: 1n, lovelace: 2_000_000n },
+          );
 
-    const tx = await txBuilder
-      .attach.SpendingValidator(this.validator.spendValidator)
-      .addSignerKey(this.ownerKeyHash)
-      .complete(COMPLETE_OPTS);
+        // Refund each requester with conservation-exact amounts
+        this.pendingRequests.forEach((req, i) => {
+          const refund = perRequest + (BigInt(i) === 0n ? remainder : 0n);
+          if (refund > 0n) {
+            txBuilder = txBuilder.pay.ToAddress(this.walletAddress, {
+              lovelace: refund,
+            });
+          }
+        });
+
+        return txBuilder
+          .attach.SpendingValidator(this.validator.spendValidator)
+          .addSignerKey(this.ownerKeyHash);
+      },
+    );
 
     await this.submitAndWait(tx);
 
@@ -317,7 +333,7 @@ class Cage implements PromiseLike<void> {
     const datum = encodeStateDatum(
       this.ownerKeyHash,
       this.root,
-      this.maxFee,
+      this.tip,
       this.processTime,
       this.retractTime,
     );
@@ -358,42 +374,55 @@ class Cage implements PromiseLike<void> {
     const sameDatum = encodeStateDatum(
       this.ownerKeyHash,
       this.root,
-      this.maxFee,
+      this.tip,
       this.processTime,
       this.retractTime,
     );
 
     const now = BigInt(Date.now());
+    const n = BigInt(this.pendingRequests.length);
+    const totalInputLovelace = this.pendingRequests.reduce(
+      (sum, r) => sum + r.lovelace,
+      0n,
+    );
 
-    let txBuilder = this.lucid
-      .newTx()
-      .validFrom(Number(now))
-      .validTo(Number(now + 60_000n))
-      .collectFrom([this.stateUtxo!], rejectRedeemer)
-      .collectFrom(
-        this.pendingRequests.map((r) => r.utxo),
-        contributeRedeemer,
-      )
-      .pay.ToContract(
-        this.validator.scriptAddress,
-        { kind: "inline", value: sameDatum },
-        { [this.unit]: 1n, lovelace: 2_000_000n },
-      );
+    // Two-pass: estimate fee, then set exact refunds
+    const tx = await this.buildWithConservation(
+      (estimatedFee: bigint) => {
+        const totalRefund = totalInputLovelace - estimatedFee - n * this.tip;
+        const perRequest = n > 0n ? totalRefund / n : 0n;
+        const remainder = n > 0n ? totalRefund % n : 0n;
 
-    // Refund each requester (lovelace minus fee)
-    for (const req of this.pendingRequests) {
-      const refund = req.lovelace - req.fee;
-      if (refund > 0n) {
-        txBuilder = txBuilder.pay.ToAddress(this.walletAddress, {
-          lovelace: refund,
+        let txBuilder = this.lucid
+          .newTx()
+          .validFrom(Number(now))
+          .validTo(Number(now + 60_000n))
+          .collectFrom([this.stateUtxo!], rejectRedeemer)
+          .collectFrom(
+            this.pendingRequests.map((r) => r.utxo),
+            contributeRedeemer,
+          )
+          .pay.ToContract(
+            this.validator.scriptAddress,
+            { kind: "inline", value: sameDatum },
+            { [this.unit]: 1n, lovelace: 2_000_000n },
+          );
+
+        // Refund each requester with conservation-exact amounts
+        this.pendingRequests.forEach((req, i) => {
+          const refund = perRequest + (BigInt(i) === 0n ? remainder : 0n);
+          if (refund > 0n) {
+            txBuilder = txBuilder.pay.ToAddress(this.walletAddress, {
+              lovelace: refund,
+            });
+          }
         });
-      }
-    }
 
-    const tx = await txBuilder
-      .attach.SpendingValidator(this.validator.spendValidator)
-      .addSignerKey(this.ownerKeyHash)
-      .complete(COMPLETE_OPTS);
+        return txBuilder
+          .attach.SpendingValidator(this.validator.spendValidator)
+          .addSignerKey(this.ownerKeyHash);
+      },
+    );
 
     await this.submitAndWait(tx);
 
@@ -424,6 +453,28 @@ class Cage implements PromiseLike<void> {
   }
 
   // --- Helpers ---
+
+  /**
+   * Build a transaction with conservation-exact refunds.
+   * Two-pass: first estimate the fee with a dummy build, then rebuild
+   * with refund amounts that satisfy the conservation equation.
+   * Iterates until the fee stabilizes (max 5 attempts).
+   */
+  private async buildWithConservation(
+    build: (estimatedFee: bigint) => ReturnType<LucidEvolution["newTx"]>,
+  ): Promise<Awaited<ReturnType<ReturnType<LucidEvolution["newTx"]>["complete"]>>> {
+    let fee = 300_000n; // initial estimate
+    for (let i = 0; i < 5; i++) {
+      const txBuilder = build(fee);
+      const tx = await txBuilder.complete(COMPLETE_OPTS);
+      const actualFee = BigInt(tx.toTransaction().body().fee());
+      if (actualFee === fee) return tx;
+      fee = actualFee;
+    }
+    // Use last estimate
+    const txBuilder = build(fee);
+    return txBuilder.complete(COMPLETE_OPTS);
+  }
 
   private async submitAndWait(
     txBuilder: Awaited<ReturnType<ReturnType<LucidEvolution["newTx"]>["complete"]>>,
