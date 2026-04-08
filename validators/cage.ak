@@ -576,18 +576,20 @@ pub fn is_rejectable(
 /// - Request with Insert on existing key -> mpf.insert fails
 /// - Request with Delete on non-existent key -> mpf.delete fails
 /// - Request with Update with wrong old value -> mpf.update fails
-fn mkUpdate(tokenId, max_fee, process_time, validity_range) {
+fn mkUpdate(tokenId, state_tip, process_time, validity_range) {
   fn(
     input: Input,
     acc: (
       MerklePatriciaForestry,
       List<Proof>,
       List<Pair<VerificationKeyHash, Int>>,
+      Int,
     ),
   ) -> (
     MerklePatriciaForestry,
     List<Proof>,
     List<Pair<VerificationKeyHash, Int>>,
+    Int,
   ) {
     when input.output.datum is {
       InlineDatum(datum) ->
@@ -597,15 +599,15 @@ fn mkUpdate(tokenId, max_fee, process_time, validity_range) {
             requestKey,
             requestValue,
             requestOwner,
-            fee,
+            tip,
             submitted_at,
           } = request
           if requestToken == tokenId {
-            // Fee must match the state's max_fee
-            expect fee == max_fee
+            // Tip must match the state's declared tip
+            expect tip == state_tip
             // Request must be in Phase 1
             expect in_phase1(validity_range, submitted_at, process_time)
-            let (root, proofs, refunds) = acc
+            let (root, proofs, owners, totalInputLovelace) = acc
             let proof, proofsTail <- uncons(proofs)
             let newRoot =
               when requestValue is {
@@ -614,16 +616,14 @@ fn mkUpdate(tokenId, max_fee, process_time, validity_range) {
                 Update(oldValue, newValue) ->
                   mpf.update(root, requestKey, proof, oldValue, newValue)
               }
-            // Compute refund: input lovelace minus fee
             let inputLovelace = assets.lovelace_of(input.output.value)
-            let refundAmount = inputLovelace - fee
-            let newRefunds =
-              if refundAmount > 0 {
-                [Pair(requestOwner, refundAmount), ..refunds]
+            let newOwners =
+              if inputLovelace > 0 {
+                [Pair(requestOwner, inputLovelace), ..owners]
               } else {
-                refunds
+                owners
               }
-            (newRoot, proofsTail, newRefunds)
+            (newRoot, proofsTail, newOwners, totalInputLovelace + inputLovelace)
           } else {
             acc
           }
@@ -635,23 +635,21 @@ fn mkUpdate(tokenId, max_fee, process_time, validity_range) {
   }
 }
 
-/// Verify that refund outputs match the expected refunds.
+/// Sum refund output lovelaces, verifying each goes to the correct owner.
 ///
-/// Walks the output list in parallel with the refunds list.
-/// For each refund, checks that the output pays at least
-/// the refund amount to the correct owner address.
-fn verifyRefunds(
+/// Walks the output list in parallel with the owners list.
+/// Returns the total lovelace across all refund outputs.
+fn sumRefunds(
   outputs: List<Output>,
-  refunds: List<Pair<VerificationKeyHash, Int>>,
-) -> Bool {
-  when refunds is {
-    [] -> True
-    [Pair(owner, amount), ..rest] -> {
+  owners: List<Pair<VerificationKeyHash, Int>>,
+) -> Int {
+  when owners is {
+    [] -> 0
+    [Pair(owner, _inputLovelace), ..rest] -> {
       expect [output, ..remaining] = outputs
       expect address.VerificationKey(vkh) = output.address.payment_credential
       expect vkh == owner
-      expect assets.lovelace_of(output.value) >= amount
-      verifyRefunds(remaining, rest)
+      assets.lovelace_of(output.value) + sumRefunds(remaining, rest)
     }
   }
 }
@@ -725,8 +723,8 @@ fn validRootUpdate(
   tx: Transaction,
   proofs: List<Proof>,
 ) {
-  let Transaction { outputs, inputs, validity_range, .. } = tx
-  let State { root, max_fee, process_time, retract_time, .. } = state
+  let Transaction { outputs, inputs, validity_range, fee: tx_fee, .. } = tx
+  let State { root, tip, process_time, retract_time, .. } = state
   expect Some(output) = head(outputs)
   expect InlineDatum(outState) = output.datum
   expect
@@ -742,45 +740,51 @@ fn validRootUpdate(
   expect process_time == outProcessTime
   expect retract_time == outRetractTime
 
-  let (expectedNewRoot, _, refunds) =
+  let (expectedNewRoot, _, owners, totalInputLovelace) =
     inputs
       |> foldl(
-          (mpf.from_root(root), proofs, []),
-          mkUpdate(tokenId, max_fee, process_time, validity_range),
+          (mpf.from_root(root), proofs, [], 0),
+          mkUpdate(tokenId, tip, process_time, validity_range),
         )
   expect (mpf.root(expectedNewRoot) == newRoot)?
   expect
     output.address.payment_credential == input.output.address.payment_credential
 
   // Verify refund outputs (starting after the State UTxO at index 0)
+  let n = list.length(owners)
   expect [_, ..refundOutputs] = outputs
-  let orderedRefunds = list.reverse(refunds)
-  expect verifyRefunds(refundOutputs, orderedRefunds)
+  let orderedOwners = list.reverse(owners)
+  let totalRefunded = sumRefunds(refundOutputs, orderedOwners)
+  // Conservation: total refunded == total input lovelace - tx fee - N * tip
+  expect totalRefunded == totalInputLovelace - tx_fee - n * tip
   True
 }
 
-/// Create a reject function for folding over inputs to collect refunds.
+/// Create a reject function for folding over inputs to collect owners/lovelaces.
 /// Like mkUpdate but: no proofs, no MPF operations, is_rejectable check.
 fn mkReject(
   tokenId,
-  max_fee,
+  state_tip,
   process_time,
   retract_time,
   validity_range,
 ) {
-  fn(input: Input, refunds: List<Pair<VerificationKeyHash, Int>>) {
+  fn(
+    input: Input,
+    acc: (List<Pair<VerificationKeyHash, Int>>, Int),
+  ) -> (List<Pair<VerificationKeyHash, Int>>, Int) {
     when input.output.datum is {
       InlineDatum(datum) ->
         if datum is RequestDatum(request): CageDatum {
           let Request {
             requestToken,
             requestOwner,
-            fee,
+            tip,
             submitted_at,
             ..
           } = request
           if requestToken == tokenId {
-            expect fee == max_fee
+            expect tip == state_tip
             expect
               is_rejectable(
                 validity_range,
@@ -788,34 +792,36 @@ fn mkReject(
                 process_time,
                 retract_time,
               )
+            let (owners, totalInputLovelace) = acc
             let inputLovelace = assets.lovelace_of(input.output.value)
-            let refundAmount = inputLovelace - fee
-            if refundAmount > 0 {
-              [Pair(requestOwner, refundAmount), ..refunds]
-            } else {
-              refunds
-            }
+            let newOwners =
+              if inputLovelace > 0 {
+                [Pair(requestOwner, inputLovelace), ..owners]
+              } else {
+                owners
+              }
+            (newOwners, totalInputLovelace + inputLovelace)
           } else {
-            refunds
+            acc
           }
         } else {
-          refunds
+          acc
         }
-      _ -> refunds
+      _ -> acc
     }
   }
 }
 
 /// Validate a Reject operation: discard expired/dishonest requests.
-/// Root MUST NOT change. Refunds enforced for each rejected request.
+/// Root MUST NOT change. Conservation equation enforced.
 fn validReject(
   state: State,
   input: Input,
   tokenId: TokenId,
   tx: Transaction,
 ) {
-  let Transaction { outputs, inputs, validity_range, .. } = tx
-  let State { root, max_fee, process_time, retract_time, .. } = state
+  let Transaction { outputs, inputs, validity_range, fee: tx_fee, .. } = tx
+  let State { root, tip, process_time, retract_time, .. } = state
 
   expect Some(output) = head(outputs)
   expect InlineDatum(outState) = output.datum
@@ -836,22 +842,25 @@ fn validReject(
   expect
     output.address.payment_credential == input.output.address.payment_credential
 
-  let refunds =
+  let (owners, totalInputLovelace) =
     inputs
       |> foldl(
-          [],
+          ([], 0),
           mkReject(
             tokenId,
-            max_fee,
+            tip,
             process_time,
             retract_time,
             validity_range,
           ),
         )
 
+  let n = list.length(owners)
   expect [_, ..refundOutputs] = outputs
-  let orderedRefunds = list.reverse(refunds)
-  expect verifyRefunds(refundOutputs, orderedRefunds)
+  let orderedOwners = list.reverse(owners)
+  let totalRefunded = sumRefunds(refundOutputs, orderedOwners)
+  // Conservation: total refunded == total input lovelace - tx fee - N * tip
+  expect totalRefunded == totalInputLovelace - tx_fee - n * tip
   True
 }
 

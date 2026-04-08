@@ -53,8 +53,8 @@ describe("MPF Cage Migration E2E", () => {
       PROCESS_TIME,
       RETRACT_TIME,
     )
-      .mint({ maxFee: 500_000n })
-      .request(INSERT_KEY, INSERT_VALUE, { fee: 500_000n })
+      .mint({ tip: 500_000n })
+      .request(INSERT_KEY, INSERT_VALUE, { tip: 500_000n })
       .modify(MODIFIED_ROOT)
       .end();
   });
