@@ -125,6 +125,8 @@ import PlutusTx.Builtins.Internal
     )
 
 
+import ConservationBalance (FeeLoopError (..), balanceFeeLoop)
+
 import Cardano.MPFS.OnChain.AssetName (computeAssetName)
 import Cardano.MPFS.OnChain.Datum
     ( mkInlineDatum
@@ -561,198 +563,25 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
     let feeUtxo = case walletUtxos of
             [] -> error "buildModifyTx: no wallet UTxOs"
             (u : _) -> u
-        (stateIn, stateOut) = stateUtxo
-        reqIns = map fst reqUtxos
-        -- Fee overestimate: conservation equation
-        -- uses this as tx.fee seen by the script
-        overestimate = Coin 600_000
-        numReqs = fromIntegral (length reqUtxos)
-        totalInputLovelace =
-            foldl
-                ( \(Coin acc) (_, o) ->
-                    let Coin c = o ^. coinTxOutL
-                    in  Coin (acc + c)
-                )
-                (Coin 0)
-                reqUtxos
-        Coin totalIn = totalInputLovelace
-        Coin overEst = overestimate
-        -- Conservation: refund = reqValues - fee - N*tip
-        totalRefund = totalIn - overEst - numReqs * tip
-        perRequest =
-            if numReqs > 0
-                then totalRefund `div` numReqs
-                else 0
-        remainder =
-            if numReqs > 0
-                then totalRefund `mod` numReqs
-                else 0
-        -- N*tip added to state output (oracle income)
-        oracleTipTotal = numReqs * tip
-        ownerKhBytes = case ownerAddr of
-            Addr _ (KeyHashObj kh) _ ->
-                let KeyHash h = kh
-                in  hashToBytes h
-            _ -> error "buildModifyTx: not a key address"
-        assetNameSbs = case stateOut ^. valueTxOutL of
-            MaryValue _ (MultiAsset ma) ->
-                case Map.lookup (envPolicyId env) ma of
-                    Just assets ->
-                        case Map.keys assets of
-                            (Value.AssetName an : _) -> an
-                            _ -> error "buildModifyTx: no asset"
-                    Nothing -> error "buildModifyTx: no policy"
-        assetNameLedger = Value.AssetName assetNameSbs
-        newStateDatum =
-            StateDatum
-                OnChainTokenState
-                    { stateOwner =
-                        BuiltinByteString
-                            ownerKhBytes
-                    , stateRoot =
-                        OnChainRoot rootAfterInsert42
-                    , stateTip = tip
-                    , stateProcessTime = processTime
-                    , stateRetractTime = retractTime
-                    }
-        mint =
-            MultiAsset
-                $ Map.singleton
-                    (envPolicyId env)
-                    (Map.singleton assetNameLedger 1)
-        -- State output carries the token + original
-        -- ADA + accumulated tips (oracle income)
-        newStateOut =
-            mkBasicTxOut
-                (envScriptAddr env)
-                ( MaryValue
-                    (Coin (2_000_000 + oracleTipTotal))
-                    mint
-                )
-                & datumTxOutL
-                    .~ mkInlineDatum
-                        (toPlcData newStateDatum)
-        mkRefundOut i =
-            mkBasicTxOut
-                ownerAddr
-                ( inject
-                    ( Coin
-                        ( perRequest
-                            + if i == (0 :: Int)
-                                then remainder
-                                else 0
-                        )
-                    )
-                )
-        refundOuts =
-            map mkRefundOut [0 .. length reqUtxos - 1]
-        allOuts =
-            StrictSeq.fromList
-                (newStateOut : refundOuts)
-        allScriptIns =
-            Set.fromList (stateIn : reqIns)
-        -- Compute proofs: empty for E2E (empty MPF)
-        proofs = map (const []) reqUtxos
-        stateRef = txInToRef stateIn
-        modifyRedeemer = Modify proofs
-        stateIx =
-            spendingIndex stateIn allScriptIns
-        contributeEntries =
-            map
-                ( \rIn ->
-                    let ix =
-                            spendingIndex
-                                rIn
-                                allScriptIns
-                        rdm = Contribute stateRef
-                    in  ( ConwaySpending (AsIx ix)
-                        ,
-                            ( toLedgerData rdm
-                            , placeholderExUnits
-                            )
-                        )
-                )
-                reqIns
-        redeemers =
-            Redeemers
-                $ Map.fromList
-                $ ( ConwaySpending
-                        (AsIx stateIx)
-                  ,
-                      ( toLedgerData modifyRedeemer
-                      , placeholderExUnits
-                      )
-                  )
-                    : contributeEntries
-        integrity =
-            computeScriptIntegrity pp redeemers
-        witnessKh =
-            coerceKeyRole ownerKh
-                :: KeyHash 'Witness
-        -- Validity: no lower bound, upper well within
-        -- devnet era (slot < 500).
-        -- Upper bound must be before Phase 1 ends
-        -- (submitted_at + process_time) for the
-        -- validator's in_phase1 check.
-        upperSlot = SlotNo 300
-        vldt =
-            ValidityInterval
-                SNothing
-                (SJust upperSlot)
-        body =
-            mkBasicTxBody
-                & inputsTxBodyL .~ allScriptIns
-                & outputsTxBodyL .~ allOuts
-                & feeTxBodyL .~ overestimate
-                & collateralInputsTxBodyL
-                    .~ Set.singleton (fst feeUtxo)
-                & reqSignerHashesTxBodyL
-                    .~ Set.singleton witnessKh
-                & vldtTxBodyL .~ vldt
-                & scriptIntegrityHashTxBodyL
-                    .~ integrity
-        tx =
-            mkBasicTx body
-                & witsTxL . scriptTxWitsL
-                    .~ Map.singleton
-                        (envSpendScriptHash env)
-                        (envSpendScript env)
-                & witsTxL . rdmrsTxWitsL
-                    .~ redeemers
-    evalResult <- evaluateTx (envProvider env) tx
-    let failures =
-            [ (p, e)
-            | (p, Left e) <- Map.toList evalResult
-            ]
-    if null failures
-        then pure ()
-        else
-            error
-                $ "buildModifyTx: script eval: "
-                    <> show failures
-    let Redeemers rdmrMap =
-            tx ^. witsTxL . rdmrsTxWitsL
-        patchedRdmrs =
-            Map.mapWithKey
-                ( \purpose (dat, eu) ->
-                    case Map.lookup
-                        purpose
-                        evalResult of
-                        Just (Right eu') ->
-                            (dat, eu')
-                        _ -> (dat, eu)
-                )
-                rdmrMap
-        newRedeemers = Redeemers patchedRdmrs
-        newIntegrity =
-            computeScriptIntegrity pp newRedeemers
-    pure
-        $ tx
-            & witsTxL . rdmrsTxWitsL
-                .~ newRedeemers
-            & bodyTxL
-                . scriptIntegrityHashTxBodyL
-                .~ newIntegrity
+    buildConservationTx
+        BuildConservationConfig
+            { bccEnv = env
+            , bccPP = pp
+            , bccOwnerKh = ownerKh
+            , bccOwnerAddr = ownerAddr
+            , bccStateUtxo = stateUtxo
+            , bccReqUtxos = reqUtxos
+            , bccFeeUtxo = feeUtxo
+            , bccTip = tip
+            , bccProcessTime = processTime
+            , bccRetractTime = retractTime
+            , bccNewRoot = rootAfterInsert42
+            , bccStateRedeemer = Modify (map (const []) reqUtxos)
+            , bccVldt =
+                ValidityInterval
+                    SNothing
+                    (SJust (SlotNo 300))
+            }
 
 -- | Build a reject transaction with conservation-aware fee handling.
 buildRejectTx
@@ -771,9 +600,71 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
     let feeUtxo = case walletUtxos of
             [] -> error "buildRejectTx: no wallet UTxOs"
             (u : _) -> u
-        (stateIn, stateOut) = stateUtxo
+        -- Phase 3 validity: devnet-relative slots
+        -- (100ms/slot), with ~5s genesis delay
+        genesisDelayMs = 5_000
+        phase3StartMs =
+            genesisDelayMs
+                + processTime
+                + retractTime
+                + 5_000
+        lowerSlot =
+            SlotNo
+                ( fromIntegral
+                    (phase3StartMs `div` 100)
+                )
+    buildConservationTx
+        BuildConservationConfig
+            { bccEnv = env
+            , bccPP = pp
+            , bccOwnerKh = ownerKh
+            , bccOwnerAddr = ownerAddr
+            , bccStateUtxo = stateUtxo
+            , bccReqUtxos = reqUtxos
+            , bccFeeUtxo = feeUtxo
+            , bccTip = tip
+            , bccProcessTime = processTime
+            , bccRetractTime = retractTime
+            , bccNewRoot = emptyRoot
+            , bccStateRedeemer = Reject
+            , bccVldt =
+                ValidityInterval
+                    (SJust lowerSlot)
+                    (SJust (SlotNo 490))
+            }
+
+-- | Config for conservation-aware tx building
+-- (shared by modify and reject).
+data BuildConservationConfig = BuildConservationConfig
+    { bccEnv :: CageEnv
+    , bccPP :: PParams ConwayEra
+    , bccOwnerKh :: KeyHash 'Payment
+    , bccOwnerAddr :: Addr
+    , bccStateUtxo :: (TxIn, TxOut ConwayEra)
+    , bccReqUtxos :: [(TxIn, TxOut ConwayEra)]
+    , bccFeeUtxo :: (TxIn, TxOut ConwayEra)
+    , bccTip :: Integer
+    , bccProcessTime :: Integer
+    , bccRetractTime :: Integer
+    , bccNewRoot :: BS.ByteString
+    , bccStateRedeemer :: UpdateRedeemer
+    , bccVldt :: ValidityInterval
+    }
+
+-- | Build a conservation-aware transaction (modify
+-- or reject). Uses 'balanceFeeLoop' to find the
+-- fee fixed point: fee and refund outputs converge
+-- in 2–3 rounds, with no hardcoded overestimate.
+buildConservationTx
+    :: BuildConservationConfig -> IO (Tx ConwayEra)
+buildConservationTx cfg = do
+    let env = bccEnv cfg
+        pp = bccPP cfg
+        ownerAddr = bccOwnerAddr cfg
+        (stateIn, stateOut) = bccStateUtxo cfg
+        reqUtxos = bccReqUtxos cfg
         reqIns = map fst reqUtxos
-        overestimate = Coin 600_000
+        tip = bccTip cfg
         numReqs = fromIntegral (length reqUtxos)
         totalInputLovelace =
             foldl
@@ -784,77 +675,107 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
                 (Coin 0)
                 reqUtxos
         Coin totalIn = totalInputLovelace
-        Coin overEst = overestimate
-        totalRefund = totalIn - overEst - numReqs * tip
-        perRequest =
-            if numReqs > 0
-                then totalRefund `div` numReqs
-                else 0
-        remainder =
-            if numReqs > 0
-                then totalRefund `mod` numReqs
-                else 0
         oracleTipTotal = numReqs * tip
         ownerKhBytes = case ownerAddr of
             Addr _ (KeyHashObj kh) _ ->
                 let KeyHash h = kh
                 in  hashToBytes h
-            _ -> error "buildRejectTx: not a key address"
+            _ ->
+                error
+                    "buildConservationTx: \
+                    \not a key address"
         assetNameSbs = case stateOut ^. valueTxOutL of
             MaryValue _ (MultiAsset ma) ->
                 case Map.lookup (envPolicyId env) ma of
                     Just assets ->
                         case Map.keys assets of
-                            (Value.AssetName an : _) -> an
-                            _ -> error "buildRejectTx: no asset"
-                    Nothing -> error "buildRejectTx: no policy"
+                            (Value.AssetName an : _) ->
+                                an
+                            _ ->
+                                error
+                                    "buildConservationTx: \
+                                    \no asset"
+                    Nothing ->
+                        error
+                            "buildConservationTx: \
+                            \no policy"
         assetNameLedger = Value.AssetName assetNameSbs
-        sameDatum =
+        newDatum =
             StateDatum
                 OnChainTokenState
                     { stateOwner =
                         BuiltinByteString
                             ownerKhBytes
-                    , stateRoot = OnChainRoot emptyRoot
+                    , stateRoot =
+                        OnChainRoot (bccNewRoot cfg)
                     , stateTip = tip
-                    , stateProcessTime = processTime
-                    , stateRetractTime = retractTime
+                    , stateProcessTime =
+                        bccProcessTime cfg
+                    , stateRetractTime =
+                        bccRetractTime cfg
                     }
         mint =
             MultiAsset
                 $ Map.singleton
                     (envPolicyId env)
                     (Map.singleton assetNameLedger 1)
-        newStateOut =
-            mkBasicTxOut
-                (envScriptAddr env)
-                ( MaryValue
-                    (Coin (2_000_000 + oracleTipTotal))
-                    mint
-                )
-                & datumTxOutL
-                    .~ mkInlineDatum (toPlcData sameDatum)
-        mkRefundOut i =
-            mkBasicTxOut
-                ownerAddr
-                ( inject
-                    ( Coin
-                        ( perRequest
-                            + if i == (0 :: Int)
-                                then remainder
-                                else 0
-                        )
-                    )
-                )
-        refundOuts =
-            map mkRefundOut [0 .. length reqUtxos - 1]
-        allOuts =
-            StrictSeq.fromList
-                (newStateOut : refundOuts)
+        -- Output function for balanceFeeLoop:
+        -- given a fee, compute state + refund outputs
+        mkOutputs (Coin fee) =
+            let totalRefund =
+                    totalIn - fee - numReqs * tip
+                perRequest =
+                    if numReqs > 0
+                        then totalRefund `div` numReqs
+                        else 0
+                remainder =
+                    if numReqs > 0
+                        then totalRefund `mod` numReqs
+                        else 0
+            in  if totalRefund < 0
+                    then
+                        Left
+                            "insufficient funds \
+                            \for fee + tips"
+                    else
+                        let stOut =
+                                mkBasicTxOut
+                                    (envScriptAddr env)
+                                    ( MaryValue
+                                        ( Coin
+                                            ( 2_000_000
+                                                + oracleTipTotal
+                                            )
+                                        )
+                                        mint
+                                    )
+                                    & datumTxOutL
+                                        .~ mkInlineDatum
+                                            (toPlcData newDatum)
+                            mkRefund i =
+                                mkBasicTxOut
+                                    ownerAddr
+                                    ( inject
+                                        ( Coin
+                                            ( perRequest
+                                                + if i
+                                                    == (0 :: Int)
+                                                    then
+                                                        remainder
+                                                    else 0
+                                            )
+                                        )
+                                    )
+                            refunds =
+                                map
+                                    mkRefund
+                                    [0 .. length reqUtxos - 1]
+                        in  Right
+                                $ StrictSeq.fromList
+                                    (stOut : refunds)
         allScriptIns =
             Set.fromList (stateIn : reqIns)
         stateRef = txInToRef stateIn
-        rejectRedeemer = Reject
         stateIx =
             spendingIndex stateIn allScriptIns
         contributeEntries =
@@ -876,10 +797,10 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
         redeemers =
             Redeemers
                 $ Map.fromList
-                $ ( ConwaySpending
-                        (AsIx stateIx)
+                $ ( ConwaySpending (AsIx stateIx)
                   ,
-                      ( toLedgerData rejectRedeemer
+                      ( toLedgerData
+                            (bccStateRedeemer cfg)
                       , placeholderExUnits
                       )
                   )
@@ -887,63 +808,61 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
         integrity =
             computeScriptIntegrity pp redeemers
         witnessKh =
-            coerceKeyRole ownerKh
+            coerceKeyRole (bccOwnerKh cfg)
                 :: KeyHash 'Witness
-        -- Validity: Phase 3 = after process_time +
-        -- retract_time. Use devnet-relative slots
-        -- (100ms/slot). Must stay within first era
-        -- (< 500 slots).
-        -- Account for ~3s N2C connection delay
-        -- between genesis start and envStartMs.
-        genesisDelayMs = 5_000
-        phase3StartMs =
-            genesisDelayMs
-                + processTime
-                + retractTime
-                + 5_000
-        lowerSlot =
-            SlotNo
-                ( fromIntegral
-                    (phase3StartMs `div` 100)
-                )
-        upperSlot = SlotNo 490
-        vldt =
-            ValidityInterval
-                (SJust lowerSlot)
-                (SJust upperSlot)
-        body =
+        -- Template tx: inputs, collateral, scripts,
+        -- redeemers set. Fee and outputs will be
+        -- overwritten by balanceFeeLoop.
+        templateBody =
             mkBasicTxBody
                 & inputsTxBodyL .~ allScriptIns
-                & outputsTxBodyL .~ allOuts
-                & feeTxBodyL .~ overestimate
                 & collateralInputsTxBodyL
-                    .~ Set.singleton (fst feeUtxo)
+                    .~ Set.singleton
+                        (fst (bccFeeUtxo cfg))
                 & reqSignerHashesTxBodyL
                     .~ Set.singleton witnessKh
-                & vldtTxBodyL .~ vldt
+                & vldtTxBodyL .~ bccVldt cfg
                 & scriptIntegrityHashTxBodyL
                     .~ integrity
-        tx =
-            mkBasicTx body
+        templateTx =
+            mkBasicTx templateBody
                 & witsTxL . scriptTxWitsL
                     .~ Map.singleton
                         (envSpendScriptHash env)
                         (envSpendScript env)
                 & witsTxL . rdmrsTxWitsL
                     .~ redeemers
-    evalResult <- evaluateTx (envProvider env) tx
+    -- Phase 1: evaluate scripts with a fee
+    -- overestimate to get real ExUnits.
+    let overestTx = case mkOutputs (Coin 1_000_000) of
+            Left msg ->
+                error
+                    $ "buildConservationTx: "
+                        <> msg
+            Right outs ->
+                templateTx
+                    & bodyTxL . outputsTxBodyL .~ outs
+                    & bodyTxL . feeTxBodyL
+                        .~ Coin 1_000_000
+    evalResult <-
+        evaluateTx (envProvider env) overestTx
     let failures =
             [ (p, e)
-            | (p, Left e) <- Map.toList evalResult
+            | (p, Left e) <-
+                Map.toList evalResult
             ]
     if null failures
         then pure ()
         else
             error
-                $ "buildRejectTx: script eval: "
+                $ "buildConservationTx: \
+                  \script eval: "
                     <> show failures
+    -- Phase 2: patch ExUnits, recompute integrity,
+    -- then find the fee fixed point with the real
+    -- ExUnits baked in.
     let Redeemers rdmrMap =
-            tx ^. witsTxL . rdmrsTxWitsL
+            templateTx ^. witsTxL . rdmrsTxWitsL
         patchedRdmrs =
             Map.mapWithKey
                 ( \purpose (dat, eu) ->
@@ -958,13 +877,27 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
         newRedeemers = Redeemers patchedRdmrs
         newIntegrity =
             computeScriptIntegrity pp newRedeemers
-    pure
-        $ tx
-            & witsTxL . rdmrsTxWitsL
-                .~ newRedeemers
-            & bodyTxL
-                . scriptIntegrityHashTxBodyL
-                .~ newIntegrity
+        patchedTx =
+            templateTx
+                & witsTxL . rdmrsTxWitsL
+                    .~ newRedeemers
+                & bodyTxL
+                    . scriptIntegrityHashTxBodyL
+                    .~ newIntegrity
+    case balanceFeeLoop
+        pp
+        mkOutputs
+        1
+        patchedTx of
+        Left (OutputError msg) ->
+            error
+                $ "buildConservationTx: "
+                    <> msg
+        Left FeeDidNotConverge ->
+            error
+                "buildConservationTx: \
+                \fee did not converge"
+        Right tx -> pure tx
 
 -- | Build an end transaction (burn token, spend state UTxO).
 buildEndTx
