@@ -75,6 +75,7 @@ test-suite e2e-tests
     , cardano-ledger-allegra
     , cardano-ledger-alonzo
     , cardano-ledger-api
+    , cardano-ledger-binary
     , cardano-ledger-conway
     , cardano-ledger-core
     , cardano-ledger-mary
@@ -86,3 +87,4 @@ test-suite e2e-tests
     , hspec
     , microlens
     , plutus-tx
+    , time

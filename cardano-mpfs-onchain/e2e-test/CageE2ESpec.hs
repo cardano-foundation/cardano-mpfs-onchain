@@ -6,6 +6,7 @@ module CageE2ESpec (spec) where
 import Control.Concurrent (threadDelay)
 import Data.ByteString qualified as BS
 import Data.Maybe (listToMaybe)
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import System.Environment (lookupEnv)
 import Test.Hspec
 
@@ -55,7 +56,9 @@ setupDevnet action = do
     bpPath <- lookupEnv "MPFS_BLUEPRINT"
     let bp = maybe "plutus.json" id bpPath
     withDevnet $ \lsq ltxs -> do
-        env <- mkCageEnv bp 0 lsq ltxs
+        now <- getPOSIXTime
+        let startMs = round (now * 1000)
+        env <- mkCageEnv bp startMs lsq ltxs
         action (env, genesisAddr)
 
 selfTransferWithCollateral :: DevnetEnv -> IO ()

@@ -22,12 +22,15 @@ module CageTxBuilder
 
 import Control.Concurrent (threadDelay)
 import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as BSL
 import Data.ByteString.Short qualified as SBS
 import Data.Map.Strict qualified as Map
 import Data.Sequence.Strict qualified as StrictSeq
 import Data.Set qualified as Set
 import Data.Word (Word32)
 import Lens.Micro ((&), (.~), (^.))
+import Numeric (showHex)
+import System.IO (hPutStrLn, hFlush, stderr)
 
 import Cardano.Crypto.Hash (hashToBytes)
 import Cardano.Ledger.Address (Addr (..))
@@ -81,7 +84,7 @@ import Cardano.Ledger.BaseTypes
     ( Inject (..)
     , Network (..)
     , SlotNo (..)
-    , StrictMaybe (SJust)
+    , StrictMaybe (SJust, SNothing)
     , TxIx (..)
     )
 import Cardano.Ledger.Coin (Coin (..))
@@ -92,6 +95,7 @@ import Cardano.Ledger.Conway.Scripts
 import Cardano.Ledger.Core
     ( PParams
     , Script
+    , eraProtVerLow
     , extractHash
     , hashScript
     )
@@ -151,6 +155,51 @@ import Cardano.Node.Client.Submitter
     , Submitter (..)
     )
 import Cardano.Crypto.DSIGN (Ed25519DSIGN, SignKeyDSIGN)
+import Cardano.Ledger.Binary (serialize)
+
+-- | Dump tx body diagnostic info to stderr.
+-- Checks if CBOR bytes contain key 13 (collateral).
+diagnoseTxBody :: String -> Tx ConwayEra -> IO ()
+diagnoseTxBody label tx = do
+    let body = tx ^. bodyTxL
+        collateral =
+            body ^. collateralInputsTxBodyL
+        inputs = body ^. inputsTxBodyL
+        fee = body ^. feeTxBodyL
+        mintVal = body ^. mintTxBodyL
+        bodyBytes =
+            BSL.toStrict
+                $ serialize
+                    (eraProtVerLow @ConwayEra)
+                    body
+        -- Search for CBOR key 13 (0x0d) in the
+        -- body map. Key 13 = collateral inputs.
+        hexStr = bytesToHex bodyBytes
+    hPutStrLn stderr
+        $ "DIAG ["
+            <> label
+            <> "] inputs="
+            <> show (Set.size inputs)
+            <> " collateral="
+            <> show (Set.size collateral)
+            <> " fee="
+            <> show fee
+            <> " mint="
+            <> show (mintVal == mempty)
+            <> " bodyHex="
+            <> hexStr
+    hFlush stderr
+
+bytesToHex :: BS.ByteString -> String
+bytesToHex =
+    concatMap
+        ( \w ->
+            let s = showHex w ""
+            in  if length s == 1
+                    then '0' : s
+                    else s
+        )
+        . BS.unpack
 
 data CageEnv = CageEnv
     { envScript :: Script ConwayEra
@@ -215,6 +264,19 @@ placeholderExUnits = ExUnits 0 0
 emptyRoot :: BS.ByteString
 emptyRoot = BS.replicate 32 0
 
+-- | MPF root after inserting key "42" value "42"
+-- into an empty trie with proof []. Taken from the
+-- Aiken test vector in cage.tests.ak.
+rootAfterInsert42 :: BS.ByteString
+rootAfterInsert42 =
+    BS.pack
+        [ 0x48, 0x4d, 0xee, 0x38, 0x6b, 0xcb, 0x51
+        , 0xe2, 0x85, 0x89, 0x62, 0x71, 0x04, 0x8b
+        , 0xaf, 0x6e, 0xa4, 0x39, 0x6b, 0x2e, 0xe9
+        , 0x5b, 0xe6, 0xfd, 0x29, 0xa9, 0x2a, 0x0e
+        , 0xeb, 0x84, 0x62, 0xea
+        ]
+
 computeScriptIntegrity
     :: PParams ConwayEra
     -> Redeemers ConwayEra
@@ -261,6 +323,19 @@ evaluateAndBalance prov pp inputUtxos changeAddr tx =
                     & bodyTxL . inputsTxBodyL
                         .~ allIns
         evalResult <- evaluateTx prov txForEval
+        -- Check for script evaluation failures
+        let failures =
+                [ (p, e)
+                | (p, Left e) <-
+                    Map.toList evalResult
+                ]
+        if null failures
+            then pure ()
+            else
+                error
+                    $ "evaluateAndBalance: \
+                      \script eval failed: "
+                        <> show failures
         let Redeemers rdmrMap =
                 tx ^. witsTxL . rdmrsTxWitsL
             patched =
@@ -279,16 +354,16 @@ evaluateAndBalance prov pp inputUtxos changeAddr tx =
                 computeScriptIntegrity
                     pp
                     newRedeemers
-            -- Rebuild the body with new integrity to avoid
-            -- composed lens losing collateral from MemoBytes
-            oldBody = tx ^. bodyTxL
-            newBody = oldBody
-                & scriptIntegrityHashTxBodyL .~ integrity
+            origCollateral =
+                tx ^. bodyTxL . collateralInputsTxBodyL
             patched' =
                 tx
                     & witsTxL . rdmrsTxWitsL
                         .~ newRedeemers
-                    & bodyTxL .~ newBody
+                    & bodyTxL
+                        . scriptIntegrityHashTxBodyL
+                        .~ integrity
+        diagnoseTxBody "pre-balance" patched'
         case balanceTx
             pp
             inputUtxos
@@ -298,7 +373,29 @@ evaluateAndBalance prov pp inputUtxos changeAddr tx =
                 error
                     $ "evaluateAndBalance: "
                         <> show err
-            Right balanced -> pure balanced
+            Right balanced -> do
+                diagnoseTxBody "post-balance" balanced
+                -- Re-apply collateral if balanceTx
+                -- dropped it (MemoBytes bug)
+                let postColl =
+                        balanced
+                            ^. bodyTxL
+                                . collateralInputsTxBodyL
+                if Set.null postColl
+                    && not (Set.null origCollateral)
+                    then do
+                        hPutStrLn stderr
+                            "DIAG: balanceTx dropped \
+                            \collateral! Re-applying."
+                        hFlush stderr
+                        let fixed =
+                                balanced
+                                    & bodyTxL
+                                        . collateralInputsTxBodyL
+                                        .~ origCollateral
+                        diagnoseTxBody "post-fix" fixed
+                        pure fixed
+                    else pure balanced
 
 -- | Build a mint transaction.
 buildMintTx
@@ -460,9 +557,15 @@ buildModifyTx
     -> IO (Tx ConwayEra)
 buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime retractTime = do
     pp <- queryProtocolParams (envProvider env)
-    let (stateIn, stateOut) = stateUtxo
+    walletUtxos <- queryUTxOs (envProvider env) ownerAddr
+    let feeUtxo = case walletUtxos of
+            [] -> error "buildModifyTx: no wallet UTxOs"
+            (u : _) -> u
+        (stateIn, stateOut) = stateUtxo
         reqIns = map fst reqUtxos
-        overestimate = Coin 500_000
+        -- Fee overestimate: conservation equation
+        -- uses this as tx.fee seen by the script
+        overestimate = Coin 600_000
         numReqs = fromIntegral (length reqUtxos)
         totalInputLovelace =
             foldl
@@ -474,6 +577,7 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
                 reqUtxos
         Coin totalIn = totalInputLovelace
         Coin overEst = overestimate
+        -- Conservation: refund = reqValues - fee - N*tip
         totalRefund = totalIn - overEst - numReqs * tip
         perRequest =
             if numReqs > 0
@@ -483,6 +587,8 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
             if numReqs > 0
                 then totalRefund `mod` numReqs
                 else 0
+        -- N*tip added to state output (oracle income)
+        oracleTipTotal = numReqs * tip
         ownerKhBytes = case ownerAddr of
             Addr _ (KeyHashObj kh) _ ->
                 let KeyHash h = kh
@@ -503,7 +609,8 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
                     { stateOwner =
                         BuiltinByteString
                             ownerKhBytes
-                    , stateRoot = OnChainRoot emptyRoot
+                    , stateRoot =
+                        OnChainRoot rootAfterInsert42
                     , stateTip = tip
                     , stateProcessTime = processTime
                     , stateRetractTime = retractTime
@@ -513,10 +620,15 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
                 $ Map.singleton
                     (envPolicyId env)
                     (Map.singleton assetNameLedger 1)
+        -- State output carries the token + original
+        -- ADA + accumulated tips (oracle income)
         newStateOut =
             mkBasicTxOut
                 (envScriptAddr env)
-                (MaryValue (Coin 2_000_000) mint)
+                ( MaryValue
+                    (Coin (2_000_000 + oracleTipTotal))
+                    mint
+                )
                 & datumTxOutL
                     .~ mkInlineDatum
                         (toPlcData newStateDatum)
@@ -577,19 +689,23 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
         witnessKh =
             coerceKeyRole ownerKh
                 :: KeyHash 'Witness
-        -- Validity: current time window
-        nowMs = envStartMs env + 10_000
-        nowSlot = SlotNo (fromIntegral (nowMs `div` 1000))
-        upperSlot = SlotNo (fromIntegral ((nowMs + 60_000) `div` 1000))
+        -- Validity: no lower bound, upper well within
+        -- devnet era (slot < 500).
+        -- Upper bound must be before Phase 1 ends
+        -- (submitted_at + process_time) for the
+        -- validator's in_phase1 check.
+        upperSlot = SlotNo 300
         vldt =
             ValidityInterval
-                (SJust nowSlot)
+                SNothing
                 (SJust upperSlot)
         body =
             mkBasicTxBody
                 & inputsTxBodyL .~ allScriptIns
                 & outputsTxBodyL .~ allOuts
                 & feeTxBodyL .~ overestimate
+                & collateralInputsTxBodyL
+                    .~ Set.singleton (fst feeUtxo)
                 & reqSignerHashesTxBodyL
                     .~ Set.singleton witnessKh
                 & vldtTxBodyL .~ vldt
@@ -603,23 +719,19 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
                         (envSpendScript env)
                 & witsTxL . rdmrsTxWitsL
                     .~ redeemers
-    -- Conservation-aware: evaluate but don't rebalance
-    -- (fee is already set, change goes to oracle via refunds)
-    walletUtxos <- queryUTxOs (envProvider env) ownerAddr
-    let feeUtxo = case walletUtxos of
-            [] -> error "buildModifyTx: no wallet UTxOs"
-            (u : _) -> u
-        _allInputUtxos = feeUtxo : stateUtxo : reqUtxos
-    -- Add collateral
-    let txWithCollateral =
-            tx
-                & bodyTxL . collateralInputsTxBodyL
-                    .~ Set.singleton (fst feeUtxo)
-                & bodyTxL . inputsTxBodyL
-                    .~ Set.insert (fst feeUtxo) allScriptIns
-    evalResult <- evaluateTx (envProvider env) txWithCollateral
+    evalResult <- evaluateTx (envProvider env) tx
+    let failures =
+            [ (p, e)
+            | (p, Left e) <- Map.toList evalResult
+            ]
+    if null failures
+        then pure ()
+        else
+            error
+                $ "buildModifyTx: script eval: "
+                    <> show failures
     let Redeemers rdmrMap =
-            txWithCollateral ^. witsTxL . rdmrsTxWitsL
+            tx ^. witsTxL . rdmrsTxWitsL
         patchedRdmrs =
             Map.mapWithKey
                 ( \purpose (dat, eu) ->
@@ -635,7 +747,7 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
         newIntegrity =
             computeScriptIntegrity pp newRedeemers
     pure
-        $ txWithCollateral
+        $ tx
             & witsTxL . rdmrsTxWitsL
                 .~ newRedeemers
             & bodyTxL
@@ -655,9 +767,13 @@ buildRejectTx
     -> IO (Tx ConwayEra)
 buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTime = do
     pp <- queryProtocolParams (envProvider env)
-    let (stateIn, stateOut) = stateUtxo
+    walletUtxos <- queryUTxOs (envProvider env) ownerAddr
+    let feeUtxo = case walletUtxos of
+            [] -> error "buildRejectTx: no wallet UTxOs"
+            (u : _) -> u
+        (stateIn, stateOut) = stateUtxo
         reqIns = map fst reqUtxos
-        overestimate = Coin 500_000
+        overestimate = Coin 600_000
         numReqs = fromIntegral (length reqUtxos)
         totalInputLovelace =
             foldl
@@ -678,6 +794,7 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
             if numReqs > 0
                 then totalRefund `mod` numReqs
                 else 0
+        oracleTipTotal = numReqs * tip
         ownerKhBytes = case ownerAddr of
             Addr _ (KeyHashObj kh) _ ->
                 let KeyHash h = kh
@@ -692,7 +809,6 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
                             _ -> error "buildRejectTx: no asset"
                     Nothing -> error "buildRejectTx: no policy"
         assetNameLedger = Value.AssetName assetNameSbs
-        -- Same datum (root unchanged for reject)
         sameDatum =
             StateDatum
                 OnChainTokenState
@@ -712,7 +828,10 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
         newStateOut =
             mkBasicTxOut
                 (envScriptAddr env)
-                (MaryValue (Coin 2_000_000) mint)
+                ( MaryValue
+                    (Coin (2_000_000 + oracleTipTotal))
+                    mint
+                )
                 & datumTxOutL
                     .~ mkInlineDatum (toPlcData sameDatum)
         mkRefundOut i =
@@ -770,20 +889,35 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
         witnessKh =
             coerceKeyRole ownerKh
                 :: KeyHash 'Witness
-        -- Validity: must be after process_time + retract_time
-        -- Use slots well past phase 3
-        nowMs = envStartMs env + processTime + retractTime + 5_000
-        nowSlot = SlotNo (fromIntegral (nowMs `div` 1000))
-        upperSlot = SlotNo (fromIntegral ((nowMs + 60_000) `div` 1000))
+        -- Validity: Phase 3 = after process_time +
+        -- retract_time. Use devnet-relative slots
+        -- (100ms/slot). Must stay within first era
+        -- (< 500 slots).
+        -- Account for ~3s N2C connection delay
+        -- between genesis start and envStartMs.
+        genesisDelayMs = 5_000
+        phase3StartMs =
+            genesisDelayMs
+                + processTime
+                + retractTime
+                + 5_000
+        lowerSlot =
+            SlotNo
+                ( fromIntegral
+                    (phase3StartMs `div` 100)
+                )
+        upperSlot = SlotNo 490
         vldt =
             ValidityInterval
-                (SJust nowSlot)
+                (SJust lowerSlot)
                 (SJust upperSlot)
         body =
             mkBasicTxBody
                 & inputsTxBodyL .~ allScriptIns
                 & outputsTxBodyL .~ allOuts
                 & feeTxBodyL .~ overestimate
+                & collateralInputsTxBodyL
+                    .~ Set.singleton (fst feeUtxo)
                 & reqSignerHashesTxBodyL
                     .~ Set.singleton witnessKh
                 & vldtTxBodyL .~ vldt
@@ -797,20 +931,19 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
                         (envSpendScript env)
                 & witsTxL . rdmrsTxWitsL
                     .~ redeemers
-    walletUtxos <- queryUTxOs (envProvider env) ownerAddr
-    let feeUtxo = case walletUtxos of
-            [] -> error "buildRejectTx: no wallet UTxOs"
-            (u : _) -> u
-        _allInputUtxos = feeUtxo : stateUtxo : reqUtxos
-    let txWithCollateral =
-            tx
-                & bodyTxL . collateralInputsTxBodyL
-                    .~ Set.singleton (fst feeUtxo)
-                & bodyTxL . inputsTxBodyL
-                    .~ Set.insert (fst feeUtxo) allScriptIns
-    evalResult <- evaluateTx (envProvider env) txWithCollateral
+    evalResult <- evaluateTx (envProvider env) tx
+    let failures =
+            [ (p, e)
+            | (p, Left e) <- Map.toList evalResult
+            ]
+    if null failures
+        then pure ()
+        else
+            error
+                $ "buildRejectTx: script eval: "
+                    <> show failures
     let Redeemers rdmrMap =
-            txWithCollateral ^. witsTxL . rdmrsTxWitsL
+            tx ^. witsTxL . rdmrsTxWitsL
         patchedRdmrs =
             Map.mapWithKey
                 ( \purpose (dat, eu) ->
@@ -826,7 +959,7 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
         newIntegrity =
             computeScriptIntegrity pp newRedeemers
     pure
-        $ txWithCollateral
+        $ tx
             & witsTxL . rdmrsTxWitsL
                 .~ newRedeemers
             & bodyTxL
@@ -860,7 +993,17 @@ buildEndTx env ownerKh ownerAddr stateUtxo = do
         endRedeemer = End
         burnRedeemer = Burning
         allScriptIns = Set.singleton stateIn
-        stateIx = spendingIndex stateIn allScriptIns
+    walletUtxos <- queryUTxOs (envProvider env) ownerAddr
+    let feeUtxo = case walletUtxos of
+            [] -> error "buildEndTx: no wallet UTxOs"
+            (u : _) -> u
+        collateralIn = fst feeUtxo
+        -- Compute indices with all inputs that
+        -- evaluateAndBalance will add
+        allInputs =
+            Set.insert (fst feeUtxo) allScriptIns
+        stateIx =
+            spendingIndex stateIn allInputs
         redeemers =
             Redeemers
                 $ Map.fromList
@@ -886,6 +1029,8 @@ buildEndTx env ownerKh ownerAddr stateUtxo = do
             mkBasicTxBody
                 & inputsTxBodyL .~ allScriptIns
                 & mintTxBodyL .~ burn
+                & collateralInputsTxBodyL
+                    .~ Set.singleton collateralIn
                 & reqSignerHashesTxBodyL
                     .~ Set.singleton witnessKh
                 & scriptIntegrityHashTxBodyL
@@ -899,10 +1044,6 @@ buildEndTx env ownerKh ownerAddr stateUtxo = do
                         ]
                 & witsTxL . rdmrsTxWitsL
                     .~ redeemers
-    walletUtxos <- queryUTxOs (envProvider env) ownerAddr
-    let feeUtxo = case walletUtxos of
-            [] -> error "buildEndTx: no wallet UTxOs"
-            (u : _) -> u
     evaluateAndBalance
         (envProvider env)
         pp
@@ -927,7 +1068,9 @@ signAndSubmit
     -> Tx ConwayEra
     -> IO ()
 signAndSubmit env sk tx = do
+    diagnoseTxBody "pre-sign" tx
     let signed = addKeyWitness sk tx
+    diagnoseTxBody "post-sign" signed
     result <- submitTx (envSubmitter env) signed
     case result of
         Submitted _ -> pure ()
