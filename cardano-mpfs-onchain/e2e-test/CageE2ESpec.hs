@@ -48,6 +48,7 @@ spec = do
             it "mint and end" mintAndEnd
             it "modify with tip" modifyWithTip
             it "reject after retract window" rejectAfterRetract
+            it "reject multiple requests" rejectMultipleRequests
 
 type DevnetEnv = (CageEnv, Addr)
 
@@ -151,6 +152,73 @@ modifyWithTip (env, addr) = do
             600_000
             600_000
     signAndSubmit env sk modTx
+    waitForTx
+    -- End
+    scriptUtxos' <- queryScriptUtxos env
+    stateUtxo' <- requireJust "state UTxO" $ findStateUtxo env scriptUtxos'
+    endTx <- buildEndTx env kh addr stateUtxo'
+    signAndSubmit env sk endTx
+    waitForTx
+
+-- | Reject 3 requests in a single tx.
+-- Proves the fee loop converges with multiple
+-- requests (more outputs, different fee).
+rejectMultipleRequests :: DevnetEnv -> IO ()
+rejectMultipleRequests (env, addr) = do
+    let sk = genesisSignKey
+        kh = keyHashFromSignKey sk
+        processTime = 10_000
+        retractTime = 10_000
+        tip = 100_000
+    utxos <- queryUTxOs (envProvider env) addr
+    seedUtxo <- requireJust "seed UTxO" $ listToMaybe utxos
+    let assetName = computeAssetName (fst seedUtxo)
+        tokenId = OnChainTokenId (BuiltinByteString assetName)
+    mintTx <- buildMintTx env kh addr seedUtxo tip processTime retractTime
+    signAndSubmit env sk mintTx
+    waitForTx
+    -- Submit 3 requests
+    let submittedAt = envStartMs env + 5_000
+        submitReq key value = do
+            reqTx <-
+                buildRequestTx
+                    env
+                    kh
+                    addr
+                    assetName
+                    tokenId
+                    key
+                    value
+                    tip
+                    submittedAt
+            signAndSubmit env sk reqTx
+            waitForTx
+    submitReq "k1" "v1"
+    submitReq "k2" "v2"
+    submitReq "k3" "v3"
+    -- Wait for phase 3
+    let waitMs = processTime + retractTime + 2_000
+    threadDelay (fromIntegral waitMs * 1000)
+    -- Find state and request UTxOs
+    scriptUtxos <- queryScriptUtxos env
+    stateUtxo <- requireJust "state UTxO" $ findStateUtxo env scriptUtxos
+    let reqUtxos =
+            filter
+                (\(tin, _) -> tin /= fst stateUtxo)
+                scriptUtxos
+    length reqUtxos `shouldBe` 3
+    -- Reject all 3
+    rejTx <-
+        buildRejectTx
+            env
+            kh
+            addr
+            stateUtxo
+            reqUtxos
+            tip
+            processTime
+            retractTime
+    signAndSubmit env sk rejTx
     waitForTx
     -- End
     scriptUtxos' <- queryScriptUtxos env
