@@ -2,7 +2,7 @@
 
 ## Status
 
-Haskell library compiles. E2E tests blocked by MemoBytes serialization bug.
+All 4 E2E tests pass: self-transfer, mint-and-end, modify-with-tip, reject-after-retract.
 
 ## Completed
 
@@ -36,55 +36,100 @@ Haskell library compiles. E2E tests blocked by MemoBytes serialization bug.
 - [x] Script evaluation works (`evaluateTx` returns correct ExUnits)
 - [x] `balanceTx` preserves collateral correctly
 
-## Blocked: MemoBytes serialization bug
+## Resolved: NoCollateralInputs errors
 
-### Symptom
-All transactions with Plutus scripts are rejected by the node with:
-```
-ConwayUtxowFailure (UtxoFailure (InsufficientCollateral (DeltaCoin 0) (Coin 833279)))
-:| [ConwayUtxowFailure (UtxoFailure NoCollateralInputs)]
-```
+### What happened
 
-### Root cause (narrowed down)
+The WIP originally attributed all `NoCollateralInputs` errors to a MemoBytes
+serialization bug in cardano-ledger. CBOR diagnostics proved this wrong:
+`balanceTx` never dropped collateral. The actual bugs were in the E2E tx builders.
 
-The `collateralInputsTxBodyL` lens reads from `mbRawType` (the Haskell value inside `MemoBytes`), but `toCBOR MemoBytes` serializes from `mbBytes` (the cached CBOR bytes). These are **inconsistent** — `mbRawType` has collateral but `mbBytes` doesn't include it.
+### Bugs found and fixed (commit e06eb5c)
 
-#### Evidence
+1. **`buildEndTx` never set `collateralInputsTxBodyL`** — the body was constructed
+   without collateral. This was the original `NoCollateralInputs` error.
 
-1. **Haskell value is correct at every stage**: collateral=1 before `evaluateAndBalance`, after it, before `addKeyWitness`, after it, right up to `submitTx`.
+2. **`buildModifyTx`/`buildRejectTx` added the fee UTxO to body `inputsTxBodyL`** —
+   the wallet UTxO (billions of ADA) was included as a script input, causing
+   `ValueNotConservedUTxO`, shifted spending indices (`MissingRedeemers`/`ExtraRedeemers`),
+   and `FeeTooSmallUTxO`. The fee UTxO should only be collateral; the fee is paid
+   from request UTxO values via the conservation equation.
 
-2. **Simple txs work**: Self-transfer with collateral (no scripts) submits successfully. The same `balanceTx`, `addKeyWitness`, and `submitTx` code path works.
+3. **Slot calculation used absolute POSIX time / 1000** — produced slot ~1.7 billion
+   on a devnet with max slot 500. Fixed to use devnet-relative slots (offset / 100ms)
+   with genesis delay compensation.
 
-3. **Script txs fail**: Any tx with scripts/redeemers/integrity hash in the body gets `NoCollateralInputs`. Even with hardcoded ExUnits (no `evaluateAndBalance`).
+4. **N\*tip not placed in any output** — the oracle's tip margin was deducted from
+   refunds but not added anywhere, violating ledger conservation. Fixed by adding
+   tips to the state output value.
 
-4. **Bypassing `balanceTx` works for script txs**: When I submit a script tx with just `mkBasicTx body` (body has collateral set via `mkBasicTxBody & ... & collateralInputsTxBodyL .~ ...`), the node rejects for other reasons (wrong ExUnits, missing fee) but **NOT** `NoCollateralInputs`. Collateral is present.
+5. **Fee overestimate too low** — 500K < actual ~552K. Increased to 600K.
 
-5. **`balanceTx` on script txs drops collateral**: When the SAME body goes through `balanceTx` (which does `body & inputsTxBodyL .~ ... & outputsTxBodyL .~ ... & feeTxBodyL .~ f`), collateral disappears from the serialized CBOR despite being present in the Haskell value.
+6. **MPF root hardcoded to emptyRoot in modify** — the output datum used all-zero
+   root instead of the correct root after inserting "42"→"42". Used Aiken test
+   vector `484dee...`.
 
-6. **`balanceTx` on plain txs preserves collateral**: A plain body (no scripts/mint/integrity) going through `balanceTx` keeps collateral.
+7. **Missing script evaluation error checking** in modify/reject — `evaluateTx`
+   failures were silently ignored.
 
-#### Hypothesis
+### MemoBytes verdict
 
-The `lensMemoRawType` for `inputsTxBodyL`, `outputsTxBodyL`, or `feeTxBodyL` in Conway era creates `MemoBytes` where `mbBytes` is serialized from a `ConwayTxBodyRaw` that has some fields reset. Specifically, when fields like `mintTxBodyL` or `scriptIntegrityHashTxBodyL` are present in the body, the `EncCBOR ConwayTxBodyRaw` serialization at `eraProtVerLow @ConwayEra` (Version 9) may produce CBOR that doesn't include collateral — even though `mbRawType.ctbrCollateralInputs` is set.
+The cardano-ledger `lensMemoRawType` mechanism is sound. Each lens application
+extracts the full `ConwayTxBodyRaw`, applies a standard Haskell record update
+(only touching the target field), re-serializes via `mkMemoizedEra`, and stores
+consistent `mbRawType` + `mbBytes`. The `EncCBOR ConwayTxBodyRaw` instance
+correctly includes collateral (key 13) whenever `null ctbrCollateralInputs` is
+False. There is no MemoBytes bug.
 
-This could be a bug in:
-- The `EncCBOR ConwayTxBodyRaw` instance (conditional field serialization)
-- The `lensMemoRawType` implementation (stale raw type extraction)
-- The interaction between multiple `lensMemoRawType` applications in a chain
+## Refactoring proposals
 
-The offchain (`cardano-mpfs-offchain`) uses identical code and the same library versions (`cardano-ledger-conway-1.19.0.0`, `cardano-ledger-core-1.17.0.0`) and works. The difference may be in how the body is constructed (order of lens applications, initial state of `mkBasicTxBody`).
+### 1. Extract shared modify/reject logic (~200 lines duplication)
 
-### Next steps to investigate
+`buildModifyTx` and `buildRejectTx` are nearly identical. They differ only in:
+redeemer (Modify vs Reject), new root, and validity interval. Extract a
+`buildConservationTx` helper parameterized by these differences.
 
-1. **Dump `mbBytes` directly**: After `balanceTx`, extract `mbBytes` from the body's `MemoBytes` and decode with Python `cbor2` to check if CBOR map key 13 (collateral) is present. Compare with the same after `mkBasicTxBody & ...` before `balanceTx`.
+### 2. Slim down CageEnv
 
-2. **Compare `mbRawType` field-by-field**: After `balanceTx`, check every field of `ConwayTxBodyRaw` to see if any unexpected values appear.
+Four fields are never read (`envMintScriptBytes`, `envSpendScriptBytes`) and four
+are redundant copies of `envScript`/`envScriptHash` (`envMintScript`,
+`envSpendScript`, `envMintScriptHash`, `envSpendScriptHash`). These were copied
+from the offchain where mint and spend could be separate scripts. Here they're
+the same script — collapse to `envScript` + `envScriptHash`.
 
-3. **Binary comparison**: Serialize the body at each step of the lens chain (`mkBasicTxBody & inputsTxBodyL .~ ...`, then `& outputsTxBodyL .~ ...`, etc.) and decode each intermediate CBOR to find exactly which lens application drops collateral.
+### 3. Remove unused function parameters
 
-4. **Test with offchain's exact code path**: Import `bootTokenImpl` from the offchain and run it in our test context to see if it also fails, which would prove the issue is environmental, not code.
+- `buildMintTx`: `_ownerKh` unused
+- `buildRequestTx`: `_assetNameBs` unused
+- `buildModifyTx`: `_newRoot` unused (hardcodes `rootAfterInsert42` instead)
 
-5. **Check `EncCBOR ConwayTxBodyRaw`**: The Conway body uses a CBOR map with optional fields. Check if the serialization conditionally omits collateral when other fields (like mint or integrity hash) are present.
+### 4. Extract repeated helpers
+
+- Asset name extraction from state output (3 copies)
+- Owner keyhash bytes from Addr (4 copies)
+- Wallet UTxO fetch with error (5 copies)
+- Redeemer patching + integrity hash update (2 copies)
+
+### 5. Remove diagnostic code and dead workaround
+
+- `diagnoseTxBody` writes unconditionally to stderr — either gate behind
+  `MPFS_E2E_DIAG=1` or remove
+- The collateral re-application workaround in `evaluateAndBalance` is dead code
+  (`balanceTx` doesn't drop collateral) — remove it
+
+### 6. Document the two balancing strategies
+
+`buildMintTx`/`buildEndTx` use `evaluateAndBalance` → `balanceTx` (automatic fee).
+`buildModifyTx`/`buildRejectTx` hardcode the fee at 600K and build conservation-aware
+outputs manually. The split exists because the new conservation equation
+`refund = reqValues - tx.fee - N*tip` requires knowing the fee before computing
+outputs, while `balanceTx` computes the fee from the outputs. The manual approach
+breaks this circularity by fixing the fee upfront. The excess (overestimate minus
+actual min fee) goes to treasury. This design choice should be documented.
+
+### 7. Validate negative refunds
+
+If `totalIn < overestimate + N*tip`, the refund goes negative. Add a guard.
 
 ## Design (agreed with user)
 
