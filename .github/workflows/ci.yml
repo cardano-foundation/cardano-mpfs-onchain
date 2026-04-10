@@ -69,8 +69,8 @@ jobs:
           if [ -f result ]; then mv result plutus.json; fi
           ls -la plutus.json
 
-      - name: Build E2E tests
-        run: nix build .#e2e-tests
-
-      - name: Run E2E tests
-        run: MPFS_BLUEPRINT=plutus.json nix run .#e2e-tests
+      - name: Build and run E2E tests
+        run: |
+          nix build .#e2e-tests
+          nix develop --command bash -c \
+            'MPFS_BLUEPRINT=plutus.json ./result/bin/e2e-tests'
