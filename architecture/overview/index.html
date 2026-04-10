@@ -1,0 +1,986 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/overview/">
+      
+      
+        <link rel="prev" href="../../development/">
+      
+      
+        <link rel="next" href="../validators/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Overview - Cardano MPFS Onchain</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture-overview" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Cardano MPFS Onchain" class="md-header__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Cardano MPFS Onchain
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Overview
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Cardano MPFS Onchain" class="md-nav__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Cardano MPFS Onchain
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transaction-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transaction Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transaction Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#time-gated-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time-Gated Phases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Properties
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aiken-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aiken Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types & Encodings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proofs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proof System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../properties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Properties
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="architecture-overview">Architecture Overview</h1>
+<h2 id="system-context">System Context</h2>
+<p>The on-chain validators are one half of the
+<a href="https://github.com/cardano-foundation/mpfs">MPFS system</a>
+(<a href="https://cardano-foundation.github.io/mpfs/">documentation</a>).
+They enforce the rules for creating, updating, and destroying MPF
+token instances on the Cardano blockchain. The off-chain service
+that builds transactions and manages the trie lives in the
+<a href="https://github.com/cardano-foundation/mpfs/tree/main/off_chain"><code>off_chain/</code></a>
+directory of the upstream repository.</p>
+<pre class="mermaid"><code>graph TD
+    subgraph Blockchain
+        V["Cage Validators"]
+        S1["Token X&lt;br/&gt;State UTxO"]
+        R1["Request UTxOs"]
+    end
+
+    O["Oracle&lt;br/&gt;(token owner)"]
+    A["Requester A"]
+    B["Requester B"]
+    Obs["Observer"]
+
+    O --&gt;|"Boot / Modify / Reject / End"| V
+    A --&gt;|"Submit request"| R1
+    B --&gt;|"Submit / Retract request"| R1
+    R1 --&gt;|"consumed by Modify or Reject"| S1
+    Obs -.-&gt;|"read chain history"| Blockchain</code></pre>
+<p>The <strong>oracle</strong> (token owner) controls the MPF token: it boots
+the token, applies pending requests via <code>Modify</code>, rejects
+expired or dishonest requests via <code>Reject</code>, and can destroy
+it with <code>End</code>. <strong>Requesters</strong> submit modification requests as
+UTxOs at the script address and can retract them during Phase 2.
+<strong>Observers</strong> read the MPF state from the blockchain history —
+no on-chain interaction is needed.</p>
+<h2 id="transaction-lifecycle">Transaction Lifecycle</h2>
+<p>The token and requests have separate lifecycles that intersect
+when the oracle processes a <code>Modify</code> transaction.</p>
+<pre class="mermaid"><code>stateDiagram-v2
+    state "Token Lifecycle" as TL {
+        [*] --&gt; Active: Boot (Mint)
+        Active --&gt; Active: Modify / Reject
+        Active --&gt; Active: Migrate (new validator)
+        Active --&gt; [*]: End (Burn)
+    }
+
+    state "Request Lifecycle" as RL {
+        [*] --&gt; Phase1: Submit (pay to script)
+        Phase1 --&gt; Consumed: Contribute + Modify
+        Phase1 --&gt; Phase2: process_time elapsed
+        Phase2 --&gt; [*]: Retract
+        Phase2 --&gt; Phase3: retract_time elapsed
+        Phase3 --&gt; Rejected: Reject (refund minus fee)
+    }</code></pre>
+<h3 id="time-gated-phases">Time-Gated Phases</h3>
+<p>Each request passes through three exclusive time phases,
+enforced on-chain via <code>tx.validity_range</code>. The phase boundaries
+are determined by the request's <code>submitted_at</code> timestamp and the
+State datum's <code>process_time</code> and <code>retract_time</code> fields (set at
+mint time and enforced immutable across Modify/Reject operations).</p>
+<pre class="mermaid"><code>gantt
+    title Request Time Phases
+    dateFormat X
+    axisFormat %s
+
+    section Phases
+    Phase 1 - Oracle Modify   :active, p1, 0, 10
+    Phase 2 - Requester Retract :crit, p2, 10, 20
+    Phase 3 - Oracle Reject    :done, p3, 20, 30</code></pre>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Window</th>
+<th>Allowed Operations</th>
+<th>Actor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Phase 1</td>
+<td><code>[submitted_at, submitted_at + process_time)</code></td>
+<td>Modify, Contribute</td>
+<td>Oracle</td>
+</tr>
+<tr>
+<td>Phase 2</td>
+<td><code>[submitted_at + process_time, submitted_at + process_time + retract_time)</code></td>
+<td>Retract</td>
+<td>Requester</td>
+</tr>
+<tr>
+<td>Phase 3</td>
+<td><code>[submitted_at + process_time + retract_time, ...)</code></td>
+<td>Reject</td>
+<td>Oracle</td>
+</tr>
+</tbody>
+</table>
+<p>A request with a <strong>dishonest <code>submitted_at</code></strong> (in the future) is
+immediately rejectable by the oracle, regardless of phase.</p>
+<table>
+<thead>
+<tr>
+<th>Transaction</th>
+<th>Action</th>
+<th>Validator</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Boot</td>
+<td>Mint a new MPF token with empty root</td>
+<td>Minting policy</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Submit</td>
+<td>Lock ADA at script with a modification request</td>
+<td>— (pay to script, no validator)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Modify</td>
+<td>Oracle applies pending requests, updates MPF root</td>
+<td>Spending validator (Modify on state + Contribute on each request)</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Retract</td>
+<td>Request owner cancels a pending request, reclaims ADA</td>
+<td>Spending validator (Retract)</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Reject</td>
+<td>Oracle discards expired/dishonest requests, refunds ADA minus fee</td>
+<td>Spending validator (Reject on state + Contribute on each request)</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Migrate</td>
+<td>Move token to a new validator version</td>
+<td>Minting policy (Burning old + Migrating new) + Spending validator (End)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>End</td>
+<td>Burn the MPF token, destroy the instance</td>
+<td>Minting policy (Burning) + Spending validator (End)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="protocol-flow">Protocol Flow</h2>
+<pre class="mermaid"><code>sequenceDiagram
+    participant O as Oracle
+    participant B as Blockchain
+    participant A as Alice (requester)
+    participant C as Bob (requester)
+
+    O-&gt;&gt;B: Boot Token X (Mint)
+    Note over B: Token X created with empty root
+
+    A-&gt;&gt;B: Submit Request: Insert("keyA", "valA")
+    C-&gt;&gt;B: Submit Request: Insert("keyB", "valB")
+    Note over B: Two Request UTxOs at script address
+
+    rect rgb(40, 80, 40)
+        Note over O,B: Phase 1 — Oracle processes requests
+        O-&gt;&gt;B: Modify Token X (consumes both requests)
+        Note over B: Root updated: empty → root(keyA, keyB)
+    end
+
+    A-&gt;&gt;B: Submit Request: Delete("keyB", "valB")
+    rect rgb(40, 80, 40)
+        Note over O,B: Phase 1
+        O-&gt;&gt;B: Modify Token X
+        Note over B: Root updated: root(keyA, keyB) → root(keyA)
+    end
+
+    C-&gt;&gt;B: Submit Request: Delete("keyA", "valA")
+    rect rgb(80, 80, 40)
+        Note over C,B: Phase 2 — Requester retracts
+        C-&gt;&gt;B: Retract own request
+        Note over B: Request UTxO reclaimed, root unchanged
+    end
+
+    A-&gt;&gt;B: Submit Request: Insert("spam", "data")
+    rect rgb(80, 40, 40)
+        Note over O,B: Phase 3 — Oracle rejects expired request
+        O-&gt;&gt;B: Reject (refund ADA minus fee, root unchanged)
+    end
+
+    O-&gt;&gt;B: End Token X (Burn)
+    Note over B: Token destroyed</code></pre>
+<h2 id="security-properties">Security Properties</h2>
+<p>The validators enforce invariants across 16 categories, each
+verified by the inline test suite (80 tests):</p>
+<ol>
+<li><strong>Ownership</strong> — only the oracle (token owner) can modify, reject, or destroy a token.</li>
+<li><strong>Integrity</strong> — every MPF modification carries a cryptographic proof
+   verified on-chain; the output root must match the proof computation.</li>
+<li><strong>Uniqueness</strong> — token IDs are derived from spent UTxOs, guaranteed
+   unique by the ledger.</li>
+<li><strong>Confinement</strong> — the token must remain at the script address after
+   every operation.</li>
+<li><strong>Retractability</strong> — request owners can reclaim their locked ADA during Phase 2.</li>
+<li><strong>Request binding</strong> — a request's target token is validated on-chain
+   before it can be consumed.</li>
+<li><strong>Type safety</strong> — each redeemer/datum combination is enforced; mismatches
+   are rejected.</li>
+<li><strong>Time-gated phases</strong> — each request passes through three exclusive phases
+   (oracle Modify, requester Retract, oracle Reject), preventing race conditions.</li>
+<li><strong>DDoS protection</strong> — expired or dishonest requests can be rejected by the
+   oracle, who keeps the fee and refunds the rest.</li>
+<li><strong>Fee enforcement</strong> — oracle fees are validated on-chain; requesters are
+    refunded correctly.</li>
+</ol>
+<p>See <a href="../properties/">Security Properties</a> for the complete list with
+test cross-references.</p>
+<h2 id="aiken-dependencies">Aiken Dependencies</h2>
+<table>
+<thead>
+<tr>
+<th>Dependency</th>
+<th>Version</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/aiken-lang/stdlib">aiken-lang/stdlib</a></td>
+<td>v2.2.0</td>
+<td>Standard library (assets, transactions, addresses)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/aiken-lang/merkle-patricia-forestry">aiken-lang/merkle-patricia-forestry</a></td>
+<td>v2.0.0</td>
+<td>MPF trie operations and proof verification</td>
+</tr>
+<tr>
+<td><a href="https://github.com/aiken-lang/fuzz">aiken-lang/fuzz</a></td>
+<td>v2.1.1</td>
+<td>Property-based testing (used in test suite only)</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.sections", "navigation.path", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
