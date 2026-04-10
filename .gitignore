@@ -4,3 +4,5 @@ plutus.json
 e2e/node_modules/
 e2e/dist/
 .direnv
+result-blueprint
+result-e2e
