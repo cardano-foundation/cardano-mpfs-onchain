@@ -27,7 +27,6 @@ import Data.ByteString.Short qualified as SBS
 import Data.Map.Strict qualified as Map
 import Data.Sequence.Strict qualified as StrictSeq
 import Data.Set qualified as Set
-import Data.Word (Word32)
 import Lens.Micro ((&), (.~), (^.))
 import Numeric (showHex)
 import System.IO (hPutStrLn, hFlush, stderr)
@@ -37,22 +36,13 @@ import Cardano.Ledger.Address (Addr (..))
 import Cardano.Ledger.Allegra.Scripts
     ( ValidityInterval (..)
     )
-import Cardano.Ledger.Alonzo.PParams
-    ( LangDepView
-    , getLanguageView
-    )
 import Cardano.Ledger.Alonzo.Scripts (AsIx (..))
-import Cardano.Ledger.Alonzo.Tx
-    ( ScriptIntegrityHash
-    , hashScriptIntegrity
-    )
 import Cardano.Ledger.Alonzo.TxBody
     ( reqSignerHashesTxBodyL
     , scriptIntegrityHashTxBodyL
     )
 import Cardano.Ledger.Alonzo.TxWits
     ( Redeemers (..)
-    , TxDats (..)
     )
 import Cardano.Ledger.Api.Tx
     ( Tx
@@ -114,7 +104,6 @@ import Cardano.Ledger.Mary.Value
     , MultiAsset (..)
     , PolicyID (..)
     )
-import Cardano.Ledger.Plutus.ExUnits (ExUnits (..))
 import Cardano.Ledger.Plutus.Language
     ( Language (PlutusV3)
     )
@@ -125,7 +114,13 @@ import PlutusTx.Builtins.Internal
     )
 
 
-import ConservationBalance (FeeLoopError (..), balanceFeeLoop)
+import Cardano.Node.Client.Balance
+    ( FeeLoopError (..)
+    , balanceFeeLoop
+    , computeScriptIntegrity
+    , placeholderExUnits
+    , spendingIndex
+    )
 
 import Cardano.MPFS.OnChain.AssetName (computeAssetName)
 import Cardano.MPFS.OnChain.Datum
@@ -260,8 +255,6 @@ mkCageEnv bpPath startMs lsq ltxs = do
             , envStartMs = startMs
             }
 
-placeholderExUnits :: ExUnits
-placeholderExUnits = ExUnits 0 0
 
 emptyRoot :: BS.ByteString
 emptyRoot = BS.replicate 32 0
@@ -278,29 +271,6 @@ rootAfterInsert42 =
         , 0x5b, 0xe6, 0xfd, 0x29, 0xa9, 0x2a, 0x0e
         , 0xeb, 0x84, 0x62, 0xea
         ]
-
-computeScriptIntegrity
-    :: PParams ConwayEra
-    -> Redeemers ConwayEra
-    -> StrictMaybe ScriptIntegrityHash
-computeScriptIntegrity pp rdmrs =
-    let langViews :: Set.Set LangDepView
-        langViews =
-            Set.singleton
-                (getLanguageView pp PlutusV3)
-        emptyDats = TxDats mempty
-    in  hashScriptIntegrity langViews rdmrs emptyDats
-
-spendingIndex :: TxIn -> Set.Set TxIn -> Word32
-spendingIndex needle inputs =
-    let sorted = Set.toAscList inputs
-    in  go 0 sorted
-  where
-    go _ [] =
-        error "spendingIndex: TxIn not in set"
-    go n (x : xs)
-        | x == needle = n
-        | otherwise = go (n + 1) xs
 
 evaluateAndBalance
     :: Provider IO
@@ -354,6 +324,7 @@ evaluateAndBalance prov pp inputUtxos changeAddr tx =
             newRedeemers = Redeemers patched
             integrity =
                 computeScriptIntegrity
+                    PlutusV3
                     pp
                     newRedeemers
             origCollateral =
@@ -468,7 +439,7 @@ buildMintTx env _ownerKh ownerAddr seedUtxo tip processTime retractTime = do
                     , placeholderExUnits
                     )
         integrity =
-            computeScriptIntegrity pp mintRdmr
+            computeScriptIntegrity PlutusV3 pp mintRdmr
         body =
             mkBasicTxBody
                 & inputsTxBodyL .~ allScriptIns
@@ -806,7 +777,7 @@ buildConservationTx cfg = do
                   )
                     : contributeEntries
         integrity =
-            computeScriptIntegrity pp redeemers
+            computeScriptIntegrity PlutusV3 pp redeemers
         witnessKh =
             coerceKeyRole (bccOwnerKh cfg)
                 :: KeyHash 'Witness
@@ -876,7 +847,7 @@ buildConservationTx cfg = do
                 rdmrMap
         newRedeemers = Redeemers patchedRdmrs
         newIntegrity =
-            computeScriptIntegrity pp newRedeemers
+            computeScriptIntegrity PlutusV3 pp newRedeemers
         patchedTx =
             templateTx
                 & witsTxL . rdmrsTxWitsL
@@ -954,7 +925,7 @@ buildEndTx env ownerKh ownerAddr stateUtxo = do
                       )
                     ]
         integrity =
-            computeScriptIntegrity pp redeemers
+            computeScriptIntegrity PlutusV3 pp redeemers
         witnessKh =
             coerceKeyRole ownerKh
                 :: KeyHash 'Witness

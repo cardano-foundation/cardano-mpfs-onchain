@@ -24,7 +24,7 @@
       flake = false;
     };
     cardano-node-clients = {
-      url = "github:lambdasistemi/cardano-node-clients/1104f7cb47fee3169074da1c803ff633b85c43f7";
+      url = "github:lambdasistemi/cardano-node-clients/a37cbd62170740efc86dae1a1cf242a8608e4b78";
     };
     cardano-node.follows = "cardano-node-clients/cardano-node";
   };

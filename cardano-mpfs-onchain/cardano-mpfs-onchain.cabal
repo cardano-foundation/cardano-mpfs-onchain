@@ -67,7 +67,6 @@ test-suite e2e-tests
   other-modules:
     CageE2ESpec
     CageTxBuilder
-    ConservationBalance
 
   build-depends:
     , base
