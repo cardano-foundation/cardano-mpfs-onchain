@@ -456,24 +456,21 @@ class Cage implements PromiseLike<void> {
 
   /**
    * Build a transaction with conservation-exact refunds.
-   * Two-pass: first estimate the fee with a dummy build, then rebuild
-   * with refund amounts that satisfy the conservation equation.
-   * Iterates until the fee stabilizes (max 5 attempts).
+   *
+   * Uses a generous fee overestimate set via setMinFee(). The Cardano
+   * ledger only requires tx.fee >= min_fee, so overpaying is valid —
+   * the excess goes to the treasury. The refund outputs are computed
+   * based on this overestimate, and setMinFee() ensures the tx body
+   * carries that fee during script evaluation.
    */
   private async buildWithConservation(
     build: (estimatedFee: bigint) => ReturnType<LucidEvolution["newTx"]>,
   ): Promise<Awaited<ReturnType<ReturnType<LucidEvolution["newTx"]>["complete"]>>> {
-    let fee = 300_000n; // initial estimate
-    for (let i = 0; i < 5; i++) {
-      const txBuilder = build(fee);
-      const tx = await txBuilder.complete(COMPLETE_OPTS);
-      const actualFee = BigInt(tx.toTransaction().body().fee());
-      if (actualFee === fee) return tx;
-      fee = actualFee;
-    }
-    // Use last estimate
-    const txBuilder = build(fee);
-    return txBuilder.complete(COMPLETE_OPTS);
+    // Generous overestimate: scripts see this fee during evaluation
+    // and the ledger accepts it because fee >= min_fee.
+    const overestimatedFee = 500_000n;
+    const txBuilder = build(overestimatedFee);
+    return txBuilder.setMinFee(overestimatedFee).complete(COMPLETE_OPTS);
   }
 
   private async submitAndWait(
