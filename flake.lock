@@ -114,16 +114,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1772724184,
-        "narHash": "sha256-D3tFoMfmea8M2RNNqdOe1vFRXAJLeOEdReFd8dSw+Fo=",
+        "lastModified": 1776078810,
+        "narHash": "sha256-t9PKJdoWZKtFgDUm3iNNMmGaO8ANAGlFhugkuB54F3M=",
         "owner": "cardano-foundation",
         "repo": "cardano-mpfs-cage",
-        "rev": "b1f133b22b27ec1777dca769ce843b3f82e3bb55",
+        "rev": "ca915dc5d2e9d96cbe7d6817d77514fc38257f0c",
         "type": "github"
       },
       "original": {
         "owner": "cardano-foundation",
-        "ref": "feat/aiken-vectors",
+        "ref": "001-mixed-modify-reject",
         "repo": "cardano-mpfs-cage",
         "type": "github"
       }
