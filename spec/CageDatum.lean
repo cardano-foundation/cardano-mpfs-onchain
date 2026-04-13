@@ -91,12 +91,18 @@ inductive MintRedeemer where
 /-- Abstract Merkle proof (opaque — verified by the MPF library). -/
 opaque def Proof := Unit
 
+/-- Per-request action in a Modify redeemer. -/
+inductive RequestAction where
+  /-- Update with Merkle proof (Constr 0). -/
+  | Update  (proof : Proof)
+  /-- Reject expired request (Constr 1). -/
+  | Rejected
+
 inductive SpendRedeemer where
   | End
   | Contribute (stateRef : OutputReference)
-  | Modify     (proofs : List Proof)
+  | Modify     (actions : List RequestAction)
   | Retract    (stateRef : OutputReference)
-  | Reject
 
 -- ============================================================================
 -- Transaction model (abstract)
@@ -226,7 +232,7 @@ def retractAuthorized (request : Request) (tx : Transaction) : Prop :=
 -- 4. Token confinement
 -- ============================================================================
 
-/-- After Modify or Reject the token stays at the same script address. -/
+/-- After Modify the token stays at the same script address. -/
 def tokenConfined (input : TxInput) (output : TxOutput) : Prop :=
   output.address = input.address
 
@@ -283,7 +289,6 @@ def datumRedeemerCompat : SpendRedeemer → CageDatum → Prop
   | .Contribute _,  .RequestDatum _ => True
   | .Modify _,      .StateDatum _   => True
   | .End,           .StateDatum _   => True
-  | .Reject,        .StateDatum _   => True
   | _,              _               => False
 
 -- ============================================================================
@@ -336,32 +341,24 @@ theorem phase2_reject_exclusive (vr : Interval) (sa : POSIXTime) (s : State) :
   sorry
 
 -- ============================================================================
--- 14. Reject (DDoS protection)
+-- 14. Per-action validation (mixed update/reject)
 -- ============================================================================
 
-/-- A Reject transaction is valid iff all of the following hold. -/
-structure ValidReject (state : State)
-    (stateInput : TxInput) (tx : Transaction)
-    (requests : List (TxInput × Request)) : Prop where
-  /-- Owner signed. -/
-  auth      : oracleAuthorized state tx
-  /-- Root unchanged. -/
-  rootSame  : ∀ o ∈ tx.outputs, tx.outputs.head? = some o →
-              ∃ s, o.datum = some (CageDatum.StateDatum s) ∧ s.root = state.root
-  /-- Token confined. -/
-  confined  : ∀ o ∈ tx.outputs, tx.outputs.head? = some o →
-              o.address = stateInput.address
-  /-- Each request is rejectable. -/
-  rejectable : ∀ (pair : TxInput × Request), pair ∈ requests →
-               isRejectable tx.validityRange pair.2.submittedAt state
-  /-- Each request fee matches state max_fee. -/
-  feeMatch  : ∀ (pair : TxInput × Request), pair ∈ requests →
-              pair.2.fee = state.maxFee
-  /-- Refunds: each requester receives inputLovelace - fee. -/
-  refunds   : ∀ (pair : TxInput × Request), pair ∈ requests →
-              ∃ o ∈ tx.outputs,
-                o.address = sorry ∧  -- requestOwner's address
-                o.value ≥ pair.1.value - pair.2.fee
+/-- A single request action is valid given the current state and transaction.
+    Update actions require proof verification and Phase 1.
+    Rejected actions require rejectability (Phase 3 or dishonest). -/
+def validRequestAction (state : State) (tx : Transaction)
+    (reqInput : TxInput) (request : Request) : RequestAction → Prop
+  | .Update _proof =>
+      inPhase1 tx.validityRange request.submittedAt state ∧
+      request.fee = state.maxFee ∧
+      ∃ o ∈ tx.outputs,
+        o.value ≥ reqInput.value - request.fee
+  | .Rejected =>
+      isRejectable tx.validityRange request.submittedAt state ∧
+      request.fee = state.maxFee ∧
+      ∃ o ∈ tx.outputs,
+        o.value ≥ reqInput.value - request.fee
 
 -- ============================================================================
 -- 15. Fee enforcement
@@ -411,14 +408,10 @@ def validSpend (_p : ValidatorParams) (policyId : PolicyId)
   | .Contribute stateRef, .RequestDatum req =>
       (∃ si ∈ tx.inputs, si.ref = stateRef ∧
        ∃ tid, si.token = some tid ∧ requestBound req tid)
-  | .Modify proofs, .StateDatum state =>
+  | .Modify _actions, .StateDatum state =>
       oracleAuthorized state tx ∧
       (∃ o, tx.outputs.head? = some o ∧ tokenConfined self o) ∧
-      True  -- + rootIntegrity + feeEnforced + proofConsumption (elided)
-  | .Reject, .StateDatum state =>
-      oracleAuthorized state tx ∧
-      (∃ o, tx.outputs.head? = some o ∧ tokenConfined self o ∧
-       ∃ s, o.datum = some (CageDatum.StateDatum s) ∧ s.root = state.root)
+      True  -- + per-action validation via validRequestAction (elided)
   | .End, .StateDatum state =>
       oracleAuthorized state tx ∧
       burnIntegrity policyId (sorry : TokenId) tx  -- token extracted from self
