@@ -39,7 +39,8 @@ export function encodeBurningRedeemer(): string {
   return Data.to(new Constr(2, []));
 }
 
-// UpdateRedeemer = End(0) | Contribute(OutputReference)(1) | Modify(List<Proof>)(2) | Retract(OutputReference)(3) | Reject(4)
+// UpdateRedeemer = End(0) | Contribute(OutputReference)(1) | Modify(List<RequestAction>)(2) | Retract(OutputReference)(3)
+// RequestAction = UpdateAction(Proof)(0) | Rejected(1)
 
 // End is index 0
 export function encodeEndRedeemer(): string {
@@ -55,11 +56,22 @@ export function encodeContributeRedeemer(stateUtxo: UTxO): string {
   return Data.to(new Constr(1, [outputRef]));
 }
 
-// Modify is index 2, takes List<Proof> where Proof = List<ProofStep>
+// Modify is index 2, takes List<RequestAction>
+// RequestAction = UpdateAction(Proof)(0) | Rejected(1)
 // For inserting into an empty MPF, proof is [] (empty list)
-// So one insert: proofs = [[]] (one empty proof)
-export function encodeModifyRedeemer(proofs: Data[][]): string {
-  return Data.to(new Constr(2, [proofs]));
+// So one update: actions = [UpdateAction([])]
+export function encodeModifyRedeemer(actions: Data[]): string {
+  return Data.to(new Constr(2, [actions]));
+}
+
+// Helper: wrap a proof as an UpdateAction (Constr 0)
+export function encodeUpdateAction(proof: Data[]): Data {
+  return new Constr(0, [proof]);
+}
+
+// Helper: encode a Rejected action (Constr 1)
+export function encodeRejectedAction(): Data {
+  return new Constr(1, []);
 }
 
 // CageDatum = RequestDatum(Request)(0) | StateDatum(State)(1)
@@ -119,7 +131,4 @@ export function encodeRetractRedeemer(stateUtxo: UTxO): string {
   return Data.to(new Constr(3, [outputRef]));
 }
 
-// Reject is index 4 (no fields)
-export function encodeRejectRedeemer(): string {
-  return Data.to(new Constr(4, []));
-}
+// Reject is now Modify([Rejected]) — use encodeModifyRedeemer([encodeRejectedAction()])
