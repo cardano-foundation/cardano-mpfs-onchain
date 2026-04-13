@@ -114,16 +114,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1776078810,
+        "lastModified": 1776081259,
         "narHash": "sha256-t9PKJdoWZKtFgDUm3iNNMmGaO8ANAGlFhugkuB54F3M=",
         "owner": "cardano-foundation",
         "repo": "cardano-mpfs-cage",
-        "rev": "ca915dc5d2e9d96cbe7d6817d77514fc38257f0c",
+        "rev": "53edc6efc0db739f1d78e4a717de9c387ecfa941",
         "type": "github"
       },
       "original": {
         "owner": "cardano-foundation",
-        "ref": "001-mixed-modify-reject",
         "repo": "cardano-mpfs-cage",
         "type": "github"
       }

@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    cardano-mpfs-cage.url = "github:cardano-foundation/cardano-mpfs-cage/001-mixed-modify-reject";
+    cardano-mpfs-cage.url = "github:cardano-foundation/cardano-mpfs-cage";
   };
 
   outputs =
