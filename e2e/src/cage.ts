@@ -18,7 +18,8 @@ import {
   encodeModifyRedeemer,
   encodeContributeRedeemer,
   encodeRetractRedeemer,
-  encodeRejectRedeemer,
+  encodeUpdateAction,
+  encodeRejectedAction,
 } from "./codec.js";
 import { onChainTimeOffset } from "./setup.js";
 
@@ -255,8 +256,8 @@ class Cage implements PromiseLike<void> {
   }
 
   private async doModify(newRoot: string): Promise<void> {
-    const proofs = this.pendingRequests.map(() => [] as Data[]);
-    const modifyRedeemer = encodeModifyRedeemer(proofs);
+    const actions = this.pendingRequests.map(() => encodeUpdateAction([]));
+    const modifyRedeemer = encodeModifyRedeemer(actions);
     const contributeRedeemer = encodeContributeRedeemer(this.stateUtxo!);
     const newDatum = encodeStateDatum(
       this.ownerKeyHash,
@@ -353,7 +354,8 @@ class Cage implements PromiseLike<void> {
   }
 
   private async doReject(): Promise<void> {
-    const rejectRedeemer = encodeRejectRedeemer();
+    const actions = this.pendingRequests.map(() => encodeRejectedAction());
+    const rejectRedeemer = encodeModifyRedeemer(actions);
     const contributeRedeemer = encodeContributeRedeemer(this.stateUtxo!);
     const sameDatum = encodeStateDatum(
       this.ownerKeyHash,
