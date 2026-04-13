@@ -113,8 +113,8 @@ use cardano/transaction.{
 use lib.{TokenId, assetName, quantity, tokenFromValue}
 use types.{
   Burning, CageDatum, Contribute, Delete, End, Insert, Migrating, Migration, Mint,
-  MintRedeemer, Minting, Modify, Reject, Request, RequestDatum, Retract, State,
-  StateDatum, Update, UpdateRedeemer,
+  MintRedeemer, Minting, Modify, Rejected, Request, RequestAction, RequestDatum,
+  Retract, State, StateDatum, Update, UpdateAction, UpdateRedeemer,
 }
 
 /// The main validator for caged MPF tokens.
@@ -263,9 +263,8 @@ validator mpfCage(_version: Int) {
         // TokenId (for identifying which token is being operated on).
         let (input, tokenId) = extractToken(self, tx)
         when redeemer is {
-          Modify(proofs) ->
-            validRootUpdate(state, input, tokenId, tx, proofs)
-          Reject -> validReject(state, input, tokenId, tx)
+          Modify(actions) ->
+            validModify(state, input, tokenId, tx, actions)
           End -> {
             expect address.Script(policyId) =
               input.output.address.payment_credential
@@ -506,87 +505,32 @@ pub fn is_rejectable(
     || interval.is_entirely_before(validity_range, submitted_at)
 }
 
-/// Create an update function for folding requests into the MPF.
+/// Create an action function for folding requests into the MPF.
 ///
 /// Returns a function suitable for use with `foldl` that processes each
 /// transaction input. For inputs containing a Request targeting the given
-/// token, it applies the request's operation to the MPF using the next
-/// proof from the accumulator.
+/// token, it pops one `RequestAction` from the accumulator and dispatches:
+/// - `Update(proof)`: apply the MPF operation (Phase 1 enforced)
+/// - `Rejected`: skip MPF, verify rejectability (Phase 3 enforced)
 ///
-/// ## Parameters
-/// - `tokenId`: The TokenId of the caged token being modified
-///
-/// ## Returns
-/// A function `(Input, (MPF, List<Proof>)) -> (MPF, List<Proof>)` where:
-/// - The `Input` is a transaction input being examined
-/// - The first element of the tuple is the current MPF state
-/// - The second element is the remaining proofs to consume
-///
-/// ## How the Fold Works (step by step)
-///
-/// For each input in the transaction:
-///
-/// 1. **Check datum type**: Does the input have an `InlineDatum`?
-///    - No -> skip (return accumulator unchanged)
-///
-/// 2. **Check datum content**: Is it a `RequestDatum(request)`?
-///    - No -> skip (return accumulator unchanged)
-///
-/// 3. **Check token match**: Does `requestToken == tokenId`?
-///    - No -> skip (return accumulator unchanged)
-///    - This is how requests for OTHER tokens are filtered out
-///
-/// 4. **Consume a proof**: Pop the next proof from the proofs list via `uncons`
-///    - If no proofs remain, `uncons` fails -> transaction rejected
-///
-/// 5. **Apply the operation**: Based on `requestValue`:
-///    - `Insert(value)` -> `mpf.insert(root, key, value, proof)`
-///    - `Delete(value)` -> `mpf.delete(root, key, value, proof)`
-///    - `Update(old, new)` -> `mpf.update(root, key, proof, old, new)`
-///    Each of these MPF functions will fail if the proof is invalid.
-///
-/// 6. **Return**: Updated (newRoot, remainingProofs)
-///
-/// ## Important: Input Ordering
-/// The fold processes inputs in the order they appear in `tx.inputs`.
-/// The proofs list must match this order. If inputs are reordered, the
-/// proofs would be applied to the wrong requests, causing proof
-/// verification failures.
-///
-/// ## Important: Non-Request Inputs Are Skipped
-/// The State UTxO itself is also in the inputs list, but it has a
-/// `StateDatum`, not a `RequestDatum`, so it's skipped. Any other
-/// inputs (e.g., wallet UTxOs for fees) have no inline datum or a
-/// non-CageDatum datum, so they're also skipped.
-///
-/// ## Security: Type Coercion Safety
-/// The `if datum is RequestDatum(request): CageDatum` syntax attempts
-/// to parse the inline datum as a `CageDatum`. If the datum is from
-/// a completely different script and happens to parse as a CageDatum,
-/// it would be processed. In practice this is harmless because:
-/// - The requestToken check filters out irrelevant requests
-/// - MPF proof verification would fail for fabricated data
-///
-/// ## Test Hints
-/// - One matching request with valid proof -> MPF updated
-/// - Non-matching request (different token) -> skipped, no proof consumed
-/// - Input with no datum -> skipped
-/// - Input with non-CageDatum -> skipped
-/// - Multiple matching requests -> proofs consumed in order
-/// - Request with Insert on existing key -> mpf.insert fails
-/// - Request with Delete on non-existent key -> mpf.delete fails
-/// - Request with Update with wrong old value -> mpf.update fails
-fn mkUpdate(tokenId, max_fee, process_time, validity_range) {
+/// Non-request inputs are skipped without consuming an action.
+fn mkAction(
+  tokenId,
+  max_fee,
+  process_time,
+  retract_time,
+  validity_range,
+) {
   fn(
     input: Input,
     acc: (
       MerklePatriciaForestry,
-      List<Proof>,
+      List<RequestAction>,
       List<Pair<VerificationKeyHash, Int>>,
     ),
   ) -> (
     MerklePatriciaForestry,
-    List<Proof>,
+    List<RequestAction>,
     List<Pair<VerificationKeyHash, Int>>,
   ) {
     when input.output.datum is {
@@ -601,20 +545,44 @@ fn mkUpdate(tokenId, max_fee, process_time, validity_range) {
             submitted_at,
           } = request
           if requestToken == tokenId {
-            // Fee must match the state's max_fee
             expect fee == max_fee
-            // Request must be in Phase 1
-            expect in_phase1(validity_range, submitted_at, process_time)
-            let (root, proofs, refunds) = acc
-            let proof, proofsTail <- uncons(proofs)
+            let (root, actions, refunds) = acc
+            let action, actionsTail <- uncons(actions)
             let newRoot =
-              when requestValue is {
-                Insert(value) -> mpf.insert(root, requestKey, value, proof)
-                Delete(value) -> mpf.delete(root, requestKey, value, proof)
-                Update(oldValue, newValue) ->
-                  mpf.update(root, requestKey, proof, oldValue, newValue)
+              when action is {
+                UpdateAction(proof) -> {
+                  expect
+                    in_phase1(
+                      validity_range,
+                      submitted_at,
+                      process_time,
+                    )
+                  when requestValue is {
+                    Insert(value) ->
+                      mpf.insert(root, requestKey, value, proof)
+                    Delete(value) ->
+                      mpf.delete(root, requestKey, value, proof)
+                    Update(oldValue, newValue) ->
+                      mpf.update(
+                        root,
+                        requestKey,
+                        proof,
+                        oldValue,
+                        newValue,
+                      )
+                  }
+                }
+                Rejected -> {
+                  expect
+                    is_rejectable(
+                      validity_range,
+                      submitted_at,
+                      process_time,
+                      retract_time,
+                    )
+                  root
+                }
               }
-            // Compute refund: input lovelace minus fee
             let inputLovelace = assets.lovelace_of(input.output.value)
             let refundAmount = inputLovelace - fee
             let newRefunds =
@@ -623,7 +591,7 @@ fn mkUpdate(tokenId, max_fee, process_time, validity_range) {
               } else {
                 refunds
               }
-            (newRoot, proofsTail, newRefunds)
+            (newRoot, actionsTail, newRefunds)
           } else {
             acc
           }
@@ -656,74 +624,20 @@ fn verifyRefunds(
   }
 }
 
-/// Validate that the MPF root was correctly updated.
+/// Validate a Modify operation: process requests with mixed actions.
 ///
-/// This is the core validation for the `Modify` operation. It verifies
-/// that the output's MPF root matches the result of folding all input
-/// requests into the current MPF.
+/// Folds all transaction inputs with `mkAction`, which dispatches per
+/// `RequestAction`: `Update(proof)` applies MPF operations (Phase 1),
+/// `Rejected` skips MPF and verifies rejectability (Phase 3).
 ///
-/// ## Parameters
-/// - `state`: The current State from the input datum (has current root + owner)
-/// - `input`: The Input being spent (the State UTxO, for address comparison)
-/// - `tokenId`: The caged token's identifier
-/// - `tx`: The full transaction context
-/// - `proofs`: The list of Merkle proofs, one per request being processed
-///
-/// ## Algorithm
-///
-/// 1. **Extract output state**: Get the first output (`head(outputs)`) and
-///    parse its inline datum as `StateDatum(State { root: newRoot, .. })`.
-///    This is the claimed new state.
-///
-/// 2. **Compute expected root**: Fold over ALL transaction inputs using
-///    `mkUpdate(tokenId)`. Starting from `(mpf.from_root(root), proofs)`,
-///    each matching Request consumes a proof and updates the MPF.
-///
-/// 3. **Verify root**: Compare `mpf.root(expectedNewRoot) == newRoot`.
-///    If they don't match, the transaction is rejected.
-///
-/// 4. **Verify address preservation**: The output's payment credential must
-///    match the input's payment credential. This ensures the token stays
-///    at the same script address (prevents stealing the token by sending
-///    it to a different address).
-///
-/// ## Important: head(outputs)
-/// The validator only checks the FIRST output. This means the transaction
-/// builder must place the new State UTxO as the first output. Other outputs
-/// (e.g., change, fee) can follow.
-///
-/// ## Important: Owner Not Checked
-/// The validator does NOT verify that the owner field is preserved. The
-/// output datum can have a different `owner` than the input. This enables
-/// ownership transfer during a Modify operation.
-///
-/// ## Important: Unconsumed Proofs
-/// After the fold, the remaining proofs list is discarded (`_`). This means
-/// providing extra proofs does NOT cause failure. Only too few proofs
-/// (when a matching request has no proof to consume) causes failure.
-///
-/// ## Security: Address Check
-/// The `output.address.payment_credential == input.output.address.payment_credential`
-/// check prevents a subtle attack: without it, the owner could Modify the
-/// state and redirect the output to their wallet address, effectively
-/// stealing the caged token.
-///
-/// ## Test Hints
-/// - Correct root computation with one Insert request -> success
-/// - Correct root computation with multiple requests -> success
-/// - Wrong claimed root in output datum -> fail
-/// - Output at different script address -> fail
-/// - Output at wallet address -> fail
-/// - Extra proofs provided -> success (extras ignored)
-/// - Owner changed in output -> success
-/// - Output is not first in outputs list -> depends on what's first
-/// - No matching requests (empty fold) -> root unchanged, must match
-fn validRootUpdate(
+/// Verifies: root integrity, address confinement, time param immutability,
+/// and refund correctness.
+fn validModify(
   state: State,
   input: Input,
   tokenId: TokenId,
   tx: Transaction,
-  proofs: List<Proof>,
+  actions: List<RequestAction>,
 ) {
   let Transaction { outputs, inputs, validity_range, .. } = tx
   let State { root, max_fee, process_time, retract_time, .. } = state
@@ -745,102 +659,8 @@ fn validRootUpdate(
   let (expectedNewRoot, _, refunds) =
     inputs
       |> foldl(
-          (mpf.from_root(root), proofs, []),
-          mkUpdate(tokenId, max_fee, process_time, validity_range),
-        )
-  expect (mpf.root(expectedNewRoot) == newRoot)?
-  expect
-    output.address.payment_credential == input.output.address.payment_credential
-
-  // Verify refund outputs (starting after the State UTxO at index 0)
-  expect [_, ..refundOutputs] = outputs
-  let orderedRefunds = list.reverse(refunds)
-  expect verifyRefunds(refundOutputs, orderedRefunds)
-  True
-}
-
-/// Create a reject function for folding over inputs to collect refunds.
-/// Like mkUpdate but: no proofs, no MPF operations, is_rejectable check.
-fn mkReject(
-  tokenId,
-  max_fee,
-  process_time,
-  retract_time,
-  validity_range,
-) {
-  fn(input: Input, refunds: List<Pair<VerificationKeyHash, Int>>) {
-    when input.output.datum is {
-      InlineDatum(datum) ->
-        if datum is RequestDatum(request): CageDatum {
-          let Request {
-            requestToken,
-            requestOwner,
-            fee,
-            submitted_at,
-            ..
-          } = request
-          if requestToken == tokenId {
-            expect fee == max_fee
-            expect
-              is_rejectable(
-                validity_range,
-                submitted_at,
-                process_time,
-                retract_time,
-              )
-            let inputLovelace = assets.lovelace_of(input.output.value)
-            let refundAmount = inputLovelace - fee
-            if refundAmount > 0 {
-              [Pair(requestOwner, refundAmount), ..refunds]
-            } else {
-              refunds
-            }
-          } else {
-            refunds
-          }
-        } else {
-          refunds
-        }
-      _ -> refunds
-    }
-  }
-}
-
-/// Validate a Reject operation: discard expired/dishonest requests.
-/// Root MUST NOT change. Refunds enforced for each rejected request.
-fn validReject(
-  state: State,
-  input: Input,
-  tokenId: TokenId,
-  tx: Transaction,
-) {
-  let Transaction { outputs, inputs, validity_range, .. } = tx
-  let State { root, max_fee, process_time, retract_time, .. } = state
-
-  expect Some(output) = head(outputs)
-  expect InlineDatum(outState) = output.datum
-  expect
-    StateDatum(
-      State {
-        root: newRoot,
-        process_time: outProcessTime,
-        retract_time: outRetractTime,
-        ..
-      },
-    ) = outState
-  expect newRoot == root
-  // Enforce time params immutability
-  expect process_time == outProcessTime
-  expect retract_time == outRetractTime
-
-  expect
-    output.address.payment_credential == input.output.address.payment_credential
-
-  let refunds =
-    inputs
-      |> foldl(
-          [],
-          mkReject(
+          (mpf.from_root(root), actions, []),
+          mkAction(
             tokenId,
             max_fee,
             process_time,
@@ -848,7 +668,11 @@ fn validReject(
             validity_range,
           ),
         )
+  expect (mpf.root(expectedNewRoot) == newRoot)?
+  expect
+    output.address.payment_credential == input.output.address.payment_credential
 
+  // Verify refund outputs (starting after the State UTxO at index 0)
   expect [_, ..refundOutputs] = outputs
   let orderedRefunds = list.reverse(refunds)
   expect verifyRefunds(refundOutputs, orderedRefunds)

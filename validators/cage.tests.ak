@@ -37,8 +37,8 @@ use cardano/transaction.{
 use lib.{TokenId, assetName, valueFromToken}
 use types.{
   Burning, CageDatum, Contribute, Delete, End, Insert, Migrating, Migration,
-  Mint, MintRedeemer, Minting, Modify, Reject, Request, RequestDatum, Retract,
-  State, StateDatum, Update, UpdateRedeemer,
+  Mint, MintRedeemer, Minting, Modify, Rejected, Request, RequestAction,
+  RequestDatum, Retract, State, StateDatum, Update, UpdateAction, UpdateRedeemer,
 }
 
 // ============================================================================
@@ -157,7 +157,7 @@ test canCage() {
   cage.mpfCage.spend(
     0,
     stateDatum,
-    Modify([[]]),
+    Modify([UpdateAction([])]),
     testStateRef,
     Transaction {
       ..transaction.placeholder,
@@ -414,7 +414,7 @@ test contribute_in_phase3() {
 /// Only the cage owner can Modify. Without the owner's signature, anyone
 /// could update the MPF root with arbitrary data.
 test modify_missing_signature() fail {
-  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [output], extra_signatories: [], inputs: [update, request] })
 }
 
@@ -423,7 +423,7 @@ test modify_missing_signature() fail {
 /// the output to a different script they control.
 test modify_wrong_address() fail {
   let bad_output = Output { ..output, address: address.from_script("different_script") }
-  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [bad_output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
@@ -431,7 +431,7 @@ test modify_wrong_address() fail {
 /// a different owner than the input. This is intentional: it allows the
 /// current owner to hand off the cage to someone else.
 test modify_owner_transfer() {
-  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
@@ -478,7 +478,7 @@ test modify_too_few_proofs() fail {
 /// Extra proofs beyond what's needed are silently ignored. The fold consumes
 /// one proof per matching request; leftover proofs are discarded.
 test modify_extra_proofs() {
-  cage.mpfCage.spend(0, stateDatum, Modify([[], []]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([UpdateAction([]), UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
@@ -490,14 +490,14 @@ test modify_wrong_root() fail {
     datum: InlineDatum(StateDatum(State { owner: "new-owner", root: "wrong_root_hash", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
-  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [bad_root_output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
 /// Modify is forbidden in Phase 2 (the retract window). The oracle can only
 /// process requests during Phase 1 to give requesters a fair retract window.
 test modify_in_phase2() fail {
-  cage.mpfCage.spend(0, stateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, stateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase2Range, outputs: [output], extra_signatories: ["owner"], inputs: [update, request] })
 }
 
@@ -761,14 +761,14 @@ const refundOutput = Output {
 /// Happy path: Modify with fee. Request has 2 ADA, fee is 0.5 ADA,
 /// so refund of 1.5 ADA goes to the requester's address.
 test modify_with_refund() {
-  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
 /// A refund output must be present for each processed request.
 /// Omitting it steals the requester's locked ADA.
 test modify_missing_refund() fail {
-  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
@@ -776,7 +776,7 @@ test modify_missing_refund() fail {
 /// the requester.
 test modify_insufficient_refund() fail {
   let bad_refund = Output { ..refundOutput, value: from_lovelace(1_000_000) }
-  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput, bad_refund], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
@@ -784,7 +784,7 @@ test modify_insufficient_refund() fail {
 /// is theft even if the amount is correct.
 test modify_wrong_refund_address() fail {
   let wrong_addr_refund = Output { ..refundOutput, address: address.from_verification_key("wrong_key_aaaaaaaaaaaaaaaa") }
-  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput, wrong_addr_refund], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
@@ -813,7 +813,7 @@ test modify_zero_fee() {
     address: address.from_verification_key("requester_key_aaaaaaaaaaaaaaa"),
     value: from_lovelace(2_000_000), datum: NoDatum, reference_script: None,
   }
-  cage.mpfCage.spend(0, Some(StateDatum(zf_state)), Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, Some(StateDatum(zf_state)), Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [zf_state_output, zf_refund], extra_signatories: ["owner"], inputs: [zf_state_input, zf_request_input] })
 }
 
@@ -828,7 +828,7 @@ test modify_fee_mismatch() fail {
     output_reference: testRequestRef,
     output: Output { address: testScriptAddress, value: from_lovelace(2_000_000), datum: InlineDatum(mismatch_request), reference_script: None },
   }
-  cage.mpfCage.spend(0, feeStateDatum, Modify([[]]), testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([UpdateAction([])]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [feeStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, mismatch_input] })
 }
 
@@ -842,12 +842,10 @@ test end_with_extra_mint_policy() {
 }
 
 // ============================================================================
-// Reject tests
+// Reject tests (via Modify with Rejected actions)
 //
-// Reject allows the cage owner to discard expired or dishonest requests
-// (Phase 3 or future submitted_at). The MPF root must NOT change — rejected
-// requests are never folded in. Refunds are still owed for each rejected
-// request.
+// Rejection is now expressed as Modify([Rejected, ...]). The MPF root must
+// NOT change — rejected requests are never folded in. Refunds are still owed.
 // ============================================================================
 
 const rejectStateOutput = Output {
@@ -859,27 +857,25 @@ const rejectStateOutput = Output {
 /// Happy path: reject an expired request in Phase 3.
 /// Root stays the same, requester gets refunded (input ADA minus fee).
 test reject_happy() {
-  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([Rejected]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
 /// Reject is forbidden in Phase 1 — requests are still being processed.
-/// Rejecting a valid, in-progress request would violate the service agreement.
 test reject_in_phase1() fail {
-  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([Rejected]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
 /// Reject is forbidden in Phase 2 — the retract window belongs exclusively
 /// to the requester. The cage owner must wait for Phase 3.
 test reject_in_phase2() fail {
-  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([Rejected]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase2Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
-/// A request with submitted_at far in the future is dishonest — the requester
-/// lied about when they submitted. Dishonest requests are rejectable in ANY
-/// phase because `is_rejectable` returns true when `validity_range < submitted_at`.
+/// A request with submitted_at far in the future is dishonest — rejectable
+/// in ANY phase because `is_rejectable` returns true when `validity_range < submitted_at`.
 test reject_future_submitted_at() {
   let future_request = RequestDatum(Request {
     requestToken: testToken, requestKey: "42", requestValue: Insert("42"),
@@ -889,34 +885,30 @@ test reject_future_submitted_at() {
     output_reference: testRequestRef,
     output: Output { address: testScriptAddress, value: from_lovelace(2_000_000), datum: InlineDatum(future_request), reference_script: None },
   }
-  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([Rejected]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, future_request_input] })
 }
 
-/// Only the cage owner can reject requests. Without this, anyone could
-/// discard valid requests and disrupt the service.
+/// Only the cage owner can reject requests.
 test reject_missing_signature() fail {
-  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([Rejected]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, outputs: [rejectStateOutput, refundOutput], extra_signatories: [], inputs: [feeStateInput, feeRequestInput] })
 }
 
-/// The MPF root must NOT change during Reject. Rejected requests are discarded,
-/// not folded into the trie. A root change would mean data was inserted
-/// without proper validation.
+/// The MPF root must NOT change during rejection.
 test reject_root_changes() fail {
   let bad_reject_output = Output {
     address: testScriptAddress, value: testValue,
     datum: InlineDatum(StateDatum(State { owner: "owner", root: "different_root_aaaaaaaaaaaaa", max_fee: testFee, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
-  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([Rejected]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, outputs: [bad_reject_output, refundOutput], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }
 
 /// Even rejected requests must have their ADA refunded (minus fee).
-/// Providing an insufficient refund shortchanges the requester.
 test reject_wrong_refund() fail {
   let bad_refund = Output { ..refundOutput, value: from_lovelace(500_000) }
-  cage.mpfCage.spend(0, feeStateDatum, Reject, testStateRef,
+  cage.mpfCage.spend(0, feeStateDatum, Modify([Rejected]), testStateRef,
     Transaction { ..transaction.placeholder, validity_range: phase3Range, outputs: [rejectStateOutput, bad_refund], extra_signatories: ["owner"], inputs: [feeStateInput, feeRequestInput] })
 }

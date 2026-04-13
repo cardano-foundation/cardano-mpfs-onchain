@@ -124,6 +124,23 @@ pub type MintRedeemer {
   Burning
 }
 
+/// Per-request action in a `Modify` redeemer.
+///
+/// Each action corresponds to one request input in the transaction:
+/// - `Update(proof)`: verify the Merkle proof and apply the MPF operation
+/// - `Rejected`: verify the request is rejectable (Phase 3 or dishonest)
+///   and skip proof verification
+///
+/// ## On-chain encoding
+/// - `Update(proof)` → Constr 0 [proof]
+/// - `Rejected` → Constr 1 []
+pub type RequestAction {
+  /// Apply the request's operation to the MPF using this proof.
+  UpdateAction(Proof)
+  /// Reject the request (expiry or dishonest timestamp).
+  Rejected
+}
+
 /// Redeemer for spending caged UTxOs.
 ///
 /// This redeemer is used by the spending validator in `cage.ak`. The four
@@ -134,9 +151,8 @@ pub type MintRedeemer {
 /// |----------------|-----------------|-------------------------|--------------------------------|
 /// | `End`          | `StateDatum`    | State owner             | Burn the caged NFT             |
 /// | `Contribute`   | `RequestDatum`  | Anyone (permissionless) | Link a request to a State UTxO |
-/// | `Modify`       | `StateDatum`    | State owner             | Fold requests into MPF         |
+/// | `Modify`       | `StateDatum`    | State owner             | Process requests (update/reject)|
 /// | `Retract`      | `RequestDatum`  | Request owner           | Reclaim an unprocessed request |
-/// | `Reject`       | `StateDatum`    | State owner             | Discard expired/dishonest reqs |
 ///
 /// ## Test Hints
 /// - Using `End` on a `RequestDatum` UTxO -> should fail (expects StateDatum)
@@ -146,55 +162,17 @@ pub type MintRedeemer {
 /// - Using `Retract` without request owner signature -> should fail
 pub type UpdateRedeemer {
   /// Destroy the caged token (burns the NFT). Requires State datum.
-  /// The spending validator checks that the mint field contains the
-  /// same token with quantity -1, and that the state owner signed.
   End
   /// Validate that a Request UTxO targets the correct caged token.
-  /// The `OutputReference` points to the State UTxO that holds the
-  /// caged token. This is a permissionless operation: anyone can
-  /// submit a `Contribute` transaction to link their request.
-  ///
-  /// ## Why Contribute Exists
-  /// The `Contribute` step validates that a request targets the right
-  /// token BEFORE the owner processes it. Without this, a request
-  /// could claim to target token A but actually be applied to token B.
-  /// By requiring the request UTxO to be spent with `Contribute` first
-  /// (which checks `requestToken == tokenId`), the system ensures
-  /// request-token binding is validated on-chain.
   Contribute(OutputReference)
-  /// Update the MPF state by processing input requests. Requires State datum.
-  /// The `List<Proof>` must contain exactly one Merkle proof per request
-  /// being folded into the MPF, in the same order as the request inputs
-  /// appear in the transaction's input list.
-  ///
-  /// ## How the Proof List Works
-  /// The validator iterates over ALL transaction inputs. For each input
-  /// that contains a `RequestDatum` targeting this token, it consumes
-  /// one proof from the list. Non-request inputs (or requests targeting
-  /// other tokens) are skipped without consuming a proof.
-  ///
-  /// ## Test Hints
-  /// - Modify with correct proofs -> root should update correctly
-  /// - Modify with wrong proof -> should fail (MPF proof verification)
-  /// - Modify with too few proofs -> should fail (uncons on empty list)
-  /// - Modify with too many proofs -> proofs remain unconsumed (no check currently)
-  /// - Modify with no requests in inputs -> root stays the same
-  Modify(List<Proof>)
-  /// Allow the request owner to reclaim their Request UTxO. Requires Request datum.
-  /// Only the `requestOwner` (from the Request datum) can sign this transaction.
-  /// The `OutputReference` points to the State UTxO (included as a reference input)
-  /// so the validator can read `process_time` and `retract_time` from its datum.
-  ///
-  /// ## Test Hints
-  /// - Retract signed by requestOwner -> should succeed
-  /// - Retract signed by someone else -> should fail
-  /// - Retract on an already-processed request -> impossible (UTxO already consumed)
+  /// Process requests with mixed update/reject actions. Requires State datum.
+  /// The `List<RequestAction>` must contain exactly one action per request
+  /// being processed, in the same order as the request inputs appear in
+  /// the transaction's input list. `Update(proof)` applies the MPF operation;
+  /// `Rejected` skips the proof and verifies rejectability instead.
+  Modify(List<RequestAction>)
+  /// Allow the request owner to reclaim their Request UTxO.
   Retract(OutputReference)
-  /// Discard requests that are past their retract window (Phase 3) or have
-  /// a dishonest (future) `submitted_at` timestamp. Requires State datum.
-  /// The oracle keeps the fee and refunds the remaining lovelace.
-  /// The MPF root MUST NOT change during a Reject operation.
-  Reject
 }
 
 /// The state of a caged token, stored as inline datum.
