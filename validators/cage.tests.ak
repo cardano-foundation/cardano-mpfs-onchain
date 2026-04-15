@@ -79,7 +79,7 @@ const state =
   State {
     owner: "owner",
     root: root(mpf.empty),
-    max_fee: 0,
+    tip: 0,
     process_time: testProcessTime,
     retract_time: testRetractTime,
   }
@@ -98,7 +98,7 @@ const aRequest =
       requestKey: "42",
       requestValue: Insert("42"),
       requestOwner: "owner",
-      fee: 0,
+      tip: 0,
       submitted_at: 0,
     },
   )
@@ -137,7 +137,7 @@ const output =
         State {
           owner: "new-owner",
           root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
-          max_fee: 0,
+          tip: 0,
           process_time: testProcessTime,
           retract_time: testRetractTime,
         },
@@ -203,7 +203,7 @@ const minted =
         State {
           owner: "owner",
           root: root(empty),
-          max_fee: 0,
+          tip: 0,
           process_time: testProcessTime,
           retract_time: testRetractTime,
         },
@@ -299,7 +299,7 @@ test mint_to_wrong_script() fail {
 /// A non-empty root would mean data exists without ever being inserted.
 test mint_nonempty_root() fail {
   let bad_output =
-    Output { ..minted, datum: InlineDatum(StateDatum(State { owner: "owner", root: "nonempty_root", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })) }
+    Output { ..minted, datum: InlineDatum(StateDatum(State { owner: "owner", root: "nonempty_root", tip: 0, process_time: testProcessTime, retract_time: testRetractTime })) }
   cage.mpfCage.mint(
     0,
     Minting(minting), "policy_id",
@@ -315,7 +315,7 @@ test mint_request_datum() fail {
       ..minted,
       datum: InlineDatum(RequestDatum(Request {
         requestToken: token, requestKey: "k", requestValue: Insert("v"),
-        requestOwner: "owner", fee: 0, submitted_at: 0,
+        requestOwner: "owner", tip: 0, submitted_at: 0,
       })),
     }
   cage.mpfCage.mint(
@@ -379,7 +379,7 @@ test retract_in_phase3() fail {
 test contribute_wrong_token() fail {
   let wrong_request = RequestDatum(Request {
     requestToken: TokenId { assetName: "different_asset" },
-    requestKey: "42", requestValue: Insert("42"), requestOwner: "owner", fee: 0, submitted_at: 0,
+    requestKey: "42", requestValue: Insert("42"), requestOwner: "owner", tip: 0, submitted_at: 0,
   })
   cage.mpfCage.spend(0, Some(wrong_request), Contribute(testStateRef), testRequestRef,
     Transaction { ..transaction.placeholder, validity_range: phase1Range, inputs: [update, request] })
@@ -440,7 +440,7 @@ test modify_owner_transfer() {
 test modify_no_requests() {
   let unchanged_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), tip: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   cage.mpfCage.spend(0, stateDatum, Modify([]), testStateRef,
@@ -453,7 +453,7 @@ test modify_no_requests() {
 test modify_skip_other_token() {
   let other_request_datum = RequestDatum(Request {
     requestToken: TokenId { assetName: "other_token" },
-    requestKey: "42", requestValue: Insert("42"), requestOwner: "someone", fee: 0, submitted_at: 0,
+    requestKey: "42", requestValue: Insert("42"), requestOwner: "someone", tip: 0, submitted_at: 0,
   })
   let other_request = Input {
     output_reference: OutputReference { transaction_id: "3334567890abcdef", output_index: 1 },
@@ -461,7 +461,7 @@ test modify_skip_other_token() {
   }
   let unchanged_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), tip: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   cage.mpfCage.spend(0, stateDatum, Modify([]), testStateRef,
@@ -487,7 +487,7 @@ test modify_extra_proofs() {
 test modify_wrong_root() fail {
   let bad_root_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "new-owner", root: "wrong_root_hash", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
+    datum: InlineDatum(StateDatum(State { owner: "new-owner", root: "wrong_root_hash", tip: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   cage.mpfCage.spend(0, stateDatum, Modify([UpdateAction([])]), testStateRef,
@@ -602,7 +602,7 @@ fn owner_fuzzer() -> Fuzzer<ByteArray> {
 test prop_retract_requires_owner(signer via owner_fuzzer()) fail once {
   let req = RequestDatum(Request {
     requestToken: testToken, requestKey: "k", requestValue: Insert("v"),
-    requestOwner: "the_real_owner_key_aaaaaaaaaa", fee: 0, submitted_at: 0,
+    requestOwner: "the_real_owner_key_aaaaaaaaaa", tip: 0, submitted_at: 0,
   })
   cage.mpfCage.spend(0, Some(req), Retract(testStateRef), testRequestRef,
     Transaction { ..transaction.placeholder, validity_range: phase2Range, extra_signatories: [signer], reference_inputs: [update] })
@@ -615,10 +615,10 @@ test prop_retract_requires_owner(signer via owner_fuzzer()) fail once {
 /// doesn't match the state owner. This verifies `has(extra_signatories, owner)`
 /// protects the MPF state from unauthorized modifications.
 test prop_modify_requires_owner(signer via owner_fuzzer()) fail once {
-  let s = State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime }
+  let s = State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty), tip: 0, process_time: testProcessTime, retract_time: testRetractTime }
   let unchanged_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
+    datum: InlineDatum(StateDatum(State { owner: "the_real_owner_key_aaaaaaaaaa", root: root(empty), tip: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   let state_input = Input {
@@ -647,7 +647,7 @@ test prop_mint_roundtrip(params via fuzz.tuple(fuzz.bytearray_fixed(32), fuzz.in
   let addr = address.from_script("policy_id")
   let out = Output {
     address: addr, value: val,
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: root(empty), tip: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   let utxo = Output { address: paying_address, value: zero, datum: NoDatum, reference_script: None }
@@ -679,7 +679,7 @@ const migrate_output =
   Output {
     address: address.from_script(new_policy),
     value: from_asset(new_policy, migrate_token.assetName, 1),
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: "nonempty_root_hash_aaaaaaaaa", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: "nonempty_root_hash_aaaaaaaaa", tip: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
 
@@ -725,13 +725,13 @@ test migrate_wrong_old_policy() fail {
 
 const testFee = 500_000
 
-const feeState = State { owner: "owner", root: root(mpf.empty), max_fee: testFee, process_time: testProcessTime, retract_time: testRetractTime }
+const feeState = State { owner: "owner", root: root(mpf.empty), tip: testFee, process_time: testProcessTime, retract_time: testRetractTime }
 
 const feeStateDatum = Some(StateDatum(feeState))
 
 const feeRequest = RequestDatum(Request {
   requestToken: testToken, requestKey: "42", requestValue: Insert("42"),
-  requestOwner: "requester_key_aaaaaaaaaaaaaaa", fee: testFee, submitted_at: 0,
+  requestOwner: "requester_key_aaaaaaaaaaaaaaa", tip: testFee, submitted_at: 0,
 })
 
 const feeRequestInput = Input {
@@ -747,7 +747,7 @@ const feeStateInput = Input {
 const feeStateOutput = Output {
   address: testScriptAddress, value: testValue,
   datum: InlineDatum(StateDatum(State {
-    owner: "new-owner", root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea", max_fee: testFee,
+    owner: "new-owner", root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea", tip: testFee,
     process_time: testProcessTime, retract_time: testRetractTime,
   })),
   reference_script: None,
@@ -791,10 +791,10 @@ test modify_wrong_refund_address() fail {
 /// When fee is 0, the full input ADA is refunded. No ADA is retained by the
 /// cage owner. This is the "free service" case.
 test modify_zero_fee() {
-  let zf_state = State { owner: "owner", root: root(mpf.empty), max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime }
+  let zf_state = State { owner: "owner", root: root(mpf.empty), tip: 0, process_time: testProcessTime, retract_time: testRetractTime }
   let zf_request = RequestDatum(Request {
     requestToken: testToken, requestKey: "42", requestValue: Insert("42"),
-    requestOwner: "requester_key_aaaaaaaaaaaaaaa", fee: 0, submitted_at: 0,
+    requestOwner: "requester_key_aaaaaaaaaaaaaaa", tip: 0, submitted_at: 0,
   })
   let zf_request_input = Input {
     output_reference: testRequestRef,
@@ -806,7 +806,7 @@ test modify_zero_fee() {
   }
   let zf_state_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "new-owner", root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea", max_fee: 0, process_time: testProcessTime, retract_time: testRetractTime })),
+    datum: InlineDatum(StateDatum(State { owner: "new-owner", root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea", tip: 0, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   let zf_refund = Output {
@@ -817,12 +817,12 @@ test modify_zero_fee() {
     Transaction { ..transaction.placeholder, validity_range: phase1Range, outputs: [zf_state_output, zf_refund], extra_signatories: ["owner"], inputs: [zf_state_input, zf_request_input] })
 }
 
-/// The request's fee must match the state's max_fee. A mismatch means the
+/// The request's tip must match the state's tip. A mismatch means the
 /// request was created for a different fee tier and must be rejected.
 test modify_fee_mismatch() fail {
   let mismatch_request = RequestDatum(Request {
     requestToken: testToken, requestKey: "42", requestValue: Insert("42"),
-    requestOwner: "requester_key_aaaaaaaaaaaaaaa", fee: 100_000, submitted_at: 0,
+    requestOwner: "requester_key_aaaaaaaaaaaaaaa", tip: 100_000, submitted_at: 0,
   })
   let mismatch_input = Input {
     output_reference: testRequestRef,
@@ -850,7 +850,7 @@ test end_with_extra_mint_policy() {
 
 const rejectStateOutput = Output {
   address: testScriptAddress, value: testValue,
-  datum: InlineDatum(StateDatum(State { owner: "owner", root: root(mpf.empty), max_fee: testFee, process_time: testProcessTime, retract_time: testRetractTime })),
+  datum: InlineDatum(StateDatum(State { owner: "owner", root: root(mpf.empty), tip: testFee, process_time: testProcessTime, retract_time: testRetractTime })),
   reference_script: None,
 }
 
@@ -879,7 +879,7 @@ test reject_in_phase2() fail {
 test reject_future_submitted_at() {
   let future_request = RequestDatum(Request {
     requestToken: testToken, requestKey: "42", requestValue: Insert("42"),
-    requestOwner: "requester_key_aaaaaaaaaaaaaaa", fee: testFee, submitted_at: 100_000,
+    requestOwner: "requester_key_aaaaaaaaaaaaaaa", tip: testFee, submitted_at: 100_000,
   })
   let future_request_input = Input {
     output_reference: testRequestRef,
@@ -899,7 +899,7 @@ test reject_missing_signature() fail {
 test reject_root_changes() fail {
   let bad_reject_output = Output {
     address: testScriptAddress, value: testValue,
-    datum: InlineDatum(StateDatum(State { owner: "owner", root: "different_root_aaaaaaaaaaaaa", max_fee: testFee, process_time: testProcessTime, retract_time: testRetractTime })),
+    datum: InlineDatum(StateDatum(State { owner: "owner", root: "different_root_aaaaaaaaaaaaa", tip: testFee, process_time: testProcessTime, retract_time: testRetractTime })),
     reference_script: None,
   }
   cage.mpfCage.spend(0, feeStateDatum, Modify([Rejected]), testStateRef,

@@ -1,0 +1,88 @@
+cabal-version:   3.4
+name:            cardano-mpfs-onchain
+version:         0.1.0.0
+synopsis:        Canonical on-chain types for MPFS cage validator
+license:         Apache-2.0
+author:          Paolo Veronelli
+maintainer:      paolo.veronelli@gmail.com
+category:        Cardano
+build-type:      Simple
+
+common warnings
+  ghc-options:
+    -Wall -Werror -Wunused-imports -Wunused-packages
+    -Wmissing-export-lists -Wname-shadowing -Wredundant-constraints
+
+  default-extensions:
+    DataKinds
+    DerivingStrategies
+    DuplicateRecordFields
+    FlexibleContexts
+    GADTs
+    ImportQualifiedPost
+    OverloadedStrings
+    PatternSynonyms
+    RecordWildCards
+    ScopedTypeVariables
+    StrictData
+    TypeApplications
+    TypeOperators
+    ViewPatterns
+
+library
+  import:           warnings
+  hs-source-dirs:   lib
+  default-language: GHC2021
+  exposed-modules:
+    Cardano.MPFS.OnChain
+    Cardano.MPFS.OnChain.AssetName
+    Cardano.MPFS.OnChain.Datum
+    Cardano.MPFS.OnChain.Script
+    Cardano.MPFS.OnChain.Types
+
+  build-depends:
+    , aeson
+    , base
+    , bytestring
+    , cardano-crypto-class
+    , cardano-ledger-alonzo
+    , cardano-ledger-api
+    , cardano-ledger-conway
+    , cardano-ledger-core
+    , cardano-ledger-mary
+    , cryptonite
+    , memory
+    , microlens
+    , plutus-core
+    , plutus-ledger-api
+    , plutus-tx
+    , text
+
+test-suite e2e-tests
+  import:           warnings
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   e2e-test
+  main-is:          Main.hs
+  default-language: GHC2021
+  other-modules:
+    CageE2ESpec
+    CageTxBuilder
+
+  build-depends:
+    , base
+    , bytestring
+    , cardano-crypto-class
+    , cardano-ledger-allegra
+    , cardano-ledger-alonzo
+    , cardano-ledger-api
+    , cardano-ledger-conway
+    , cardano-ledger-core
+    , cardano-ledger-mary
+    , cardano-mpfs-onchain
+    , cardano-node-clients
+    , cardano-node-clients:devnet
+    , cardano-strict-containers
+    , containers
+    , hspec
+    , microlens
+    , plutus-tx
