@@ -36,7 +36,7 @@ export type Validator = ReturnType<
 interface PendingRequest {
   utxo: UTxO;
   datum: string;
-  fee: bigint;
+  tip: bigint;
   lovelace: bigint;
   submittedAt: bigint;
 }
@@ -70,7 +70,7 @@ class Cage implements PromiseLike<void> {
   private unit = "";
   private stateUtxo: UTxO | undefined;
   private root = EMPTY_ROOT;
-  private maxFee = 0n;
+  private tip = 0n;
   private processTime: bigint;
   private retractTime: bigint;
   private pendingRequests: PendingRequest[] = [];
@@ -109,12 +109,12 @@ class Cage implements PromiseLike<void> {
 
   // --- Public DSL methods ---
 
-  mint(opts?: { maxFee?: bigint }): this {
+  mint(opts?: { tip?: bigint }): this {
     this.chain = this.chain.then(() => this.doMint(opts));
     return this;
   }
 
-  request(key: string, value: string, opts?: { fee?: bigint }): this {
+  request(key: string, value: string, opts?: { tip?: bigint }): this {
     this.chain = this.chain.then(() =>
       this.doRequest(key, value, false, opts),
     );
@@ -124,7 +124,7 @@ class Cage implements PromiseLike<void> {
   deleteRequest(
     key: string,
     value: string,
-    opts?: { fee?: bigint },
+    opts?: { tip?: bigint },
   ): this {
     this.chain = this.chain.then(() =>
       this.doRequest(key, value, true, opts),
@@ -162,8 +162,8 @@ class Cage implements PromiseLike<void> {
 
   // --- Private step implementations ---
 
-  private async doMint(opts?: { maxFee?: bigint }): Promise<void> {
-    this.maxFee = opts?.maxFee ?? 0n;
+  private async doMint(opts?: { tip?: bigint }): Promise<void> {
+    this.tip = opts?.tip ?? 0n;
 
     const utxos = await this.lucid.wallet().getUtxos();
     expect(utxos.length).toBeGreaterThan(0);
@@ -179,7 +179,7 @@ class Cage implements PromiseLike<void> {
     const datum = encodeStateDatum(
       this.ownerKeyHash,
       EMPTY_ROOT,
-      this.maxFee,
+      this.tip,
       this.processTime,
       this.retractTime,
     );
@@ -206,9 +206,9 @@ class Cage implements PromiseLike<void> {
     key: string,
     value: string,
     isDelete: boolean,
-    opts?: { fee?: bigint },
+    opts?: { tip?: bigint },
   ): Promise<void> {
-    const fee = opts?.fee ?? 0n;
+    const tip = opts?.tip ?? 0n;
     const lovelace = 2_000_000n;
     const submittedAt = BigInt(Date.now()) + onChainTimeOffset;
     const encode = isDelete
@@ -219,7 +219,7 @@ class Cage implements PromiseLike<void> {
       this.ownerKeyHash,
       key,
       value,
-      fee,
+      tip,
       submittedAt,
     );
 
@@ -249,7 +249,7 @@ class Cage implements PromiseLike<void> {
     this.pendingRequests.push({
       utxo: requestUtxo!,
       datum,
-      fee,
+      tip,
       lovelace,
       submittedAt,
     });
@@ -262,7 +262,7 @@ class Cage implements PromiseLike<void> {
     const newDatum = encodeStateDatum(
       this.ownerKeyHash,
       newRoot,
-      this.maxFee,
+      this.tip,
       this.processTime,
       this.retractTime,
     );
@@ -284,16 +284,32 @@ class Cage implements PromiseLike<void> {
         { [this.unit]: 1n, lovelace: 2_000_000n },
       );
 
-    // Refund each requester
-    for (const req of this.pendingRequests) {
-      txBuilder = txBuilder.pay.ToAddress(this.walletAddress, {
-        lovelace: req.lovelace - req.fee,
-      });
-    }
+    // Conservation-exact refunds with overestimated fee.
+    // setMinFee locks tx.fee before evaluation so the
+    // validator sees the same fee used to compute refunds.
+    // The ledger accepts fee >= min_fee; excess goes to
+    // the Cardano treasury.
+    const overestimatedFee = 1_000_000n;
+    const n = BigInt(this.pendingRequests.length);
+    const totalInputLovelace = this.pendingRequests.reduce(
+      (sum, r) => sum + r.lovelace, 0n);
+    const totalRefund = totalInputLovelace - overestimatedFee - n * this.tip;
+    const perRequest = n > 0n ? totalRefund / n : 0n;
+    const remainder = n > 0n ? totalRefund % n : 0n;
+
+    this.pendingRequests.forEach((_req, i) => {
+      const refund = perRequest + (BigInt(i) === 0n ? remainder : 0n);
+      if (refund > 0n) {
+        txBuilder = txBuilder.pay.ToAddress(this.walletAddress, {
+          lovelace: refund,
+        });
+      }
+    });
 
     const tx = await txBuilder
       .attach.SpendingValidator(this.validator.spendValidator)
       .addSignerKey(this.ownerKeyHash)
+      .setMinFee(overestimatedFee)
       .complete(COMPLETE_OPTS);
 
     await this.submitAndWait(tx);
@@ -318,7 +334,7 @@ class Cage implements PromiseLike<void> {
     const datum = encodeStateDatum(
       this.ownerKeyHash,
       this.root,
-      this.maxFee,
+      this.tip,
       this.processTime,
       this.retractTime,
     );
@@ -360,12 +376,20 @@ class Cage implements PromiseLike<void> {
     const sameDatum = encodeStateDatum(
       this.ownerKeyHash,
       this.root,
-      this.maxFee,
+      this.tip,
       this.processTime,
       this.retractTime,
     );
 
     const now = BigInt(Date.now());
+
+    const overestimatedFee = 1_000_000n;
+    const n = BigInt(this.pendingRequests.length);
+    const totalInputLovelace = this.pendingRequests.reduce(
+      (sum, r) => sum + r.lovelace, 0n);
+    const totalRefund = totalInputLovelace - overestimatedFee - n * this.tip;
+    const perRequest = n > 0n ? totalRefund / n : 0n;
+    const remainder = n > 0n ? totalRefund % n : 0n;
 
     let txBuilder = this.lucid
       .newTx()
@@ -382,19 +406,19 @@ class Cage implements PromiseLike<void> {
         { [this.unit]: 1n, lovelace: 2_000_000n },
       );
 
-    // Refund each requester (lovelace minus fee)
-    for (const req of this.pendingRequests) {
-      const refund = req.lovelace - req.fee;
+    this.pendingRequests.forEach((_req, i) => {
+      const refund = perRequest + (BigInt(i) === 0n ? remainder : 0n);
       if (refund > 0n) {
         txBuilder = txBuilder.pay.ToAddress(this.walletAddress, {
           lovelace: refund,
         });
       }
-    }
+    });
 
     const tx = await txBuilder
       .attach.SpendingValidator(this.validator.spendValidator)
       .addSignerKey(this.ownerKeyHash)
+      .setMinFee(overestimatedFee)
       .complete(COMPLETE_OPTS);
 
     await this.submitAndWait(tx);

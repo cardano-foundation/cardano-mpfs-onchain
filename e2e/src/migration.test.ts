@@ -44,7 +44,7 @@ describe("MPF Cage Migration E2E", () => {
       .end();
   });
 
-  it("modify with fee enforces refund to requester", async () => {
+  it("modify with tip enforces refund to requester", async () => {
     await cage(
       lucid,
       loadValidator(0),
@@ -53,8 +53,8 @@ describe("MPF Cage Migration E2E", () => {
       PROCESS_TIME,
       RETRACT_TIME,
     )
-      .mint({ maxFee: 500_000n })
-      .request(INSERT_KEY, INSERT_VALUE, { fee: 500_000n })
+      .mint({ tip: 500_000n })
+      .request(INSERT_KEY, INSERT_VALUE, { tip: 500_000n })
       .modify(MODIFIED_ROOT)
       .end();
   });

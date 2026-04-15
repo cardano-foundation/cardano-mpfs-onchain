@@ -209,9 +209,10 @@ pub type State {
   /// The current Merkle Patricia Forestry root hash.
   /// This commits to all key-value pairs stored in the MPF.
   root: ByteArray,
-  /// The maximum fee (in lovelace) the oracle charges per request.
-  /// Requesters must agree to this fee by recording it in their Request datum.
-  max_fee: Int,
+  /// The oracle's tip per request (in lovelace).
+  /// Requesters agree to this tip by recording it in their Request datum.
+  /// The actual tx fee is split across requests at Modify time (Plutus V3).
+  tip: Int,
   /// Duration (in milliseconds) of Phase 1 — the oracle processing window.
   /// Set at mint time; enforced immutable across Modify/Reject operations.
   process_time: Int,
@@ -313,9 +314,9 @@ pub type Request {
   /// The operation to perform on the key.
   /// See `Operation` type for details on Insert, Delete, and Update.
   requestValue: Operation,
-  /// The fee (in lovelace) the requester agrees to pay.
-  /// Must match `state.max_fee` at Modify time.
-  fee: Int,
+  /// The oracle tip (in lovelace) the requester agrees to pay.
+  /// Must match `state.tip` at Modify time.
+  tip: Int,
   /// The POSIXTime (in milliseconds) when the request was submitted.
   /// Used for time-gated phase enforcement: Phase 1 (oracle-only),
   /// Phase 2 (requester retract), Phase 3 (oracle reject/cleanup).

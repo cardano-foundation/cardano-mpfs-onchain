@@ -1,7 +1,7 @@
 import { Constr, Data, type UTxO } from "@lucid-evolution/lucid";
 
 // CageDatum = RequestDatum(Request) | StateDatum(State)
-// StateDatum is constructor index 1, State has fields { owner, root, max_fee, process_time, retract_time }
+// StateDatum is constructor index 1, State has fields { owner, root, tip, process_time, retract_time }
 export function encodeStateDatum(
   owner: string,
   root: string,
@@ -84,7 +84,7 @@ export function encodeRequestDatum(
   ownerHash: string,
   key: string,
   value: string,
-  fee: bigint = 0n,
+  tip: bigint = 0n,
   submittedAt: bigint = 0n,
 ): string {
   const tokenId = new Constr(0, [assetName]);
@@ -94,7 +94,7 @@ export function encodeRequestDatum(
     ownerHash,
     key,
     operation,
-    fee,
+    tip,
     submittedAt,
   ]);
   return Data.to(new Constr(0, [request]));
@@ -106,7 +106,7 @@ export function encodeDeleteRequestDatum(
   ownerHash: string,
   key: string,
   value: string,
-  fee: bigint = 0n,
+  tip: bigint = 0n,
   submittedAt: bigint = 0n,
 ): string {
   const tokenId = new Constr(0, [assetName]);
@@ -116,7 +116,7 @@ export function encodeDeleteRequestDatum(
     ownerHash,
     key,
     operation,
-    fee,
+    tip,
     submittedAt,
   ]);
   return Data.to(new Constr(0, [request]));

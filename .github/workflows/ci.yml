@@ -49,45 +49,6 @@ jobs:
       - name: Build Lean proofs
         run: nix shell nixpkgs#lean4 -c lake build
 
-  typecheck:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: e2e
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: e2e/package-lock.json
-
-      - run: npm ci
-
-      - run: npx tsc --noEmit
-
-  e2e:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Download plutus.json
-        uses: actions/download-artifact@v6
-        with:
-          name: plutus-json
-
-      - name: Prepare plutus.json
-        run: |
-          # The artifact is the blueprint file itself (named "result" from nix symlink)
-          # Rename to plutus.json for the docker-compose mount
-          if [ -f result ]; then mv result plutus.json; fi
-          ls -la plutus.json
-
-      - name: Run E2E tests
-        run: docker compose -f e2e/docker-compose.yml up --build --abort-on-container-exit test-runner
-
-      - name: Cleanup
-        if: always()
-        run: docker compose -f e2e/docker-compose.yml down -v
+  # TypeScript E2E removed — replaced by Haskell E2E
+  # in cardano-mpfs-offchain (CageFlow tests).
+  # See https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/42
