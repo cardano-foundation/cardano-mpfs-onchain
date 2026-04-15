@@ -49,6 +49,6 @@ jobs:
       - name: Build Lean proofs
         run: nix shell nixpkgs#lean4 -c lake build
 
-  # TypeScript E2E removed — replaced by Haskell E2E
-  # in cardano-mpfs-offchain (CageFlow tests).
-  # See https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/42
+  # Haskell E2E tests live in haskell/ — run via
+  # `just haskell-e2e` (requires GHC + cardano-node).
+  # CI integration pending haskell.nix flake setup.
