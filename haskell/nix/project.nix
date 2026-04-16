@@ -32,10 +32,4 @@ let
 in {
   devShells.default = project.shell;
   inherit project;
-  packages.cage-lib =
-    project.hsPkgs.cardano-mpfs-cage.components.library;
-  packages.cage-tests =
-    project.hsPkgs.cardano-mpfs-cage.components.tests.cage-tests;
-  packages.cage-test-vectors =
-    project.hsPkgs.cardano-mpfs-cage.components.exes.cage-test-vectors;
 }

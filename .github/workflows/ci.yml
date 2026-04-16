@@ -19,20 +19,52 @@ jobs:
         with:
           cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
-      - name: Check cage test vectors freshness
-        run: nix develop --command just vectors-check
+      - name: Build all checks
+        run: >-
+          nix build --quiet
+          .#checks.x86_64-linux.library
+          .#checks.x86_64-linux.cage-tests
+          .#checks.x86_64-linux.cage-test-vectors
+          .#checks.x86_64-linux.lint
+          .#checks.x86_64-linux.vectors-freshness
 
       - name: Build plutus.json
         run: nix build
 
       - name: Run aiken tests
-        run: nix develop --command aiken check
+        run: nix develop .#aiken --quiet --command aiken check
 
       - name: Upload plutus.json
         uses: actions/upload-artifact@v6
         with:
           name: plutus-json
           path: result
+
+  tests:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: paolino/dev-assets/setup-nix@v0.0.1
+        with:
+          cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Run cage QuickCheck tests
+        run: nix run .#cage-tests
+
+  lint:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: paolino/dev-assets/setup-nix@v0.0.1
+        with:
+          cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Run fourmolu + hlint
+        run: nix run .#lint
 
   lean:
     runs-on: ubuntu-latest
@@ -48,7 +80,3 @@ jobs:
 
       - name: Build Lean proofs
         run: nix shell nixpkgs#lean4 -c lake build
-
-  # Haskell E2E tests live in haskell/ — run via
-  # `just haskell-e2e` (requires GHC + cardano-node).
-  # CI integration pending haskell.nix flake setup.

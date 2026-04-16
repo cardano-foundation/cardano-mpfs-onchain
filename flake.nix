@@ -111,20 +111,45 @@
         # Haskell build (cage package)
         # -------------------------------------------------------
 
-        haskell = import ./haskell/nix/project.nix {
+        project = import ./haskell/nix/project.nix {
           inherit CHaP pkgs;
         };
+
+        components =
+          project.project.hsPkgs.cardano-mpfs-cage.components;
+
+        haskellChecks = import ./haskell/nix/checks.nix {
+          inherit pkgs components;
+          shell = project.project.shell;
+        };
+
+        haskellApps = import ./haskell/nix/apps.nix {
+          inherit pkgs;
+          checks = haskellChecks;
+        };
+
+        # -------------------------------------------------------
+        # Test vectors (from local Haskell package)
+        # -------------------------------------------------------
+
+        test-vectors = pkgs.runCommand "cage-vectors.ak" { } ''
+          ${pkgs.lib.getExe components.exes.cage-test-vectors} --aiken > $out
+        '';
+
+        test-vectors-json = pkgs.runCommand "cage-vectors.json" { } ''
+          ${pkgs.lib.getExe components.exes.cage-test-vectors} > $out
+        '';
 
       in
       {
         packages = {
           default = plutus-blueprint;
-          inherit plutus-blueprint;
-          inherit (haskell.packages) cage-lib cage-tests cage-test-vectors;
-          test-vectors = pkgs.runCommand "cage-vectors.ak" { } ''
-            ${haskell.packages.cage-test-vectors}/bin/cage-test-vectors --aiken > $out
-          '';
+          inherit plutus-blueprint test-vectors test-vectors-json;
         };
+
+        checks = haskellChecks;
+
+        apps = haskellApps;
 
         devShells = {
           aiken = pkgs.mkShell {
@@ -134,7 +159,7 @@
               pkgs.lean4
             ];
           };
-          default = haskell.devShells.default;
+          default = project.devShells.default;
         };
       }
     );
