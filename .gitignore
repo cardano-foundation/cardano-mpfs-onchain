@@ -4,3 +4,4 @@ plutus.json
 e2e/node_modules/
 e2e/dist/
 .direnv
+haskell/dist-newstyle/
