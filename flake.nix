@@ -1,25 +1,55 @@
 {
-  description = "Aiken validators for MPF";
+  description = "MPFS on-chain — Aiken validators + Haskell cage package";
+
+  nixConfig = {
+    extra-substituters = [ "https://cache.iog.io" ];
+    extra-trusted-public-keys =
+      [ "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=" ];
+  };
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    haskellNix.url =
+      "github:input-output-hk/haskell.nix/baa6a549ce876e9c44c494a12116f178f1becbe6";
+    nixpkgs.follows = "haskellNix/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    cardano-mpfs-cage.url = "github:cardano-foundation/cardano-mpfs-cage";
+    iohkNix = {
+      url =
+        "github:input-output-hk/iohk-nix/0ce7cc21b9a4cfde41871ef486d01a8fafbf9627";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    CHaP = {
+      url =
+        "github:intersectmbo/cardano-haskell-packages/a46182e9c039737bf43cdb5286df49bbe0edf6fb";
+      flake = false;
+    };
   };
 
   outputs =
     {
       nixpkgs,
       flake-utils,
-      cardano-mpfs-cage,
+      haskellNix,
+      iohkNix,
+      CHaP,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          overlays = [
+            iohkNix.overlays.crypto
+            haskellNix.overlay
+            iohkNix.overlays.haskell-nix-crypto
+            iohkNix.overlays.cardano-lib
+          ];
+          inherit system;
+        };
 
-        # Pre-fetched Aiken dependencies
+        # -------------------------------------------------------
+        # Aiken build
+        # -------------------------------------------------------
+
         stdlib = pkgs.fetchFromGitHub {
           owner = "aiken-lang";
           repo = "stdlib";
@@ -41,7 +71,6 @@
           hash = "sha256-uHVQxA1dYDuPbH+pf6SkGNBF7nBlDXdULrPFkfUDjzU=";
         };
 
-        # TOML manifest that aiken expects in build/packages/
         packagesToml = pkgs.writeText "packages.toml" ''
           [[packages]]
           name = "aiken-lang/stdlib"
@@ -59,48 +88,53 @@
           source = "github"
         '';
 
-        test-vectors =
-          cardano-mpfs-cage.packages.${system}.cage-test-vectors;
-
-        cage-vectors-ak = pkgs.runCommand "cage-vectors.ak" { } ''
-          ${test-vectors}/bin/cage-test-vectors --aiken > $out
-        '';
-
-      in
-      {
-        packages.test-vectors = cage-vectors-ak;
-
-        packages.default = pkgs.stdenv.mkDerivation {
+        plutus-blueprint = pkgs.stdenv.mkDerivation {
           pname = "mpf-plutus-blueprint";
           version = "0.0.0";
-
           src = pkgs.lib.cleanSource ./.;
-
           nativeBuildInputs = [ pkgs.aiken ];
-
           buildPhase = ''
-            # Populate build/packages/ with copies (aiken needs write access)
             mkdir -p build/packages
             cp ${packagesToml} build/packages/packages.toml
             cp -r ${stdlib} build/packages/aiken-lang-stdlib
             cp -r ${fuzz} build/packages/aiken-lang-fuzz
             cp -r ${merkle-patricia-forestry} build/packages/aiken-lang-merkle-patricia-forestry
             chmod -R u+w build/packages
-
             aiken build
           '';
-
           installPhase = ''
             cp plutus.json $out
           '';
         };
 
-        devShells.default = pkgs.mkShell {
-          packages = [
-            pkgs.aiken
-            pkgs.just
-            pkgs.lean4
-          ];
+        # -------------------------------------------------------
+        # Haskell build (cage package)
+        # -------------------------------------------------------
+
+        haskell = import ./haskell/nix/project.nix {
+          inherit CHaP pkgs;
+        };
+
+      in
+      {
+        packages = {
+          default = plutus-blueprint;
+          inherit plutus-blueprint;
+          inherit (haskell.packages) cage-lib cage-tests cage-test-vectors;
+          test-vectors = pkgs.runCommand "cage-vectors.ak" { } ''
+            ${haskell.packages.cage-test-vectors}/bin/cage-test-vectors --aiken > $out
+          '';
+        };
+
+        devShells = {
+          aiken = pkgs.mkShell {
+            packages = [
+              pkgs.aiken
+              pkgs.just
+              pkgs.lean4
+            ];
+          };
+          default = haskell.devShells.default;
         };
       }
     );

@@ -10,7 +10,7 @@ description:
   Haskell cage code.
 
 license:       Apache-2.0
-license-file:  ../LICENSE
+license-file:  LICENSE
 author:        Paolo Veronelli
 maintainer:    paolo.veronelli@gmail.com
 category:      Cardano
@@ -42,8 +42,8 @@ library
     , cardano-ledger-allegra
     , cardano-ledger-alonzo
     , cardano-ledger-api
-    , cardano-ledger-binary
     , cardano-ledger-conway
+    , cardano-strict-containers
     , cardano-ledger-core
     , cardano-ledger-mary
     , cardano-node-clients

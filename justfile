@@ -2,9 +2,13 @@
 build:
     nix build
 
-# Enter development shell with aiken
+# Enter Haskell dev shell (default)
 develop:
     nix develop
+
+# Enter Aiken-only dev shell
+develop-aiken:
+    nix develop .#aiken
 
 # Build blueprint directly with aiken (requires aiken in PATH)
 aiken-build:

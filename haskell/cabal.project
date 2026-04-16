@@ -53,6 +53,10 @@ source-repository-package
   tag: fdf6fe114959453d46ea733536b70f2d28c9bec8
   --sha256: 1sykch5944i117n110zs5rpa7pxx8s4ymflwx94vmb1fffw6hdi7
 
+-- Pin ouroboros-consensus below 0.28 (Dijkstra era) to match
+-- cardano-node-clients at fdf6fe1.
+constraints: ouroboros-consensus <0.28
+
 -- chain-follower has data-default <0.8 but cardano-ledger-shelley pulls 0.8
 allow-newer: chain-follower:data-default
 
