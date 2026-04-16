@@ -1,64 +1,67 @@
--- |
--- Module      : Cardano.MPFS.Cage.Trie.Pure
--- Description : Pure in-memory Trie backed by mts:mpf
--- License     : Apache-2.0
---
--- In-memory implementation of the 'Trie' interface
--- backed by an 'IORef' holding an 'MPFInMemoryDB'
--- from the @mts:mpf@ library.
---
--- All keys and values are hashed through MPF
--- conventions ('mkMPFHash') so proof paths match
--- what the Aiken on-chain validator expects.
-module Cardano.MPFS.Cage.Trie.Pure
-    ( -- * Construction
-      mkPureTrie
-    , mkPureTrieFromRef
+{- |
+Module      : Cardano.MPFS.Cage.Trie.Pure
+Description : Pure in-memory Trie backed by mts:mpf
+License     : Apache-2.0
 
-      -- * Internals (for TrieManager)
-    , getRootFromDb
-    ) where
+In-memory implementation of the 'Trie' interface
+backed by an 'IORef' holding an 'MPFInMemoryDB'
+from the @mts:mpf@ library.
+
+All keys and values are hashed through MPF
+conventions ('mkMPFHash') so proof paths match
+what the Aiken on-chain validator expects.
+-}
+module Cardano.MPFS.Cage.Trie.Pure (
+    -- * Construction
+    mkPureTrie,
+    mkPureTrieFromRef,
+
+    -- * Internals (for TrieManager)
+    getRootFromDb,
+) where
 
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as B
-import Data.IORef
-    ( IORef
-    , modifyIORef'
-    , newIORef
-    , readIORef
-    )
+import Data.IORef (
+    IORef,
+    modifyIORef',
+    newIORef,
+    readIORef,
+ )
 
-import MPF.Backend.Pure
-    ( MPFInMemoryDB
-    , emptyMPFInMemoryDB
-    , runMPFPure
-    )
-import MPF.Hashes
-    ( mkMPFHash
-    , renderMPFHash
-    )
+import MPF.Backend.Pure (
+    MPFInMemoryDB,
+    emptyMPFInMemoryDB,
+    runMPFPure,
+ )
+import MPF.Hashes (
+    mkMPFHash,
+    renderMPFHash,
+ )
 import MPF.Interface (byteStringToHexKey)
-import MPF.Test.Lib
-    ( deleteMPFM
-    , getRootHashM
-    , insertByteStringM
-    , proofMPFM
-    )
+import MPF.Test.Lib (
+    deleteMPFM,
+    getRootHashM,
+    insertByteStringM,
+    proofMPFM,
+ )
 
+import Cardano.MPFS.Cage.Ledger (Root (..))
 import Cardano.MPFS.Cage.Proof (toProofSteps)
 import Cardano.MPFS.Cage.Trie (Trie (..))
 import Cardano.MPFS.Cage.Types (ProofStep)
-import Cardano.MPFS.Cage.Ledger (Root (..))
 
--- | Create a new empty 'Trie IO' backed by a fresh
--- 'IORef' holding an empty in-memory MPF database.
+{- | Create a new empty 'Trie IO' backed by a fresh
+'IORef' holding an empty in-memory MPF database.
+-}
 mkPureTrie :: IO (Trie IO)
 mkPureTrie = do
     ref <- newIORef emptyMPFInMemoryDB
     pure (mkPureTrieFromRef ref)
 
--- | Build a 'Trie IO' from an existing 'IORef'.
--- Allows sharing the database with a 'TrieManager'.
+{- | Build a 'Trie IO' from an existing 'IORef'.
+Allows sharing the database with a 'TrieManager'.
+-}
 mkPureTrieFromRef :: IORef MPFInMemoryDB -> Trie IO
 mkPureTrieFromRef ref =
     Trie
@@ -70,11 +73,11 @@ mkPureTrieFromRef ref =
         }
 
 -- | Insert a key-value pair.
-pureInsert
-    :: IORef MPFInMemoryDB
-    -> ByteString
-    -> ByteString
-    -> IO Root
+pureInsert ::
+    IORef MPFInMemoryDB ->
+    ByteString ->
+    ByteString ->
+    IO Root
 pureInsert ref k v = do
     db <- readIORef ref
     let ((), db') =
@@ -83,32 +86,32 @@ pureInsert ref k v = do
     getRootFromDb db'
 
 -- | Delete a key from the trie.
-pureDelete
-    :: IORef MPFInMemoryDB
-    -> ByteString
-    -> IO Root
+pureDelete ::
+    IORef MPFInMemoryDB ->
+    ByteString ->
+    IO Root
 pureDelete ref k = do
     db <- readIORef ref
     let hexKey =
-            byteStringToHexKey
-                $ renderMPFHash
-                $ mkMPFHash k
+            byteStringToHexKey $
+                renderMPFHash $
+                    mkMPFHash k
         ((), db') =
             runMPFPure db (deleteMPFM hexKey)
     modifyIORef' ref (const db')
     getRootFromDb db'
 
 -- | Look up a value by key.
-pureLookup
-    :: IORef MPFInMemoryDB
-    -> ByteString
-    -> IO (Maybe ByteString)
+pureLookup ::
+    IORef MPFInMemoryDB ->
+    ByteString ->
+    IO (Maybe ByteString)
 pureLookup ref k = do
     db <- readIORef ref
     let hexKey =
-            byteStringToHexKey
-                $ renderMPFHash
-                $ mkMPFHash k
+            byteStringToHexKey $
+                renderMPFHash $
+                    mkMPFHash k
         (mProof, _) =
             runMPFPure db (proofMPFM hexKey)
     pure $ case mProof of
@@ -124,21 +127,21 @@ pureGetRoot ref = readIORef ref >>= getRootFromDb
 getRootFromDb :: MPFInMemoryDB -> IO Root
 getRootFromDb db =
     let (mHash, _) = runMPFPure db getRootHashM
-    in  pure $ case mHash of
+     in pure $ case mHash of
             Nothing -> Root (B.replicate 32 0)
             Just h -> Root (renderMPFHash h)
 
 -- | Generate on-chain proof steps for a key.
-pureGetProofSteps
-    :: IORef MPFInMemoryDB
-    -> ByteString
-    -> IO (Maybe [ProofStep])
+pureGetProofSteps ::
+    IORef MPFInMemoryDB ->
+    ByteString ->
+    IO (Maybe [ProofStep])
 pureGetProofSteps ref k = do
     db <- readIORef ref
     let hexKey =
-            byteStringToHexKey
-                $ renderMPFHash
-                $ mkMPFHash k
+            byteStringToHexKey $
+                renderMPFHash $
+                    mkMPFHash k
         (mProof, _) =
             runMPFPure db (proofMPFM hexKey)
     pure $ case mProof of

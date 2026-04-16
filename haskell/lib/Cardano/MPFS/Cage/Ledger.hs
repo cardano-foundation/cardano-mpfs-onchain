@@ -1,46 +1,47 @@
 {-# LANGUAGE DataKinds #-}
 
--- |
--- Module      : Cardano.MPFS.Cage.Ledger
--- Description : Cardano ledger type re-exports
--- License     : Apache-2.0
---
--- Central type vocabulary for the cage transaction
--- builders. Re-exports ledger types (Conway era) and
--- defines domain types that bridge the gap between
--- cardano-ledger representations and the Aiken
--- on-chain validator layout.
-module Cardano.MPFS.Cage.Ledger
-    ( -- * Ledger re-exports
-      ConwayEra
-    , Addr
-    , TxId
-    , TxIn
-    , TxOut
-    , Coin (..)
-    , MaryValue
-    , PolicyID (..)
-    , AssetName (..)
-    , SlotNo (..)
-    , ScriptHash (..)
-    , KeyHash
-    , KeyRole (..)
-    , ExUnits (..)
-    , PParams
+{- |
+Module      : Cardano.MPFS.Cage.Ledger
+Description : Cardano ledger type re-exports
+License     : Apache-2.0
 
-      -- * Token identification
-    , TokenId (..)
+Central type vocabulary for the cage transaction
+builders. Re-exports ledger types (Conway era) and
+defines domain types that bridge the gap between
+cardano-ledger representations and the Aiken
+on-chain validator layout.
+-}
+module Cardano.MPFS.Cage.Ledger (
+    -- * Ledger re-exports
+    ConwayEra,
+    Addr,
+    TxId,
+    TxIn,
+    TxOut,
+    Coin (..),
+    MaryValue,
+    PolicyID (..),
+    AssetName (..),
+    SlotNo (..),
+    ScriptHash (..),
+    KeyHash,
+    KeyRole (..),
+    ExUnits (..),
+    PParams,
 
-      -- * Merkle Patricia Forestry
-    , Root (..)
-    , Operation (..)
+    -- * Token identification
+    TokenId (..),
 
-      -- * Requests
-    , Request (..)
+    -- * Merkle Patricia Forestry
+    Root (..),
+    Operation (..),
 
-      -- * Token state
-    , TokenState (..)
-    ) where
+    -- * Requests
+    Request (..),
+
+    -- * Token state
+    TokenState (..),
+) where
 
 import Data.ByteString (ByteString)
 
@@ -51,25 +52,27 @@ import Cardano.Ledger.Conway (ConwayEra)
 import Cardano.Ledger.Core (PParams)
 import Cardano.Ledger.Hashes (ScriptHash (..))
 import Cardano.Ledger.Keys (KeyHash, KeyRole (..))
-import Cardano.Ledger.Mary.Value
-    ( AssetName (..)
-    , MaryValue
-    , PolicyID (..)
-    )
+import Cardano.Ledger.Mary.Value (
+    AssetName (..),
+    MaryValue,
+    PolicyID (..),
+ )
 import Cardano.Ledger.Plutus.ExUnits (ExUnits (..))
 import Cardano.Ledger.Slot (SlotNo (..))
 import Cardano.Ledger.TxIn (TxId, TxIn)
 
--- | Unique identifier for a token managed by the
--- cage. Corresponds to the on-chain asset name
--- derived from SHA2-256(txId ++ index).
+{- | Unique identifier for a token managed by the
+cage. Corresponds to the on-chain asset name
+derived from SHA2-256(txId ++ index).
+-}
 newtype TokenId = TokenId
     { unTokenId :: AssetName
     }
     deriving (Eq, Ord, Show)
 
--- | MPF root hash representing the current state
--- of a trie (32 bytes Blake2b-256).
+{- | MPF root hash representing the current state
+of a trie (32 bytes Blake2b-256).
+-}
 newtype Root = Root
     { unRoot :: ByteString
     }
@@ -79,18 +82,18 @@ newtype Root = Root
 data Operation
     = -- | Insert a new key-value pair
       Insert
+        -- | Value to insert
         !ByteString
-        -- ^ Value to insert
     | -- | Delete a key
       Delete
+        -- | Old value being deleted (needed for proof)
         !ByteString
-        -- ^ Old value being deleted (needed for proof)
     | -- | Update an existing key with a new value
       Update
+        -- | Old value being replaced
         !ByteString
-        -- ^ Old value being replaced
+        -- | New value to store
         !ByteString
-        -- ^ New value to store
     deriving (Eq, Show)
 
 -- | A request to modify a token's trie.

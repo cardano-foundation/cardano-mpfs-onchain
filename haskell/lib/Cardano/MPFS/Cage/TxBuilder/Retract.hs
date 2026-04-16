@@ -1,15 +1,16 @@
--- |
--- Module      : Cardano.MPFS.Cage.TxBuilder.Retract
--- Description : Retract request transaction
--- License     : Apache-2.0
---
--- Builds the retract transaction that cancels a
--- pending request. The requester spends their request
--- UTxO (recovering locked ADA) while referencing the
--- State UTxO. Validity interval is Phase 2.
-module Cardano.MPFS.Cage.TxBuilder.Retract
-    ( retractRequestImpl
-    ) where
+{- |
+Module      : Cardano.MPFS.Cage.TxBuilder.Retract
+Description : Retract request transaction
+License     : Apache-2.0
+
+Builds the retract transaction that cancels a
+pending request. The requester spends their request
+UTxO (recovering locked ADA) while referencing the
+State UTxO. Validity interval is Phase 2.
+-}
+module Cardano.MPFS.Cage.TxBuilder.Retract (
+    retractRequestImpl,
+) where
 
 import Data.List (sortOn)
 import Data.Map.Strict qualified as Map
@@ -18,78 +19,79 @@ import Data.Set qualified as Set
 import Lens.Micro ((&), (.~), (^.))
 
 import Cardano.Ledger.Address (Addr)
-import Cardano.Ledger.Allegra.Scripts
-    ( ValidityInterval (..)
-    )
+import Cardano.Ledger.Allegra.Scripts (
+    ValidityInterval (..),
+ )
 import Cardano.Ledger.Alonzo.Scripts (AsIx (..))
-import Cardano.Ledger.Alonzo.TxBody
-    ( reqSignerHashesTxBodyL
-    , scriptIntegrityHashTxBodyL
-    )
-import Cardano.Ledger.Api.Tx
-    ( Tx
-    , mkBasicTx
-    , witsTxL
-    )
-import Cardano.Ledger.Api.Tx.Body
-    ( collateralInputsTxBodyL
-    , inputsTxBodyL
-    , mkBasicTxBody
-    , referenceInputsTxBodyL
-    , vldtTxBodyL
-    )
-import Cardano.Ledger.Api.Tx.Out
-    ( coinTxOutL
-    )
-import Cardano.Ledger.Api.Tx.Wits
-    ( Redeemers (..)
-    , rdmrsTxWitsL
-    , scriptTxWitsL
-    )
-import Cardano.Ledger.BaseTypes
-    ( SlotNo (..)
-    , StrictMaybe (SJust)
-    )
-import Cardano.Ledger.Conway.Scripts
-    ( ConwayPlutusPurpose (..)
-    )
+import Cardano.Ledger.Alonzo.TxBody (
+    reqSignerHashesTxBodyL,
+    scriptIntegrityHashTxBodyL,
+ )
+import Cardano.Ledger.Api.Tx (
+    Tx,
+    mkBasicTx,
+    witsTxL,
+ )
+import Cardano.Ledger.Api.Tx.Body (
+    collateralInputsTxBodyL,
+    inputsTxBodyL,
+    mkBasicTxBody,
+    referenceInputsTxBodyL,
+    vldtTxBodyL,
+ )
+import Cardano.Ledger.Api.Tx.Out (
+    coinTxOutL,
+ )
+import Cardano.Ledger.Api.Tx.Wits (
+    Redeemers (..),
+    rdmrsTxWitsL,
+    scriptTxWitsL,
+ )
+import Cardano.Ledger.BaseTypes (
+    SlotNo (..),
+    StrictMaybe (SJust),
+ )
+import Cardano.Ledger.Conway.Scripts (
+    ConwayPlutusPurpose (..),
+ )
 import Cardano.Ledger.Core (hashScript)
 import Cardano.Ledger.TxIn (TxIn)
 
-import Cardano.MPFS.Cage.Config
-    ( CageConfig (..)
-    )
-import Cardano.MPFS.Cage.Types
-    ( CageDatum (..)
-    , OnChainRequest (..)
-    , OnChainTokenState (..)
-    , UpdateRedeemer (..)
-    )
-import Cardano.MPFS.Cage.Ledger
-    ( ConwayEra
-    , TokenId
-    )
+import Cardano.MPFS.Cage.Config (
+    CageConfig (..),
+ )
+import Cardano.MPFS.Cage.Ledger (
+    ConwayEra,
+    TokenId,
+ )
 import Cardano.MPFS.Cage.Provider (Provider (..))
 import Cardano.MPFS.Cage.TxBuilder.Internal
-import PlutusTx.Builtins.Internal
-    ( BuiltinByteString (..)
-    )
+import Cardano.MPFS.Cage.Types (
+    CageDatum (..),
+    OnChainRequest (..),
+    OnChainTokenState (..),
+    UpdateRedeemer (..),
+ )
+import PlutusTx.Builtins.Internal (
+    BuiltinByteString (..),
+ )
 
--- | Build a retract-request transaction.
---
--- The requester spends their request UTxO
--- (returning locked ADA) while referencing the
--- state UTxO. Requires Phase 2 validity.
-retractRequestImpl
-    :: CageConfig
-    -> Provider IO
-    -> TokenId
-    -- ^ Token the request belongs to
-    -> TxIn
-    -- ^ UTxO reference of the request to retract
-    -> Addr
-    -- ^ Requester's address (receives refund)
-    -> IO (Tx ConwayEra)
+{- | Build a retract-request transaction.
+
+The requester spends their request UTxO
+(returning locked ADA) while referencing the
+state UTxO. Requires Phase 2 validity.
+-}
+retractRequestImpl ::
+    CageConfig ->
+    Provider IO ->
+    -- | Token the request belongs to
+    TokenId ->
+    -- | UTxO reference of the request to retract
+    TxIn ->
+    -- | Requester's address (receives refund)
+    Addr ->
+    IO (Tx ConwayEra)
 retractRequestImpl cfg prov tid reqTxIn addr = do
     let scriptAddr =
             cageAddrFromCfg cfg (network cfg)
@@ -162,8 +164,8 @@ retractRequestImpl cfg prov tid reqTxIn addr = do
         spendPurpose =
             ConwaySpending (AsIx reqIx)
         redeemers =
-            Redeemers
-                $ Map.singleton
+            Redeemers $
+                Map.singleton
                     spendPurpose
                     ( toLedgerData redeemer
                     , placeholderExUnits

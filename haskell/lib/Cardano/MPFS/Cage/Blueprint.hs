@@ -1,51 +1,52 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- |
--- Module      : Cardano.MPFS.Cage.Blueprint
--- Description : CIP-57 blueprint schema validation
--- License     : Apache-2.0
---
--- Minimal CIP-57 Plutus blueprint parser and validator.
--- Loads a @plutus.json@ blueprint file produced by the
--- Aiken compiler, extracts type schemas and script
--- hashes, and validates 'PlutusCore.Data.Data' values
--- against the declared schemas.
---
--- The blueprint also carries optional @compiledCode@
--- fields (hex-encoded double-CBOR PlutusV3 scripts).
--- 'extractCompiledCode' decodes these into
--- 'ShortByteString' suitable for 'PlutusBinary', and
--- 'applyVersion' applies the version parameter to
--- produce the final on-chain script.
-module Cardano.MPFS.Cage.Blueprint
-    ( -- * Schema types
-      Blueprint (..)
-    , Validator (..)
-    , Schema (..)
-    , Constructor (..)
+{- |
+Module      : Cardano.MPFS.Cage.Blueprint
+Description : CIP-57 blueprint schema validation
+License     : Apache-2.0
 
-      -- * Loading
-    , loadBlueprint
+Minimal CIP-57 Plutus blueprint parser and validator.
+Loads a @plutus.json@ blueprint file produced by the
+Aiken compiler, extracts type schemas and script
+hashes, and validates 'PlutusCore.Data.Data' values
+against the declared schemas.
 
-      -- * Validation
-    , validateData
+The blueprint also carries optional @compiledCode@
+fields (hex-encoded double-CBOR PlutusV3 scripts).
+'extractCompiledCode' decodes these into
+'ShortByteString' suitable for 'PlutusBinary', and
+'applyVersion' applies the version parameter to
+produce the final on-chain script.
+-}
+module Cardano.MPFS.Cage.Blueprint (
+    -- * Schema types
+    Blueprint (..),
+    Validator (..),
+    Schema (..),
+    Constructor (..),
 
-      -- * Script hash extraction
-    , extractScriptHash
+    -- * Loading
+    loadBlueprint,
 
-      -- * Compiled code extraction
-    , extractCompiledCode
+    -- * Validation
+    validateData,
 
-      -- * Parameter application
-    , applyVersion
-    ) where
+    -- * Script hash extraction
+    extractScriptHash,
 
-import Data.Aeson
-    ( FromJSON (..)
-    , withObject
-    , (.:)
-    , (.:?)
-    )
+    -- * Compiled code extraction
+    extractCompiledCode,
+
+    -- * Parameter application
+    applyVersion,
+) where
+
+import Data.Aeson (
+    FromJSON (..),
+    withObject,
+    (.:),
+    (.:?),
+ )
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types (Parser)
 import Data.ByteString qualified as BS
@@ -59,14 +60,14 @@ import Data.Text qualified as T
 import Data.Word (Word8)
 import PlutusCore qualified as PLC
 import PlutusCore.Data (Data (..))
-import PlutusLedgerApi.V3
-    ( serialiseUPLC
-    , uncheckedDeserialiseUPLC
-    )
-import UntypedPlutusCore
-    ( Program (..)
-    , applyProgram
-    )
+import PlutusLedgerApi.V3 (
+    serialiseUPLC,
+    uncheckedDeserialiseUPLC,
+ )
+import UntypedPlutusCore (
+    Program (..),
+    applyProgram,
+ )
 import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.DeBruijn ()
 
@@ -143,8 +144,8 @@ instance FromJSON Schema where
                         pure $ SConstructors cs
                     Nothing -> do
                         mDataType <-
-                            o .:? "dataType"
-                                :: Parser
+                            o .:? "dataType" ::
+                                Parser
                                     (Maybe Text)
                         case mDataType of
                             Just "bytes" ->
@@ -158,8 +159,8 @@ instance FromJSON Schema where
                                 idx <- o .: "index"
                                 fields <-
                                     o .: "fields"
-                                pure
-                                    $ SConstructors
+                                pure $
+                                    SConstructors
                                         [ Constructor
                                             idx
                                             fields
@@ -198,8 +199,9 @@ instance FromJSON Blueprint where
                 , definitions = defs
                 }
 
--- | Strip the @#/definitions/@ prefix and unescape
--- tilde-encoded slashes (@~1@ -> @/@).
+{- | Strip the @#/definitions/@ prefix and unescape
+tilde-encoded slashes (@~1@ -> @/@).
+-}
 parseRef :: Text -> Text
 parseRef =
     T.replace "~1" "/"
@@ -214,12 +216,13 @@ stripPrefix pfx t =
 -- Loading
 -- ---------------------------------------------------------
 
--- | Load and parse a CIP-57 blueprint from a file
--- path.
-loadBlueprint
-    :: FilePath
-    -- ^ Path to the @plutus.json@ file
-    -> IO (Either String Blueprint)
+{- | Load and parse a CIP-57 blueprint from a file
+path.
+-}
+loadBlueprint ::
+    -- | Path to the @plutus.json@ file
+    FilePath ->
+    IO (Either String Blueprint)
 loadBlueprint path = do
     bs <- BS.readFile path
     pure $ Aeson.eitherDecodeStrict' bs
@@ -228,16 +231,17 @@ loadBlueprint path = do
 -- Validation
 -- ---------------------------------------------------------
 
--- | Validate a 'Data' value against a 'Schema',
--- resolving @$ref@ through the definitions map.
-validateData
-    :: Map Text Schema
-    -- ^ Named definitions for @$ref@ resolution
-    -> Schema
-    -- ^ Schema to validate against
-    -> Data
-    -- ^ Value to validate
-    -> Bool
+{- | Validate a 'Data' value against a 'Schema',
+resolving @$ref@ through the definitions map.
+-}
+validateData ::
+    -- | Named definitions for @$ref@ resolution
+    Map Text Schema ->
+    -- | Schema to validate against
+    Schema ->
+    -- | Value to validate
+    Data ->
+    Bool
 validateData defs schema d = case (schema, d) of
     (SBytes, B _) -> True
     (SInteger, I _) -> True
@@ -268,14 +272,15 @@ validateData defs schema d = case (schema, d) of
 -- Script hash extraction
 -- ---------------------------------------------------------
 
--- | Find the first validator whose title starts with
--- the given prefix and return its hash.
-extractScriptHash
-    :: Text
-    -- ^ Title prefix to match
-    -> Blueprint
-    -- ^ Blueprint to search
-    -> Maybe Text
+{- | Find the first validator whose title starts with
+the given prefix and return its hash.
+-}
+extractScriptHash ::
+    -- | Title prefix to match
+    Text ->
+    -- | Blueprint to search
+    Blueprint ->
+    Maybe Text
 extractScriptHash prefix bp =
     case filter
         (T.isPrefixOf prefix . vTitle)
@@ -287,17 +292,18 @@ extractScriptHash prefix bp =
 -- Compiled code extraction
 -- ---------------------------------------------------------
 
--- | Find the first validator whose title starts with
--- the given prefix and return its compiled script
--- bytes as a 'ShortByteString'. The hex-encoded
--- @compiledCode@ is decoded to raw bytes suitable
--- for 'PlutusBinary'.
-extractCompiledCode
-    :: Text
-    -- ^ Title prefix to match
-    -> Blueprint
-    -- ^ Blueprint to search
-    -> Maybe SBS.ShortByteString
+{- | Find the first validator whose title starts with
+the given prefix and return its compiled script
+bytes as a 'ShortByteString'. The hex-encoded
+@compiledCode@ is decoded to raw bytes suitable
+for 'PlutusBinary'.
+-}
+extractCompiledCode ::
+    -- | Title prefix to match
+    Text ->
+    -- | Blueprint to search
+    Blueprint ->
+    Maybe SBS.ShortByteString
 extractCompiledCode prefix bp = do
     v <-
         case filter
@@ -308,8 +314,9 @@ extractCompiledCode prefix bp = do
     hex <- vCompiledCode v
     SBS.toShort <$> decodeHex hex
 
--- | Decode a hex 'Text' to 'ByteString'.
--- Returns 'Nothing' on invalid input.
+{- | Decode a hex 'Text' to 'ByteString'.
+Returns 'Nothing' on invalid input.
+-}
 decodeHex :: Text -> Maybe BS.ByteString
 decodeHex t
     | odd (T.length t) = Nothing
@@ -326,36 +333,37 @@ decodeHex t
     hexDigit :: Char -> Maybe Word8
     hexDigit c
         | isDigit c =
-            Just
-                $ fromIntegral
+            Just $
+                fromIntegral
                     (fromEnum c - fromEnum '0')
         | c >= 'a' && c <= 'f' =
-            Just
-                $ fromIntegral
+            Just $
+                fromIntegral
                     ( fromEnum c
                         - fromEnum 'a'
                         + 10
                     )
         | c >= 'A' && c <= 'F' =
-            Just
-                $ fromIntegral
+            Just $
+                fromIntegral
                     ( fromEnum c
                         - fromEnum 'A'
                         + 10
                     )
         | otherwise = Nothing
 
--- | Apply the version parameter to a UPLC script.
--- The blueprint's @compiledCode@ is a flat-encoded
--- UPLC program that expects one parameter (the
--- version integer). This function applies the
--- integer, producing the final script bytes.
-applyVersion
-    :: Integer
-    -- ^ Version number to apply
-    -> SBS.ShortByteString
-    -- ^ Flat-encoded UPLC program
-    -> SBS.ShortByteString
+{- | Apply the version parameter to a UPLC script.
+The blueprint's @compiledCode@ is a flat-encoded
+UPLC program that expects one parameter (the
+version integer). This function applies the
+integer, producing the final script bytes.
+-}
+applyVersion ::
+    -- | Version number to apply
+    Integer ->
+    -- | Flat-encoded UPLC program
+    SBS.ShortByteString ->
+    SBS.ShortByteString
 applyVersion ver sbs =
     let
         prog = uncheckedDeserialiseUPLC sbs
@@ -375,10 +383,10 @@ applyVersion ver sbs =
         applied = case applyProgram prog argProg of
             Right p -> p
             Left e ->
-                error
-                    $ "applyVersion: "
+                error $
+                    "applyVersion: "
                         <> show e
-    in
+     in
         serialiseUPLC applied
   where
     progVer (Program _ v _) = v

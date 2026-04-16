@@ -1,10 +1,11 @@
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- |
--- Module      : Cardano.MPFS.Cage.E2E.CageSpec
--- Description : E2E tests for the full cage protocol
--- License     : Apache-2.0
+{- |
+Module      : Cardano.MPFS.Cage.E2E.CageSpec
+Description : E2E tests for the full cage protocol
+License     : Apache-2.0
+-}
 module Cardano.MPFS.Cage.E2E.CageSpec (spec) where
 
 import Control.Concurrent (threadDelay)
@@ -13,102 +14,103 @@ import Data.ByteString.Short qualified as SBS
 import Data.Map.Strict qualified as Map
 import Lens.Micro ((^.))
 import System.Environment (lookupEnv)
-import Test.Hspec
-    ( Spec
-    , describe
-    , expectationFailure
-    , it
-    , runIO
-    , shouldSatisfy
-    )
+import Test.Hspec (
+    Spec,
+    describe,
+    expectationFailure,
+    it,
+    runIO,
+    shouldSatisfy,
+ )
 
-import Cardano.Ledger.Api.Tx
-    ( Tx
-    , bodyTxL
-    , txIdTx
-    )
-import Cardano.Ledger.Api.Tx.Body
-    ( mintTxBodyL
-    )
-import Cardano.Ledger.BaseTypes
-    ( Network (..)
-    , TxIx (..)
-    )
-import Cardano.Ledger.Mary.Value
-    ( MultiAsset (..)
-    )
+import Cardano.Ledger.Api.Tx (
+    Tx,
+    bodyTxL,
+    txIdTx,
+ )
+import Cardano.Ledger.Api.Tx.Body (
+    mintTxBodyL,
+ )
+import Cardano.Ledger.BaseTypes (
+    Network (..),
+    TxIx (..),
+ )
+import Cardano.Ledger.Mary.Value (
+    MultiAsset (..),
+ )
 import Cardano.Ledger.TxIn (TxIn (..))
 
-import Cardano.MPFS.Cage.Blueprint
-    ( applyVersion
-    , extractCompiledCode
-    , loadBlueprint
-    )
-import Cardano.MPFS.Cage.Config
-    ( CageConfig (..)
-    )
+import Cardano.MPFS.Cage.Blueprint (
+    applyVersion,
+    extractCompiledCode,
+    loadBlueprint,
+ )
+import Cardano.MPFS.Cage.Config (
+    CageConfig (..),
+ )
+import Cardano.MPFS.Cage.Ledger (
+    Coin (..),
+    ConwayEra,
+    TokenId (..),
+ )
 import Cardano.MPFS.Cage.Provider qualified as Cage
-import Cardano.MPFS.Cage.Trie.PureManager
-    ( mkPureTrieManager
-    )
-import Cardano.MPFS.Cage.TxBuilder.Boot
-    ( bootTokenImpl
-    )
-import Cardano.MPFS.Cage.TxBuilder.End
-    ( endTokenImpl
-    )
-import Cardano.MPFS.Cage.TxBuilder.Internal
-    ( cageAddrFromCfg
-    , cagePolicyIdFromCfg
-    , computeScriptHash
-    )
-import Cardano.MPFS.Cage.TxBuilder.Reject
-    ( rejectRequestsImpl
-    )
-import Cardano.MPFS.Cage.TxBuilder.Request
-    ( requestInsertImpl
-    )
-import Cardano.MPFS.Cage.TxBuilder.Retract
-    ( retractRequestImpl
-    )
-import Cardano.MPFS.Cage.TxBuilder.Update
-    ( updateTokenImpl
-    )
 import Cardano.MPFS.Cage.Trie (TrieManager (..))
-import Cardano.MPFS.Cage.Ledger
-    ( Coin (..)
-    , ConwayEra
-    , TokenId (..)
-    )
-import Cardano.Node.Client.E2E.Devnet
-    ( withCardanoNode
-    )
-import Cardano.Node.Client.E2E.Setup
-    ( addKeyWitness
-    , genesisAddr
-    , genesisDir
-    , genesisSignKey
-    )
-import Cardano.Node.Client.N2C.Connection
-    ( newLSQChannel
-    , newLTxSChannel
-    , runNodeClient
-    )
-import Cardano.Node.Client.N2C.Provider
-    ( mkN2CProvider
-    )
-import Cardano.Node.Client.N2C.Submitter
-    ( mkN2CSubmitter
-    )
+import Cardano.MPFS.Cage.Trie.PureManager (
+    mkPureTrieManager,
+ )
+import Cardano.MPFS.Cage.TxBuilder.Boot (
+    bootTokenImpl,
+ )
+import Cardano.MPFS.Cage.TxBuilder.End (
+    endTokenImpl,
+ )
+import Cardano.MPFS.Cage.TxBuilder.Internal (
+    cageAddrFromCfg,
+    cagePolicyIdFromCfg,
+    computeScriptHash,
+ )
+import Cardano.MPFS.Cage.TxBuilder.Reject (
+    rejectRequestsImpl,
+ )
+import Cardano.MPFS.Cage.TxBuilder.Request (
+    requestInsertImpl,
+ )
+import Cardano.MPFS.Cage.TxBuilder.Retract (
+    retractRequestImpl,
+ )
+import Cardano.MPFS.Cage.TxBuilder.Update (
+    updateTokenImpl,
+ )
+import Cardano.Node.Client.E2E.Devnet (
+    withCardanoNode,
+ )
+import Cardano.Node.Client.E2E.Setup (
+    addKeyWitness,
+    genesisAddr,
+    genesisDir,
+    genesisSignKey,
+ )
+import Cardano.Node.Client.N2C.Connection (
+    newLSQChannel,
+    newLTxSChannel,
+    runNodeClient,
+ )
+import Cardano.Node.Client.N2C.Provider (
+    mkN2CProvider,
+ )
+import Cardano.Node.Client.N2C.Submitter (
+    mkN2CSubmitter,
+ )
 import Cardano.Node.Client.Provider qualified as N2C
-import Cardano.Node.Client.Submitter
-    ( SubmitResult (..)
-    , Submitter (..)
-    )
+import Cardano.Node.Client.Submitter (
+    SubmitResult (..),
+    Submitter (..),
+ )
 import Ouroboros.Network.Magic (NetworkMagic (..))
 
--- | Full cage protocol E2E test spec.
--- Skips when @MPFS_BLUEPRINT@ is not set.
+{- | Full cage protocol E2E test spec.
+Skips when @MPFS_BLUEPRINT@ is not set.
+-}
 spec :: Spec
 spec = describe "Cage E2E" $ do
     mPath <-
@@ -134,8 +136,8 @@ spec = describe "Cage E2E" $ do
                         "cage."
                         bp of
                         Nothing ->
-                            it "no compiled code"
-                                $ expectationFailure
+                            it "no compiled code" $
+                                expectationFailure
                                     "cage script not \
                                     \found in blueprint"
                         Just scriptBytes ->
@@ -143,185 +145,183 @@ spec = describe "Cage E2E" $ do
                                     applyVersion
                                         1
                                         scriptBytes
-                            in  cageFlowSpec applied
+                             in cageFlowSpec applied
 
 -- ---------------------------------------------------------
 -- Test implementation
 -- ---------------------------------------------------------
 
--- | Full cage flow: boot, request, update,
--- and retract.
-cageFlowSpec
-    :: SBS.ShortByteString -> Spec
+{- | Full cage flow: boot, request, update,
+and retract.
+-}
+cageFlowSpec ::
+    SBS.ShortByteString -> Spec
 cageFlowSpec scriptBytes =
-    it "boot, request, update, retract"
-        $ withE2E scriptBytes
-        $ \cfg prov submit tm -> do
-            let scriptAddr =
-                    cageAddrFromCfg cfg Testnet
+    it "boot, request, update, retract" $
+        withE2E scriptBytes $
+            \cfg prov submit tm -> do
+                let scriptAddr =
+                        cageAddrFromCfg cfg Testnet
 
-            -- Step 1: Boot token
-            unsignedBoot <-
-                bootTokenImpl
-                    cfg
-                    prov
-                    genesisAddr
-            let signedBoot =
-                    addKeyWitness
-                        genesisSignKey
-                        unsignedBoot
+                -- Step 1: Boot token
+                unsignedBoot <-
+                    bootTokenImpl
+                        cfg
+                        prov
+                        genesisAddr
+                let signedBoot =
+                        addKeyWitness
+                            genesisSignKey
+                            unsignedBoot
 
-            bootResult <-
-                submitTx submit signedBoot
-            assertSubmitted bootResult
-            awaitTx
+                bootResult <-
+                    submitTx submit signedBoot
+                assertSubmitted bootResult
+                awaitTx
 
-            -- Extract TokenId from mint field
-            let tokenId =
-                    extractTokenId cfg signedBoot
+                -- Extract TokenId from mint field
+                let tokenId =
+                        extractTokenId cfg signedBoot
 
-            -- Register trie for this token
-            createTrie tm tokenId
+                -- Register trie for this token
+                createTrie tm tokenId
 
-            -- Assert: cage address has UTxO
-            cageUtxos <-
-                Cage.queryUTxOs prov scriptAddr
-            cageUtxos
-                `shouldSatisfy` (not . null)
+                -- Assert: cage address has UTxO
+                cageUtxos <-
+                    Cage.queryUTxOs prov scriptAddr
+                cageUtxos
+                    `shouldSatisfy` (not . null)
 
-            -- Step 2: Request insert
-            unsignedReq <-
-                requestInsertImpl
-                    cfg
-                    prov
-                    (Coin 1_000_000)
-                    tokenId
-                    "hello"
-                    "world"
-                    genesisAddr
-            let signedReq =
-                    addKeyWitness
-                        genesisSignKey
-                        unsignedReq
-            reqResult <-
-                submitTx submit signedReq
-            assertSubmitted reqResult
-            awaitTx
+                -- Step 2: Request insert
+                unsignedReq <-
+                    requestInsertImpl
+                        cfg
+                        prov
+                        (Coin 1_000_000)
+                        tokenId
+                        "hello"
+                        "world"
+                        genesisAddr
+                let signedReq =
+                        addKeyWitness
+                            genesisSignKey
+                            unsignedReq
+                reqResult <-
+                    submitTx submit signedReq
+                assertSubmitted reqResult
+                awaitTx
 
-            -- Assert: cage has more UTxOs now
-            cageUtxos2 <-
-                Cage.queryUTxOs prov scriptAddr
-            length cageUtxos2
-                `shouldSatisfy`
-                    (> length cageUtxos)
+                -- Assert: cage has more UTxOs now
+                cageUtxos2 <-
+                    Cage.queryUTxOs prov scriptAddr
+                length cageUtxos2
+                    `shouldSatisfy` (> length cageUtxos)
 
-            -- Step 3: Update token
-            unsignedUpdate <-
-                updateTokenImpl
-                    cfg
-                    prov
-                    tm
-                    tokenId
-                    genesisAddr
-            let signedUpdate =
-                    addKeyWitness
-                        genesisSignKey
-                        unsignedUpdate
-            updateResult <-
-                submitTx submit signedUpdate
-            assertSubmitted updateResult
-            awaitTx
+                -- Step 3: Update token
+                unsignedUpdate <-
+                    updateTokenImpl
+                        cfg
+                        prov
+                        tm
+                        tokenId
+                        genesisAddr
+                let signedUpdate =
+                        addKeyWitness
+                            genesisSignKey
+                            unsignedUpdate
+                updateResult <-
+                    submitTx submit signedUpdate
+                assertSubmitted updateResult
+                awaitTx
 
-            -- Assert: request was consumed
-            cageUtxos3 <-
-                Cage.queryUTxOs prov scriptAddr
-            cageUtxos3
-                `shouldSatisfy` (not . null)
-            length cageUtxos3
-                `shouldSatisfy`
-                    (< length cageUtxos2)
+                -- Assert: request was consumed
+                cageUtxos3 <-
+                    Cage.queryUTxOs prov scriptAddr
+                cageUtxos3
+                    `shouldSatisfy` (not . null)
+                length cageUtxos3
+                    `shouldSatisfy` (< length cageUtxos2)
 
-            -- Step 4: Request + retract
-            unsignedReq2 <-
-                requestInsertImpl
-                    cfg
-                    prov
-                    (Coin 1_000_000)
-                    tokenId
-                    "bye"
-                    "moon"
-                    genesisAddr
-            let signedReq2 =
-                    addKeyWitness
-                        genesisSignKey
-                        unsignedReq2
-            req2Result <-
-                submitTx submit signedReq2
-            assertSubmitted req2Result
-            awaitTx
+                -- Step 4: Request + retract
+                unsignedReq2 <-
+                    requestInsertImpl
+                        cfg
+                        prov
+                        (Coin 1_000_000)
+                        tokenId
+                        "bye"
+                        "moon"
+                        genesisAddr
+                let signedReq2 =
+                        addKeyWitness
+                            genesisSignKey
+                            unsignedReq2
+                req2Result <-
+                    submitTx submit signedReq2
+                assertSubmitted req2Result
+                awaitTx
 
-            let req2TxIn =
-                    TxIn
-                        (txIdTx signedReq2)
-                        (TxIx 0)
+                let req2TxIn =
+                        TxIn
+                            (txIdTx signedReq2)
+                            (TxIx 0)
 
-            cageUtxos4 <-
-                Cage.queryUTxOs prov scriptAddr
-            length cageUtxos4
-                `shouldSatisfy`
-                    (> length cageUtxos3)
+                cageUtxos4 <-
+                    Cage.queryUTxOs prov scriptAddr
+                length cageUtxos4
+                    `shouldSatisfy` (> length cageUtxos3)
 
-            -- Wait for Phase 2 (process_time =
-            -- 30s after request submitted_at)
-            threadDelay 32_000_000
+                -- Wait for Phase 2 (process_time =
+                -- 30s after request submitted_at)
+                threadDelay 32_000_000
 
-            -- Retract the second request
-            unsignedRetract <-
-                retractRequestImpl
-                    cfg
-                    prov
-                    tokenId
-                    req2TxIn
-                    genesisAddr
-            let signedRetract =
-                    addKeyWitness
-                        genesisSignKey
-                        unsignedRetract
-            retractResult <-
-                submitTx submit signedRetract
-            assertSubmitted retractResult
-            awaitTx
+                -- Retract the second request
+                unsignedRetract <-
+                    retractRequestImpl
+                        cfg
+                        prov
+                        tokenId
+                        req2TxIn
+                        genesisAddr
+                let signedRetract =
+                        addKeyWitness
+                            genesisSignKey
+                            unsignedRetract
+                retractResult <-
+                    submitTx submit signedRetract
+                assertSubmitted retractResult
+                awaitTx
 
-            -- Assert: request UTxO gone
-            cageUtxos5 <-
-                Cage.queryUTxOs prov scriptAddr
-            length cageUtxos5
-                `shouldSatisfy`
-                    (< length cageUtxos4)
+                -- Assert: request UTxO gone
+                cageUtxos5 <-
+                    Cage.queryUTxOs prov scriptAddr
+                length cageUtxos5
+                    `shouldSatisfy` (< length cageUtxos4)
 
 -- ---------------------------------------------------------
 -- Bracket
 -- ---------------------------------------------------------
 
--- | Start a devnet node, connect via N2C,
--- build Provider and Submitter, then run.
-withE2E
-    :: SBS.ShortByteString
-    -> ( CageConfig
-         -> Cage.Provider IO
-         -> Submitter IO
-         -> TrieManager IO
-         -> IO a
-       )
-    -> IO a
+{- | Start a devnet node, connect via N2C,
+build Provider and Submitter, then run.
+-}
+withE2E ::
+    SBS.ShortByteString ->
+    ( CageConfig ->
+      Cage.Provider IO ->
+      Submitter IO ->
+      TrieManager IO ->
+      IO a
+    ) ->
+    IO a
 withE2E scriptBytes action = do
     gDir <- genesisDir
     withCardanoNode gDir $ \sock _startMs -> do
         lsqCh <- newLSQChannel 16
         ltxsCh <- newLTxSChannel 16
         nodeThread <-
-            async
-                $ runNodeClient
+            async $
+                runNodeClient
                     (NetworkMagic 42)
                     sock
                     lsqCh
@@ -331,12 +331,12 @@ withE2E scriptBytes action = do
         status <- poll nodeThread
         case status of
             Just (Left err) ->
-                error
-                    $ "Node connection failed: "
+                error $
+                    "Node connection failed: "
                         <> show err
             Just (Right (Left err)) ->
-                error
-                    $ "Node connection error: "
+                error $
+                    "Node connection error: "
                         <> show err
             Just (Right (Right ())) ->
                 error
@@ -358,9 +358,10 @@ withE2E scriptBytes action = do
         cancel nodeThread
         pure result
 
--- | Adapt a @cardano-node-clients@ 'Provider' to a
--- @Cage@ 'Provider'. The record fields are
--- identical.
+{- | Adapt a @cardano-node-clients@ 'Provider' to a
+@Cage@ 'Provider'. The record fields are
+identical.
+-}
 adaptProvider :: N2C.Provider IO -> Cage.Provider IO
 adaptProvider p =
     Cage.Provider
@@ -384,13 +385,14 @@ adaptProvider p =
 assertSubmitted :: SubmitResult -> IO ()
 assertSubmitted (Submitted _) = pure ()
 assertSubmitted (Rejected reason) =
-    expectationFailure
-        $ "Tx rejected: " <> show reason
+    expectationFailure $
+        "Tx rejected: " <> show reason
 
--- | Extract the 'TokenId' from a boot
--- transaction's mint field.
-extractTokenId
-    :: CageConfig -> Tx ConwayEra -> TokenId
+{- | Extract the 'TokenId' from a boot
+transaction's mint field.
+-}
+extractTokenId ::
+    CageConfig -> Tx ConwayEra -> TokenId
 extractTokenId cfg tx =
     let MultiAsset ma =
             tx ^. bodyTxL . mintTxBodyL
@@ -399,7 +401,7 @@ extractTokenId cfg tx =
                 ( ma
                     Map.! cagePolicyIdFromCfg cfg
                 )
-    in  case assets of
+     in case assets of
             [(an, _)] -> TokenId an
             _ ->
                 error
@@ -415,8 +417,8 @@ awaitTx = threadDelay 5_000_000
 -- ---------------------------------------------------------
 
 -- | Build a 'CageConfig' from applied script bytes.
-cageCfg
-    :: SBS.ShortByteString -> CageConfig
+cageCfg ::
+    SBS.ShortByteString -> CageConfig
 cageCfg sb =
     CageConfig
         { cageScriptBytes = sb

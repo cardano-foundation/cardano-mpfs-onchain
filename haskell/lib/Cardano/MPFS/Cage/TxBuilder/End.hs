@@ -1,15 +1,16 @@
--- |
--- Module      : Cardano.MPFS.Cage.TxBuilder.End
--- Description : End token (burn) transaction
--- License     : Apache-2.0
---
--- Builds the burn transaction that retires a cage
--- token. Consumes the State UTxO with an @End@
--- spending redeemer, mints -1 with @Burning@, and
--- returns remaining ADA to the owner.
-module Cardano.MPFS.Cage.TxBuilder.End
-    ( endTokenImpl
-    ) where
+{- |
+Module      : Cardano.MPFS.Cage.TxBuilder.End
+Description : End token (burn) transaction
+License     : Apache-2.0
+
+Builds the burn transaction that retires a cage
+token. Consumes the State UTxO with an @End@
+spending redeemer, mints -1 with @Burning@, and
+returns remaining ADA to the owner.
+-}
+module Cardano.MPFS.Cage.TxBuilder.End (
+    endTokenImpl,
+) where
 
 import Data.List (sortOn)
 import Data.Map.Strict qualified as Map
@@ -19,61 +20,61 @@ import Lens.Micro ((&), (.~), (^.))
 
 import Cardano.Ledger.Address (Addr)
 import Cardano.Ledger.Alonzo.Scripts (AsIx (..))
-import Cardano.Ledger.Alonzo.TxBody
-    ( reqSignerHashesTxBodyL
-    , scriptIntegrityHashTxBodyL
-    )
-import Cardano.Ledger.Api.Tx
-    ( Tx
-    , mkBasicTx
-    , witsTxL
-    )
-import Cardano.Ledger.Api.Tx.Body
-    ( collateralInputsTxBodyL
-    , inputsTxBodyL
-    , mintTxBodyL
-    , mkBasicTxBody
-    )
+import Cardano.Ledger.Alonzo.TxBody (
+    reqSignerHashesTxBodyL,
+    scriptIntegrityHashTxBodyL,
+ )
+import Cardano.Ledger.Api.Tx (
+    Tx,
+    mkBasicTx,
+    witsTxL,
+ )
+import Cardano.Ledger.Api.Tx.Body (
+    collateralInputsTxBodyL,
+    inputsTxBodyL,
+    mintTxBodyL,
+    mkBasicTxBody,
+ )
 import Cardano.Ledger.Api.Tx.Out (coinTxOutL)
-import Cardano.Ledger.Api.Tx.Wits
-    ( Redeemers (..)
-    , rdmrsTxWitsL
-    , scriptTxWitsL
-    )
-import Cardano.Ledger.Conway.Scripts
-    ( ConwayPlutusPurpose (..)
-    )
+import Cardano.Ledger.Api.Tx.Wits (
+    Redeemers (..),
+    rdmrsTxWitsL,
+    scriptTxWitsL,
+ )
+import Cardano.Ledger.Conway.Scripts (
+    ConwayPlutusPurpose (..),
+ )
 import Cardano.Ledger.Core (hashScript)
-import Cardano.Ledger.Mary.Value
-    ( MultiAsset (..)
-    )
-import PlutusTx.Builtins.Internal
-    ( BuiltinByteString (..)
-    )
+import Cardano.Ledger.Mary.Value (
+    MultiAsset (..),
+ )
+import PlutusTx.Builtins.Internal (
+    BuiltinByteString (..),
+ )
 
-import Cardano.MPFS.Cage.Config
-    ( CageConfig (..)
-    )
-import Cardano.MPFS.Cage.Types
-    ( CageDatum (..)
-    , MintRedeemer (..)
-    , OnChainTokenState (..)
-    , UpdateRedeemer (..)
-    )
+import Cardano.MPFS.Cage.Config (
+    CageConfig (..),
+ )
+import Cardano.MPFS.Cage.Ledger (
+    ConwayEra,
+    TokenId (..),
+ )
 import Cardano.MPFS.Cage.Provider (Provider (..))
 import Cardano.MPFS.Cage.TxBuilder.Internal
-import Cardano.MPFS.Cage.Ledger
-    ( ConwayEra
-    , TokenId (..)
-    )
+import Cardano.MPFS.Cage.Types (
+    CageDatum (..),
+    MintRedeemer (..),
+    OnChainTokenState (..),
+    UpdateRedeemer (..),
+ )
 
 -- | Build an end-token (burn) transaction.
-endTokenImpl
-    :: CageConfig
-    -> Provider IO
-    -> TokenId
-    -> Addr
-    -> IO (Tx ConwayEra)
+endTokenImpl ::
+    CageConfig ->
+    Provider IO ->
+    TokenId ->
+    Addr ->
+    IO (Tx ConwayEra)
 endTokenImpl cfg prov tid addr = do
     let scriptAddr =
             cageAddrFromCfg cfg (network cfg)
@@ -109,9 +110,9 @@ endTokenImpl cfg prov tid addr = do
         (u : _) -> pure u
     let assetName = unTokenId tid
         burnMA =
-            MultiAsset
-                $ Map.singleton policyId
-                $ Map.singleton assetName (-1)
+            MultiAsset $
+                Map.singleton policyId $
+                    Map.singleton assetName (-1)
     let script = mkCageScript cfg
         scriptHash = hashScript script
         allInputs =
@@ -121,8 +122,8 @@ endTokenImpl cfg prov tid addr = do
         spendRedeemer = End
         mintRedeemer = Burning
         redeemers =
-            Redeemers
-                $ Map.fromList
+            Redeemers $
+                Map.fromList
                     [
                         ( ConwaySpending
                             (AsIx stateIx)

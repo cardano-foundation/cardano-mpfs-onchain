@@ -1,18 +1,19 @@
 {-# LANGUAGE NumericUnderscores #-}
 
--- |
--- Module      : Cardano.MPFS.Cage.TxBuilder.Boot
--- Description : Boot token minting transaction
--- License     : Apache-2.0
---
--- Builds the minting transaction for a new cage
--- token. Picks a wallet UTxO as seed for asset-name
--- derivation, mints +1 token at the cage policy, and
--- creates a State UTxO with empty root and configured
--- default parameters.
-module Cardano.MPFS.Cage.TxBuilder.Boot
-    ( bootTokenImpl
-    ) where
+{- |
+Module      : Cardano.MPFS.Cage.TxBuilder.Boot
+Description : Boot token minting transaction
+License     : Apache-2.0
+
+Builds the minting transaction for a new cage
+token. Picks a wallet UTxO as seed for asset-name
+derivation, mints +1 token at the cage policy, and
+creates a State UTxO with empty root and configured
+default parameters.
+-}
+module Cardano.MPFS.Cage.TxBuilder.Boot (
+    bootTokenImpl,
+) where
 
 import Data.ByteString.Short qualified as SBS
 import Data.Map.Strict qualified as Map
@@ -22,67 +23,67 @@ import Lens.Micro ((&), (.~))
 
 import Cardano.Ledger.Address (Addr)
 import Cardano.Ledger.Alonzo.Scripts (AsIx (..))
-import Cardano.Ledger.Alonzo.TxBody
-    ( scriptIntegrityHashTxBodyL
-    )
-import Cardano.Ledger.Api.Tx
-    ( Tx
-    , mkBasicTx
-    , witsTxL
-    )
-import Cardano.Ledger.Api.Tx.Body
-    ( collateralInputsTxBodyL
-    , inputsTxBodyL
-    , mintTxBodyL
-    , mkBasicTxBody
-    , outputsTxBodyL
-    )
-import Cardano.Ledger.Api.Tx.Out
-    ( datumTxOutL
-    , mkBasicTxOut
-    )
-import Cardano.Ledger.Api.Tx.Wits
-    ( Redeemers (..)
-    , rdmrsTxWitsL
-    , scriptTxWitsL
-    )
-import Cardano.Ledger.Conway.Scripts
-    ( ConwayPlutusPurpose (..)
-    )
+import Cardano.Ledger.Alonzo.TxBody (
+    scriptIntegrityHashTxBodyL,
+ )
+import Cardano.Ledger.Api.Tx (
+    Tx,
+    mkBasicTx,
+    witsTxL,
+ )
+import Cardano.Ledger.Api.Tx.Body (
+    collateralInputsTxBodyL,
+    inputsTxBodyL,
+    mintTxBodyL,
+    mkBasicTxBody,
+    outputsTxBodyL,
+ )
+import Cardano.Ledger.Api.Tx.Out (
+    datumTxOutL,
+    mkBasicTxOut,
+ )
+import Cardano.Ledger.Api.Tx.Wits (
+    Redeemers (..),
+    rdmrsTxWitsL,
+    scriptTxWitsL,
+ )
+import Cardano.Ledger.Conway.Scripts (
+    ConwayPlutusPurpose (..),
+ )
 import Cardano.Ledger.Core (hashScript)
-import Cardano.Ledger.Mary.Value
-    ( MaryValue (..)
-    , MultiAsset (..)
-    )
-import PlutusTx.Builtins.Internal
-    ( BuiltinByteString (..)
-    )
+import Cardano.Ledger.Mary.Value (
+    MaryValue (..),
+    MultiAsset (..),
+ )
+import PlutusTx.Builtins.Internal (
+    BuiltinByteString (..),
+ )
 
-import Cardano.MPFS.Cage.Config
-    ( CageConfig (..)
-    )
 import Cardano.MPFS.Cage.AssetName (deriveAssetName)
-import Cardano.MPFS.Cage.Ledger
-    ( AssetName (..)
-    , Coin (..)
-    , ConwayEra
-    )
+import Cardano.MPFS.Cage.Config (
+    CageConfig (..),
+ )
+import Cardano.MPFS.Cage.Ledger (
+    AssetName (..),
+    Coin (..),
+    ConwayEra,
+ )
 import Cardano.MPFS.Cage.Provider (Provider (..))
 import Cardano.MPFS.Cage.TxBuilder.Internal
-import Cardano.MPFS.Cage.Types
-    ( CageDatum (..)
-    , Mint (..)
-    , MintRedeemer (..)
-    , OnChainRoot (..)
-    , OnChainTokenState (..)
-    )
+import Cardano.MPFS.Cage.Types (
+    CageDatum (..),
+    Mint (..),
+    MintRedeemer (..),
+    OnChainRoot (..),
+    OnChainTokenState (..),
+ )
 
 -- | Build a boot-token minting transaction.
-bootTokenImpl
-    :: CageConfig
-    -> Provider IO
-    -> Addr
-    -> IO (Tx ConwayEra)
+bootTokenImpl ::
+    CageConfig ->
+    Provider IO ->
+    Addr ->
+    IO (Tx ConwayEra)
 bootTokenImpl cfg prov addr = do
     pp <- queryProtocolParams prov
     utxos <- queryUTxOs prov addr
@@ -121,7 +122,7 @@ bootTokenImpl cfg prov addr = do
                             , stateMaxFee =
                                 let Coin c =
                                         defaultTip cfg
-                                in  c
+                                 in c
                             , stateProcessTime =
                                 defaultProcessTime
                                     cfg
@@ -152,8 +153,8 @@ bootTokenImpl cfg prov addr = do
                 mintPurpose =
                     ConwayMinting (AsIx 0)
                 redeemers =
-                    Redeemers
-                        $ Map.singleton
+                    Redeemers $
+                        Map.singleton
                             mintPurpose
                             ( toLedgerData redeemer
                             , placeholderExUnits
@@ -173,8 +174,8 @@ bootTokenImpl cfg prov addr = do
                         & mintTxBodyL .~ mintMA
                         & collateralInputsTxBodyL
                             .~ Set.singleton
-                                ( fst
-                                    $ last
+                                ( fst $
+                                    last
                                         allInputUtxos
                                 )
                         & scriptIntegrityHashTxBodyL

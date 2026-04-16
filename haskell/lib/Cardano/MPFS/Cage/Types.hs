@@ -1,66 +1,69 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- |
--- Module      : Cardano.MPFS.Cage.Types
--- Description : PlutusData types for the MPFS cage validator
--- License     : Apache-2.0
---
--- Haskell types matching the Aiken on-chain datum\/redeemer
--- structures and their PlutusData encoding.
---
--- These types use Plutus primitives directly (not
--- cardano-ledger types) because they model the exact
--- on-chain data layout expected by the Aiken validator.
--- The 'ToData'\/'FromData' instances are hand-written
--- (not TH-derived) to guarantee constructor indices and
--- field ordering match the Aiken source byte-for-byte.
-module Cardano.MPFS.Cage.Types
-    ( -- * On-chain datum\/redeemer types
-      CageDatum (..)
-    , MintRedeemer (..)
-    , Mint (..)
-    , Migration (..)
-    , UpdateRedeemer (..)
-    , RequestAction (..)
+{- |
+Module      : Cardano.MPFS.Cage.Types
+Description : PlutusData types for the MPFS cage validator
+License     : Apache-2.0
 
-      -- * On-chain domain types
-    , OnChainTokenId (..)
-    , OnChainOperation (..)
-    , OnChainRoot (..)
-    , OnChainRequest (..)
-    , OnChainTokenState (..)
-    , OnChainTxOutRef (..)
+Haskell types matching the Aiken on-chain datum\/redeemer
+structures and their PlutusData encoding.
 
-      -- * Proof steps (Aiken MPF proof encoding)
-    , ProofStep (..)
-    , Neighbor (..)
-    ) where
+These types use Plutus primitives directly (not
+cardano-ledger types) because they model the exact
+on-chain data layout expected by the Aiken validator.
+The 'ToData'\/'FromData' instances are hand-written
+(not TH-derived) to guarantee constructor indices and
+field ordering match the Aiken source byte-for-byte.
+-}
+module Cardano.MPFS.Cage.Types (
+    -- * On-chain datum\/redeemer types
+    CageDatum (..),
+    MintRedeemer (..),
+    Mint (..),
+    Migration (..),
+    UpdateRedeemer (..),
+    RequestAction (..),
+
+    -- * On-chain domain types
+    OnChainTokenId (..),
+    OnChainOperation (..),
+    OnChainRoot (..),
+    OnChainRequest (..),
+    OnChainTokenState (..),
+    OnChainTxOutRef (..),
+
+    -- * Proof steps (Aiken MPF proof encoding)
+    ProofStep (..),
+    Neighbor (..),
+) where
 
 import Data.ByteString (ByteString)
 import PlutusCore.Data (Data (..))
-import PlutusTx.Builtins.Internal
-    ( BuiltinByteString (..)
-    , BuiltinData (..)
-    )
-import PlutusTx.IsData.Class
-    ( FromData (..)
-    , ToData (..)
-    , UnsafeFromData (..)
-    )
+import PlutusTx.Builtins.Internal (
+    BuiltinByteString (..),
+    BuiltinData (..),
+ )
+import PlutusTx.IsData.Class (
+    FromData (..),
+    ToData (..),
+    UnsafeFromData (..),
+ )
 
 -- ---------------------------------------------------------
 -- On-chain domain types (Plutus primitives)
 -- ---------------------------------------------------------
 
--- | On-chain token identifier (asset name as raw
--- bytes). Matches Aiken @lib\/TokenId@.
+{- | On-chain token identifier (asset name as raw
+bytes). Matches Aiken @lib\/TokenId@.
+-}
 newtype OnChainTokenId = OnChainTokenId
     { unOnChainTokenId :: BuiltinByteString
     }
     deriving stock (Show, Eq)
 
--- | On-chain output reference. Matches Aiken
--- @cardano\/transaction\/OutputReference@.
+{- | On-chain output reference. Matches Aiken
+@cardano\/transaction\/OutputReference@.
+-}
 data OnChainTxOutRef = OnChainTxOutRef
     { txOutRefId :: !BuiltinByteString
     -- ^ Transaction hash (32 bytes)
@@ -75,27 +78,29 @@ newtype OnChainRoot = OnChainRoot
     }
     deriving stock (Show, Eq)
 
--- | On-chain operation on a key in the trie.
--- Matches Aiken @types\/Operation@.
+{- | On-chain operation on a key in the trie.
+Matches Aiken @types\/Operation@.
+-}
 data OnChainOperation
     = -- | Insert a new key-value pair (Constr 0)
       OpInsert
+        -- | Value to insert
         !ByteString
-        -- ^ Value to insert
     | -- | Delete a key (Constr 1)
       OpDelete
+        -- | Old value being removed (needed for proof)
         !ByteString
-        -- ^ Old value being removed (needed for proof)
     | -- | Update an existing key (Constr 2)
       OpUpdate
+        -- | Old value being replaced
         !ByteString
-        -- ^ Old value being replaced
+        -- | New value
         !ByteString
-        -- ^ New value
     deriving stock (Show, Eq)
 
--- | On-chain request to modify a token's trie.
--- Matches Aiken @types\/Request@.
+{- | On-chain request to modify a token's trie.
+Matches Aiken @types\/Request@.
+-}
 data OnChainRequest = OnChainRequest
     { requestToken :: !OnChainTokenId
     -- ^ Token whose trie is being modified
@@ -112,8 +117,9 @@ data OnChainRequest = OnChainRequest
     }
     deriving stock (Show, Eq)
 
--- | On-chain token state. Matches Aiken
--- @types\/State@ (5 fields).
+{- | On-chain token state. Matches Aiken
+@types\/State@ (5 fields).
+-}
 data OnChainTokenState = OnChainTokenState
     { stateOwner :: !BuiltinByteString
     -- ^ Payment key hash of the token owner (28 bytes)
@@ -132,8 +138,9 @@ data OnChainTokenState = OnChainTokenState
 -- On-chain-only types (datum / redeemer wrappers)
 -- ---------------------------------------------------------
 
--- | Cage datum: either a pending request or a token
--- state. Matches Aiken @types\/CageDatum@.
+{- | Cage datum: either a pending request or a token
+state. Matches Aiken @types\/CageDatum@.
+-}
 data CageDatum
     = -- | A pending operation request (Constr 0)
       RequestDatum !OnChainRequest
@@ -141,8 +148,9 @@ data CageDatum
       StateDatum !OnChainTokenState
     deriving stock (Show, Eq)
 
--- | Minting redeemer. Matches Aiken
--- @types\/MintRedeemer@.
+{- | Minting redeemer. Matches Aiken
+@types\/MintRedeemer@.
+-}
 data MintRedeemer
     = -- | Mint a new cage token (Constr 0)
       Minting !Mint
@@ -152,16 +160,18 @@ data MintRedeemer
       Burning
     deriving stock (Show, Eq)
 
--- | Minting parameters. Matches Aiken
--- @types\/Mint@.
+{- | Minting parameters. Matches Aiken
+@types\/Mint@.
+-}
 newtype Mint = Mint
     { mintAsset :: OnChainTxOutRef
     -- ^ UTxO consumed to derive the unique asset name
     }
     deriving stock (Show, Eq)
 
--- | Migration parameters. Matches Aiken
--- @types\/Migration@.
+{- | Migration parameters. Matches Aiken
+@types\/Migration@.
+-}
 data Migration = Migration
     { migrationOldPolicy :: !BuiltinByteString
     -- ^ Policy ID of the old cage validator
@@ -170,8 +180,9 @@ data Migration = Migration
     }
     deriving stock (Show, Eq)
 
--- | Per-request action in a 'Modify' redeemer.
--- Matches Aiken @types\/RequestAction@.
+{- | Per-request action in a 'Modify' redeemer.
+Matches Aiken @types\/RequestAction@.
+-}
 data RequestAction
     = -- | Update with Merkle proof (Constr 0)
       Update ![ProofStep]
@@ -179,8 +190,9 @@ data RequestAction
       Rejected
     deriving stock (Show, Eq)
 
--- | Spending redeemer. Matches Aiken
--- @types\/UpdateRedeemer@.
+{- | Spending redeemer. Matches Aiken
+@types\/UpdateRedeemer@.
+-}
 data UpdateRedeemer
     = -- | End the token (Constr 0)
       End
@@ -192,9 +204,10 @@ data UpdateRedeemer
       Retract !OnChainTxOutRef
     deriving stock (Show, Eq)
 
--- | A single step in an MPF Merkle proof, matching
--- the Aiken @ProofStep@ type from
--- @aiken-lang\/merkle-patricia-forestry@.
+{- | A single step in an MPF Merkle proof, matching
+the Aiken @ProofStep@ type from
+@aiken-lang\/merkle-patricia-forestry@.
+-}
 data ProofStep
     = -- | Branch step (Constr 0)
       Branch
@@ -253,13 +266,15 @@ bsFromD :: Data -> Maybe ByteString
 bsFromD (B bs) = Just bs
 bsFromD _ = Nothing
 
--- | Lift a 'BuiltinByteString' into a 'Data'
--- byte-literal.
+{- | Lift a 'BuiltinByteString' into a 'Data'
+byte-literal.
+-}
 bbsToD :: BuiltinByteString -> Data
 bbsToD (BuiltinByteString bs) = B bs
 
--- | Extract a 'BuiltinByteString' from a 'Data'
--- byte-literal.
+{- | Extract a 'BuiltinByteString' from a 'Data'
+byte-literal.
+-}
 bbsFromD :: Data -> Maybe BuiltinByteString
 bbsFromD (B bs) = Just (BuiltinByteString bs)
 bbsFromD _ = Nothing
@@ -291,8 +306,8 @@ instance UnsafeFromData OnChainTokenId where
 
 instance ToData OnChainTxOutRef where
     toBuiltinData OnChainTxOutRef{..} =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 0
                 [bbsToD txOutRefId, I txOutRefIdx]
 
@@ -355,8 +370,8 @@ instance UnsafeFromData OnChainRoot where
 
 instance ToData OnChainRequest where
     toBuiltinData OnChainRequest{..} =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 0
                 [ unD (toBuiltinData requestToken)
                 , bbsToD requestOwner
@@ -405,8 +420,8 @@ instance UnsafeFromData OnChainRequest where
 
 instance ToData OnChainTokenState where
     toBuiltinData OnChainTokenState{..} =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 0
                 [ bbsToD stateOwner
                 , unD (toBuiltinData stateRoot)
@@ -445,11 +460,11 @@ instance UnsafeFromData OnChainTokenState where
 
 instance ToData CageDatum where
     toBuiltinData (RequestDatum r) =
-        mkD
-            $ Constr 0 [unD (toBuiltinData r)]
+        mkD $
+            Constr 0 [unD (toBuiltinData r)]
     toBuiltinData (StateDatum s) =
-        mkD
-            $ Constr 1 [unD (toBuiltinData s)]
+        mkD $
+            Constr 1 [unD (toBuiltinData s)]
 
 instance FromData CageDatum where
     fromBuiltinData bd = case unD bd of
@@ -464,11 +479,11 @@ instance FromData CageDatum where
 instance UnsafeFromData CageDatum where
     unsafeFromBuiltinData bd = case unD bd of
         Constr 0 [d] ->
-            RequestDatum
-                $ unsafeFromBuiltinData (mkD d)
+            RequestDatum $
+                unsafeFromBuiltinData (mkD d)
         Constr 1 [d] ->
-            StateDatum
-                $ unsafeFromBuiltinData (mkD d)
+            StateDatum $
+                unsafeFromBuiltinData (mkD d)
         _ -> error "unsafeFromBuiltinData: CageDatum"
 
 instance ToData Mint where
@@ -489,8 +504,8 @@ instance UnsafeFromData Mint where
 
 instance ToData Migration where
     toBuiltinData Migration{..} =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 0
                 [ bbsToD migrationOldPolicy
                 , unD
@@ -541,8 +556,8 @@ instance UnsafeFromData MintRedeemer where
         Constr 0 [d] ->
             Minting $ unsafeFromBuiltinData (mkD d)
         Constr 1 [d] ->
-            Migrating
-                $ unsafeFromBuiltinData (mkD d)
+            Migrating $
+                unsafeFromBuiltinData (mkD d)
         Constr 2 [] -> Burning
         _ ->
             error
@@ -550,8 +565,8 @@ instance UnsafeFromData MintRedeemer where
 
 instance ToData Neighbor where
     toBuiltinData Neighbor{..} =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 0
                 [ I neighborNibble
                 , bsToD neighborPrefix
@@ -574,22 +589,22 @@ instance UnsafeFromData Neighbor where
 
 instance ToData ProofStep where
     toBuiltinData Branch{..} =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 0
                 [ I branchSkip
                 , bsToD branchNeighbors
                 ]
     toBuiltinData Fork{..} =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 1
                 [ I forkSkip
                 , unD (toBuiltinData forkNeighbor)
                 ]
     toBuiltinData Leaf{..} =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 2
                 [ I leafSkip
                 , bsToD leafKey
@@ -611,19 +626,19 @@ instance UnsafeFromData ProofStep where
     unsafeFromBuiltinData bd = case unD bd of
         Constr 0 [I sk, B nb] -> Branch sk nb
         Constr 1 [I sk, nd] ->
-            Fork sk
-                $ unsafeFromBuiltinData (mkD nd)
+            Fork sk $
+                unsafeFromBuiltinData (mkD nd)
         Constr 2 [I sk, B k, B v] -> Leaf sk k v
         _ ->
             error "unsafeFromBuiltinData: ProofStep"
 
 instance ToData RequestAction where
     toBuiltinData (Update steps) =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 0
-                [ List
-                    $ map (unD . toBuiltinData) steps
+                [ List $
+                    map (unD . toBuiltinData) steps
                 ]
     toBuiltinData Rejected = mkD $ Constr 1 []
 
@@ -640,8 +655,8 @@ instance FromData RequestAction where
 instance UnsafeFromData RequestAction where
     unsafeFromBuiltinData bd = case unD bd of
         Constr 0 [List steps] ->
-            Update
-                $ map
+            Update $
+                map
                     (unsafeFromBuiltinData . mkD)
                     steps
         Constr 1 [] -> Rejected
@@ -655,11 +670,11 @@ instance ToData UpdateRedeemer where
     toBuiltinData (Contribute ref) =
         mkD $ Constr 1 [unD (toBuiltinData ref)]
     toBuiltinData (Modify actions) =
-        mkD
-            $ Constr
+        mkD $
+            Constr
                 2
-                [ List
-                    $ map (unD . toBuiltinData) actions
+                [ List $
+                    map (unD . toBuiltinData) actions
                 ]
     toBuiltinData (Retract ref) =
         mkD $ Constr 3 [unD (toBuiltinData ref)]
@@ -682,16 +697,16 @@ instance UnsafeFromData UpdateRedeemer where
     unsafeFromBuiltinData bd = case unD bd of
         Constr 0 [] -> End
         Constr 1 [d] ->
-            Contribute
-                $ unsafeFromBuiltinData (mkD d)
+            Contribute $
+                unsafeFromBuiltinData (mkD d)
         Constr 2 [List as] ->
-            Modify
-                $ map
+            Modify $
+                map
                     (unsafeFromBuiltinData . mkD)
                     as
         Constr 3 [d] ->
-            Retract
-                $ unsafeFromBuiltinData (mkD d)
+            Retract $
+                unsafeFromBuiltinData (mkD d)
         _ ->
             error
                 "unsafeFromBuiltinData:\

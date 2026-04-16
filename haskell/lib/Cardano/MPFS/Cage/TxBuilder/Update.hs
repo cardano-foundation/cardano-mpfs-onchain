@@ -2,20 +2,21 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 
--- |
--- Module      : Cardano.MPFS.Cage.TxBuilder.Update
--- Description : Update token transaction
--- License     : Apache-2.0
---
--- Builds the oracle update transaction that processes
--- all pending requests for a token. Consumes the State
--- UTxO and all request UTxOs, applies each operation
--- speculatively through the trie to generate proofs,
--- then outputs a new State UTxO with the updated root
--- and per-request refund outputs.
-module Cardano.MPFS.Cage.TxBuilder.Update
-    ( updateTokenImpl
-    ) where
+{- |
+Module      : Cardano.MPFS.Cage.TxBuilder.Update
+Description : Update token transaction
+License     : Apache-2.0
+
+Builds the oracle update transaction that processes
+all pending requests for a token. Consumes the State
+UTxO and all request UTxOs, applies each operation
+speculatively through the trie to generate proofs,
+then outputs a new State UTxO with the updated root
+and per-request refund outputs.
+-}
+module Cardano.MPFS.Cage.TxBuilder.Update (
+    updateTokenImpl,
+) where
 
 import Control.Exception (SomeException, try)
 import Control.Monad (when)
@@ -24,73 +25,73 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe)
 import Data.Ord (Down (..))
 import Data.Time.Clock (getCurrentTime)
-import Data.Time.Clock.POSIX
-    ( utcTimeToPOSIXSeconds
-    )
+import Data.Time.Clock.POSIX (
+    utcTimeToPOSIXSeconds,
+ )
 import Data.Void (Void)
 import Lens.Micro ((&), (.~), (^.))
 
 import Cardano.Ledger.Address (Addr)
 import Cardano.Ledger.Alonzo.Scripts (AsIx)
-import Cardano.Ledger.Api.Tx
-    ( Tx
-    , bodyTxL
-    )
-import Cardano.Ledger.Api.Tx.Body
-    ( feeTxBodyL
-    )
-import Cardano.Ledger.Api.Tx.Out
-    ( TxOut
-    , coinTxOutL
-    , datumTxOutL
-    , mkBasicTxOut
-    , valueTxOutL
-    )
-import Cardano.Ledger.BaseTypes
-    ( Inject (..)
-    )
-import Cardano.Ledger.Conway.Scripts
-    ( ConwayPlutusPurpose
-    )
+import Cardano.Ledger.Api.Tx (
+    Tx,
+    bodyTxL,
+ )
+import Cardano.Ledger.Api.Tx.Body (
+    feeTxBodyL,
+ )
+import Cardano.Ledger.Api.Tx.Out (
+    TxOut,
+    coinTxOutL,
+    datumTxOutL,
+    mkBasicTxOut,
+    valueTxOutL,
+ )
+import Cardano.Ledger.BaseTypes (
+    Inject (..),
+ )
+import Cardano.Ledger.Conway.Scripts (
+    ConwayPlutusPurpose,
+ )
 import Cardano.Ledger.Core (Script)
-import Cardano.Ledger.Keys
-    ( KeyHash
-    , KeyRole (..)
-    )
+import Cardano.Ledger.Keys (
+    KeyHash,
+    KeyRole (..),
+ )
 import Cardano.Ledger.Plutus.ExUnits (ExUnits)
-import PlutusTx.Builtins.Internal
-    ( BuiltinByteString (..)
-    )
+import PlutusTx.Builtins.Internal (
+    BuiltinByteString (..),
+ )
 
-import Cardano.MPFS.Cage.Config
-    ( CageConfig (..)
-    )
-import Cardano.MPFS.Cage.Types
-    ( CageDatum (..)
-    , OnChainOperation (..)
-    , OnChainRequest (..)
-    , OnChainRoot (..)
-    , OnChainTokenState (..)
-    , ProofStep
-    , RequestAction (..)
-    , UpdateRedeemer (..)
-    )
-import Cardano.MPFS.Cage.Provider
-    ( Provider (..)
-    )
-import Cardano.MPFS.Cage.Trie
-    ( Trie (..)
-    , TrieManager (..)
-    )
+import Cardano.MPFS.Cage.Config (
+    CageConfig (..),
+ )
+import Cardano.MPFS.Cage.Ledger (
+    Coin (..),
+    ConwayEra,
+    PParams,
+    Root (..),
+    TokenId,
+    TxIn,
+ )
+import Cardano.MPFS.Cage.Provider (
+    Provider (..),
+ )
+import Cardano.MPFS.Cage.Trie (
+    Trie (..),
+    TrieManager (..),
+ )
 import Cardano.MPFS.Cage.TxBuilder.Internal
-import Cardano.MPFS.Cage.Ledger
-    ( Coin (..)
-    , ConwayEra
-    , PParams
-    , Root (..)
-    , TokenId
-    , TxIn
-    )
+import Cardano.MPFS.Cage.Types (
+    CageDatum (..),
+    OnChainOperation (..),
+    OnChainRequest (..),
+    OnChainRoot (..),
+    OnChainTokenState (..),
+    ProofStep,
+    RequestAction (..),
+    UpdateRedeemer (..),
+ )
 import Cardano.Node.Client.TxBuild qualified as Tx
 import Cardano.Slotting.Slot (SlotNo)
 
@@ -98,13 +99,13 @@ import Cardano.Slotting.Slot (SlotNo)
 data NoCtx a
 
 -- | Build an update-token transaction (fair fee).
-updateTokenImpl
-    :: CageConfig
-    -> Provider IO
-    -> TrieManager IO
-    -> TokenId
-    -> Addr
-    -> IO (Tx ConwayEra)
+updateTokenImpl ::
+    CageConfig ->
+    Provider IO ->
+    TrieManager IO ->
+    TokenId ->
+    Addr ->
+    IO (Tx ConwayEra)
 updateTokenImpl cfg prov tm tid addr = do
     (stateUtxo, reqUtxos, feeUtxo, pp) <-
         queryContext cfg prov tid addr
@@ -144,18 +145,19 @@ updateTokenImpl cfg prov tm tid addr = do
     case result of
         Right tx -> pure tx
         Left err ->
-            error
-                $ "updateToken: build failed: "
+            error $
+                "updateToken: build failed: "
                     <> show err
 
--- | Query cage UTxOs, find the state and request
--- UTxOs, pick a fee-paying wallet UTxO.
-queryContext
-    :: CageConfig
-    -> Provider IO
-    -> TokenId
-    -> Addr
-    -> IO
+{- | Query cage UTxOs, find the state and request
+UTxOs, pick a fee-paying wallet UTxO.
+-}
+queryContext ::
+    CageConfig ->
+    Provider IO ->
+    TokenId ->
+    Addr ->
+    IO
         ( (TxIn, TxOut ConwayEra)
         , [(TxIn, TxOut ConwayEra)]
         , (TxIn, TxOut ConwayEra)
@@ -176,10 +178,10 @@ queryContext cfg prov tid addr = do
                 \not found"
         Just x -> pure x
     let reqUtxos =
-            sortOn fst
-                $ findRequestUtxos tid cageUtxos
-    when (null reqUtxos)
-        $ error "updateToken: no pending requests"
+            sortOn fst $
+                findRequestUtxos tid cageUtxos
+    when (null reqUtxos) $
+        error "updateToken: no pending requests"
     pp <- queryProtocolParams prov
     walletUtxos <- queryUTxOs prov addr
     feeUtxo <- case sortOn
@@ -189,30 +191,32 @@ queryContext cfg prov tid addr = do
         (u : _) -> pure u
     pure (stateUtxo, reqUtxos, feeUtxo, pp)
 
--- | Run speculative trie operations to compute
--- proofs and the new root hash.
-computeProofs
-    :: TrieManager IO
-    -> TokenId
-    -> [(TxIn, TxOut ConwayEra)]
-    -> IO ([[ProofStep]], Root)
+{- | Run speculative trie operations to compute
+proofs and the new root hash.
+-}
+computeProofs ::
+    TrieManager IO ->
+    TokenId ->
+    [(TxIn, TxOut ConwayEra)] ->
+    IO ([[ProofStep]], Root)
 computeProofs tm tid reqUtxos =
     withSpeculativeTrie tm tid $ \trie -> do
         ps <- mapM (processRequest trie) reqUtxos
         r <- getRoot trie
         pure (ps, r)
 
--- | Extract old state, build new state output,
--- cage script, and owner key hash.
-prepareState
-    :: CageConfig
-    -> TxOut ConwayEra
-    -> Root
-    -> ( OnChainTokenState
-       , TxOut ConwayEra
-       , Script ConwayEra
-       , KeyHash 'Witness
-       )
+{- | Extract old state, build new state output,
+cage script, and owner key hash.
+-}
+prepareState ::
+    CageConfig ->
+    TxOut ConwayEra ->
+    Root ->
+    ( OnChainTokenState
+    , TxOut ConwayEra
+    , Script ConwayEra
+    , KeyHash 'Witness
+    )
 prepareState cfg stateOut newRoot =
     let scriptAddr =
             cageAddrFromCfg cfg (network cfg)
@@ -243,14 +247,14 @@ prepareState cfg stateOut newRoot =
                         (toPlcData newStateDatum)
         script = mkCageScript cfg
         ownerKh = addrWitnessKeyHash ownerBs
-    in  (oldState, newStateOut, script, ownerKh)
+     in (oldState, newStateOut, script, ownerKh)
 
 -- | Compute the validity upper slot.
-computeUpperSlot
-    :: Provider IO
-    -> OnChainTokenState
-    -> [(TxIn, TxOut ConwayEra)]
-    -> IO SlotNo
+computeUpperSlot ::
+    Provider IO ->
+    OnChainTokenState ->
+    [(TxIn, TxOut ConwayEra)] ->
+    IO SlotNo
 computeUpperSlot prov oldState reqUtxos = do
     let extractSubmittedAt (_, rOut) =
             case extractCageDatum rOut of
@@ -258,8 +262,8 @@ computeUpperSlot prov oldState reqUtxos = do
                     requestSubmittedAt r
                 _ -> 0
         earliestDeadline =
-            minimum
-                $ map
+            minimum $
+                map
                     ( \u ->
                         extractSubmittedAt u
                             + stateProcessTime
@@ -275,8 +279,8 @@ computeUpperSlot prov oldState reqUtxos = do
             nowUtc <- getCurrentTime
             let posixSec =
                     utcTimeToPOSIXSeconds nowUtc
-            trySlots prov
-                $ map
+            trySlots prov $
+                map
                     ( \d ->
                         round
                             ((posixSec + d) * 1000)
@@ -284,10 +288,10 @@ computeUpperSlot prov oldState reqUtxos = do
                     [30, 5, 2]
 
 -- | Wrap the Provider's evaluateTx for the DSL.
-mkEvalTx
-    :: Provider IO
-    -> Tx ConwayEra
-    -> IO
+mkEvalTx ::
+    Provider IO ->
+    Tx ConwayEra ->
+    IO
         ( Map.Map
             ( ConwayPlutusPurpose
                 AsIx
@@ -297,8 +301,8 @@ mkEvalTx
         )
 mkEvalTx prov tx = do
     r <- evaluateTx prov tx
-    pure
-        $ Map.map
+    pure $
+        Map.map
             ( \case
                 Left e -> Left (show e)
                 Right eu -> Right eu
@@ -306,20 +310,20 @@ mkEvalTx prov tx = do
             r
 
 -- | The TxBuild DSL program for an update tx.
-buildProgram
-    :: CageConfig
-    -> PParams ConwayEra
-    -> TxIn
-    -> TxOut ConwayEra
-    -> [(TxIn, TxOut ConwayEra)]
-    -> (TxIn, TxOut ConwayEra)
-    -> OnChainTokenState
-    -> TxOut ConwayEra
-    -> Script ConwayEra
-    -> KeyHash 'Witness
-    -> [[ProofStep]]
-    -> SlotNo
-    -> Tx.TxBuild NoCtx Void ()
+buildProgram ::
+    CageConfig ->
+    PParams ConwayEra ->
+    TxIn ->
+    TxOut ConwayEra ->
+    [(TxIn, TxOut ConwayEra)] ->
+    (TxIn, TxOut ConwayEra) ->
+    OnChainTokenState ->
+    TxOut ConwayEra ->
+    Script ConwayEra ->
+    KeyHash 'Witness ->
+    [[ProofStep]] ->
+    SlotNo ->
+    Tx.TxBuild NoCtx Void ()
 buildProgram
     cfg
     _pp
@@ -338,8 +342,8 @@ buildProgram
                 { stateMaxFee = tipAmount
                 } = oldState
             nReqs =
-                fromIntegral (length reqUtxos)
-                    :: Integer
+                fromIntegral (length reqUtxos) ::
+                    Integer
         let actions = map Update proofs
         _ <- Tx.spendScript stateIn (Modify actions)
         mapM_
@@ -352,7 +356,7 @@ buildProgram
         _ <- Tx.output newStateOut
         Coin fee <- Tx.peek $ \tx ->
             let f = tx ^. bodyTxL . feeTxBodyL
-            in  if f > Coin 0
+             in if f > Coin 0
                     then Tx.Ok f
                     else Tx.Iterate f
         let perReqFee = fee `div` nReqs
@@ -378,8 +382,8 @@ buildProgram
                             ( extractOwnerBytes
                                 reqOut
                             )
-                Tx.output
-                    $ mkBasicTxOut
+                Tx.output $
+                    mkBasicTxOut
                         refundAddr
                         (inject rawRefund)
             )
@@ -390,11 +394,11 @@ buildProgram
         Tx.validTo upperSlot
 
 -- | Process a single request.
-processRequest
-    :: Monad m
-    => Trie m
-    -> (TxIn, TxOut ConwayEra)
-    -> m [ProofStep]
+processRequest ::
+    (Monad m) =>
+    Trie m ->
+    (TxIn, TxOut ConwayEra) ->
+    m [ProofStep]
 processRequest trie (_txIn, txOut) = do
     let OnChainRequest
             { requestKey = key
@@ -412,14 +416,16 @@ processRequest trie (_txIn, txOut) = do
             pure (fromMaybe [] mSteps)
         OpDelete _ -> do
             mSteps <- getProofSteps trie key
-            _ <- Cardano.MPFS.Cage.Trie.delete
-                trie
-                key
+            _ <-
+                Cardano.MPFS.Cage.Trie.delete
+                    trie
+                    key
             pure (fromMaybe [] mSteps)
         OpUpdate _ v -> do
             mSteps <- getProofSteps trie key
-            _ <- Cardano.MPFS.Cage.Trie.delete
-                trie
-                key
+            _ <-
+                Cardano.MPFS.Cage.Trie.delete
+                    trie
+                    key
             _ <- insert trie key v
             pure (fromMaybe [] mSteps)

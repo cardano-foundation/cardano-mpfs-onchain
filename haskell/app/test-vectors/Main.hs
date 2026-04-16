@@ -1,35 +1,36 @@
--- | Generate test vectors for the MPFS cage validator.
---
--- Supports two output formats:
---
--- - JSON (default): language-neutral test vectors
--- - Aiken (@--aiken@): test functions for the Aiken validator
+{- | Generate test vectors for the MPFS cage validator.
+
+Supports two output formats:
+
+- JSON (default): language-neutral test vectors
+- Aiken (@--aiken@): test functions for the Aiken validator
+-}
 module Main (main) where
 
-import Aiken.Codegen
-    ( BodyM
-    , Def (Blank, Test)
-    , Expr
-    , ModuleM
-    , bind
-    , bindAs
-    , call
-    , comment
-    , emit
-    , field
-    , hex
-    , int
-    , item
-    , list
-    , record
-    , renderModule
-    , runBody
-    , runModule
-    , useAs
-    , useFrom
-    , var
-    , (.==)
-    )
+import Aiken.Codegen (
+    BodyM,
+    Def (Blank, Test),
+    Expr,
+    ModuleM,
+    bind,
+    bindAs,
+    call,
+    comment,
+    emit,
+    field,
+    hex,
+    int,
+    item,
+    list,
+    record,
+    renderModule,
+    runBody,
+    runModule,
+    useAs,
+    useFrom,
+    var,
+    (.==),
+ )
 import Cardano.MPFS.Cage.AssetName (deriveAssetName)
 import Cardano.MPFS.Cage.Proof (serializeProof, toProofSteps)
 import Cardano.MPFS.Cage.Types
@@ -47,31 +48,31 @@ import Data.Char (isAlphaNum, toLower)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
-import MPF.Backend.Pure
-    ( MPFInMemoryDB
-    , MPFPure
-    , emptyMPFInMemoryDB
-    , runMPFPure
-    , runMPFPureTransaction
-    )
-import MPF.Backend.Standalone
-    ( MPFStandalone (..)
-    , MPFStandaloneCodecs (..)
-    )
-import MPF.Hashes
-    ( MPFHash
-    , fromHexKVHashes
-    , isoMPFHash
-    , mpfHashing
-    , root
-    )
+import MPF.Backend.Pure (
+    MPFInMemoryDB,
+    MPFPure,
+    emptyMPFInMemoryDB,
+    runMPFPure,
+    runMPFPureTransaction,
+ )
+import MPF.Backend.Standalone (
+    MPFStandalone (..),
+    MPFStandaloneCodecs (..),
+ )
+import MPF.Hashes (
+    MPFHash,
+    fromHexKVHashes,
+    isoMPFHash,
+    mpfHashing,
+    root,
+ )
 import MPF.Insertion (inserting)
 import MPF.Proof.Insertion (MPFProof, mkMPFInclusionProof)
 import PlutusCore.Data (Data (..))
-import PlutusTx.Builtins.Internal
-    ( BuiltinByteString (..)
-    , BuiltinData (..)
-    )
+import PlutusTx.Builtins.Internal (
+    BuiltinByteString (..),
+    BuiltinData (..),
+ )
 import PlutusTx.IsData.Class (ToData (..))
 import System.Environment (getArgs)
 
@@ -91,8 +92,8 @@ bsCodecs =
 -- | Insert a key-value pair.
 insertKV :: ByteString -> ByteString -> MPFPure ()
 insertKV k v =
-    runMPFPureTransaction bsCodecs
-        $ inserting
+    runMPFPureTransaction bsCodecs $
+        inserting
             []
             fromHexKVHashes
             mpfHashing
@@ -109,8 +110,8 @@ getRootHash =
 -- | Get inclusion proof for a key.
 getProof :: ByteString -> MPFPure (Maybe (MPFProof MPFHash))
 getProof k =
-    runMPFPureTransaction bsCodecs
-        $ mkMPFInclusionProof
+    runMPFPureTransaction bsCodecs $
+        mkMPFInclusionProof
             []
             fromHexKVHashes
             mpfHashing
@@ -123,10 +124,10 @@ buildTree kvs =
     snd $ runMPFPure emptyMPFInMemoryDB $ mapM_ (uncurry insertKV) kvs
 
 -- | Get proof and root from a database (must exist).
-getVec
-    :: MPFInMemoryDB
-    -> ByteString
-    -> (MPFProof MPFHash, ByteString)
+getVec ::
+    MPFInMemoryDB ->
+    ByteString ->
+    (MPFProof MPFHash, ByteString)
 getVec db k =
     case fst $ runMPFPure db $ (,) <$> getProof k <*> getRootHash of
         (Just p, Just r) -> (p, r)
@@ -140,10 +141,11 @@ getRoot db k = snd $ getVec db k
 -- Hex encoding
 -- -----------------------------------------------------------
 
--- | Blake2b-256 hash a ByteString.
--- The Aiken MPF library hashes keys\/values with blake2b_256
--- internally. To make Haskell-generated proofs compatible,
--- we pre-hash keys so the trie paths match.
+{- | Blake2b-256 hash a ByteString.
+The Aiken MPF library hashes keys\/values with blake2b_256
+internally. To make Haskell-generated proofs compatible,
+we pre-hash keys so the trie paths match.
+-}
 blake2b :: ByteString -> ByteString
 blake2b bs = convert (hash bs :: Digest Blake2b_256)
 
@@ -164,8 +166,8 @@ dataToJson (I n) = Aeson.toJSON n
 dataToJson (B bs) = Aeson.object ["bytes" .= toHex bs]
 dataToJson (List xs) = Aeson.toJSON $ map dataToJson xs
 dataToJson (Map kvs) =
-    Aeson.toJSON
-        $ map
+    Aeson.toJSON $
+        map
             ( \(k, v) ->
                 Aeson.object ["k" .= dataToJson k, "v" .= dataToJson v]
             )
@@ -183,11 +185,12 @@ txt = Aeson.toJSON
 -- Shared vector data types
 -- -----------------------------------------------------------
 
--- | Raw proof test vector data.
---
--- Keys are stored in original (unhashed) form. The Haskell MPF
--- uses @blake2b(key)@ as the trie path, matching the Aiken MPF
--- which hashes keys internally.
+{- | Raw proof test vector data.
+
+Keys are stored in original (unhashed) form. The Haskell MPF
+uses @blake2b(key)@ as the trie path, matching the Aiken MPF
+which hashes keys internally.
+-}
 data ProofVec = ProofVec
     { pvDesc :: Text
     , pvKey :: ByteString
@@ -215,16 +218,17 @@ data AssetNameVec = AssetNameVec
 emptyRoot :: ByteString
 emptyRoot = BS.replicate 32 0
 
--- | Build a tree from key-value pairs, pre-hashing keys with
--- blake2b_256 to match the Aiken MPF's internal key hashing.
+{- | Build a tree from key-value pairs, pre-hashing keys with
+blake2b_256 to match the Aiken MPF's internal key hashing.
+-}
 buildTreeB2 :: [(ByteString, ByteString)] -> MPFInMemoryDB
 buildTreeB2 kvs = buildTree [(blake2b k, v) | (k, v) <- kvs]
 
 -- | Get proof and root using a blake2b-hashed key.
-getVecB2
-    :: MPFInMemoryDB
-    -> ByteString
-    -> (MPFProof MPFHash, ByteString)
+getVecB2 ::
+    MPFInMemoryDB ->
+    ByteString ->
+    (MPFProof MPFHash, ByteString)
 getVecB2 db k = getVec db $ blake2b k
 
 -- | Get just the root using a blake2b-hashed key.
@@ -236,44 +240,44 @@ rawProofVectors =
     [ -- 1. Insert into empty trie
       let db = buildTreeB2 [("ab", "cd")]
           (p, r) = getVecB2 db "ab"
-      in  ProofVec "insert into empty trie" "ab" "cd" emptyRoot r p
+       in ProofVec "insert into empty trie" "ab" "cd" emptyRoot r p
     , -- 2. Insert creating fork
       let db1 = buildTreeB2 [("k1", "v1")]
           r1 = getRootB2 db1 "k1"
           db2 = buildTreeB2 [("k1", "v1"), ("k2", "v2")]
           (p2, r2) = getVecB2 db2 "k2"
-      in  ProofVec "insert creating fork" "k2" "v2" r1 r2 p2
+       in ProofVec "insert creating fork" "k2" "v2" r1 r2 p2
     , -- 3. Insert with shared prefix
       let db1 = buildTreeB2 [("ka", "va")]
           r1 = getRootB2 db1 "ka"
           db2 = buildTreeB2 [("ka", "va"), ("kb", "vb")]
           (p2, r2) = getVecB2 db2 "kb"
-      in  ProofVec "insert with shared prefix" "kb" "vb" r1 r2 p2
+       in ProofVec "insert with shared prefix" "kb" "vb" r1 r2 p2
     , -- 4. Inclusion proof for existing key
       let db = buildTreeB2 [("x", "1"), ("y", "2"), ("z", "3")]
           (p, r) = getVecB2 db "y"
-      in  ProofVec "inclusion proof for middle key" "y" "2" r r p
+       in ProofVec "inclusion proof for middle key" "y" "2" r r p
     ]
 
 rawAssetNameVectors :: [AssetNameVec]
 rawAssetNameVectors =
     [ let txId = BS.pack [0x01 .. 0x20]
           ref = OnChainTxOutRef (BuiltinByteString txId) 0
-      in  AssetNameVec
+       in AssetNameVec
             "asset name from TxOutRef index 0"
             txId
             0
             $ deriveAssetName ref
     , let txId = BS.pack [0x01 .. 0x20]
           ref = OnChainTxOutRef (BuiltinByteString txId) 1
-      in  AssetNameVec
+       in AssetNameVec
             "asset name from TxOutRef index 1"
             txId
             1
             $ deriveAssetName ref
     , let txId = BS.replicate 32 0
           ref = OnChainTxOutRef (BuiltinByteString txId) 255
-      in  AssetNameVec
+       in AssetNameVec
             "asset name from zero txId index 255"
             txId
             255
@@ -321,7 +325,7 @@ datumEncodingVectors =
                 , stateProcessTime = 300000
                 , stateRetractTime = 600000
                 }
-      in  Aeson.object
+       in Aeson.object
             [ "description" .= txt "StateDatum encoding"
             , "type" .= txt "CageDatum"
             , "plutusData" .= toDataJson (StateDatum state)
@@ -329,9 +333,9 @@ datumEncodingVectors =
     , let req =
             OnChainRequest
                 { requestToken =
-                    OnChainTokenId
-                        $ BuiltinByteString
-                        $ BS.replicate 32 0xcc
+                    OnChainTokenId $
+                        BuiltinByteString $
+                            BS.replicate 32 0xcc
                 , requestOwner =
                     BuiltinByteString $ BS.replicate 28 0xdd
                 , requestKey = BS.pack [0x01, 0x02, 0x03]
@@ -339,7 +343,7 @@ datumEncodingVectors =
                 , requestFee = 1000000
                 , requestSubmittedAt = 1700000000000
                 }
-      in  Aeson.object
+       in Aeson.object
             [ "description" .= txt "RequestDatum with OpInsert"
             , "type" .= txt "CageDatum"
             , "plutusData" .= toDataJson (RequestDatum req)
@@ -348,7 +352,7 @@ datumEncodingVectors =
             OnChainTxOutRef
                 (BuiltinByteString $ BS.replicate 32 0xee)
                 0
-      in  Aeson.object
+       in Aeson.object
             [ "description" .= txt "MintRedeemer Minting"
             , "type" .= txt "MintRedeemer"
             , "plutusData" .= toDataJson (Minting (Mint ref))
@@ -455,25 +459,25 @@ proofVecToAiken ProofVec{..} =
         body :: BodyM Expr
         body = do
             proof <-
-                bindAs "proof" "Proof"
-                    $ list
-                    $ mapM_ (item . stepToExpr) steps
+                bindAs "proof" "Proof" $
+                    list $
+                        mapM_ (item . stepToExpr) steps
             if isInclusion
                 then
-                    pure
-                        $ call
+                    pure $
+                        call
                             "mpf.has"
                             [trieE, hex pvKey, hex pvValue, proof]
                 else do
                     trie <-
-                        bind "trie"
-                            $ call
+                        bind "trie" $
+                            call
                                 "mpf.insert"
                                 [trieE, hex pvKey, hex pvValue, proof]
-                    pure
-                        $ call "mpf.root" [trie]
+                    pure $
+                        call "mpf.root" [trie]
                             .== hex pvExpectedRoot
-    in  Test name $ runBody body
+     in Test name $ runBody body
 
 -- | Render an asset name vector as an Aiken 'Def'.
 assetNameVecToAiken :: AssetNameVec -> Def
@@ -485,7 +489,7 @@ assetNameVecToAiken AssetNameVec{..} =
                 field "transaction_id" $ hex anvTxId
                 field "output_index" $ int $ fromIntegral anvOutputIndex
             pure $ call "assetName" [ref] .== hex anvExpected
-    in  Test name $ runBody body
+     in Test name $ runBody body
 
 -- | Generate complete Aiken module.
 aikenModule :: ModuleM ()
@@ -495,8 +499,8 @@ aikenModule = do
     emit $ comment "  run 'just generate-vectors'"
     emit $ comment "  to regenerate"
     emit Blank
-    emit
-        $ useFrom
+    emit $
+        useFrom
             "aiken/merkle_patricia_forestry"
             ["Branch", "Fork", "Leaf", "Neighbor", "Proof"]
     emit $ useAs "aiken/merkle_patricia_forestry" "mpf"
