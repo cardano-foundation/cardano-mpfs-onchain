@@ -14,7 +14,9 @@ let
       hlint = {};
     };
     buildInputs = [
+      pkgs.aiken
       pkgs.just
+      pkgs.lean4
     ];
   };
 
