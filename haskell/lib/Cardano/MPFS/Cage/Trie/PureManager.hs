@@ -36,7 +36,7 @@ import Cardano.MPFS.Cage.Trie (Trie, TrieManager (..))
 import Cardano.MPFS.Cage.Trie.Pure
     ( mkPureTrieFromRef
     )
-import Cardano.MPFS.Cage.Types (TokenId)
+import Cardano.MPFS.Cage.Ledger (TokenId)
 
 -- | Create a new 'TrieManager IO' backed by a 'Map'
 -- of per-token in-memory MPF databases.

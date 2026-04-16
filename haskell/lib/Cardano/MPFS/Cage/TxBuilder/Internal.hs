@@ -166,7 +166,7 @@ import PlutusTx.IsData.Class
 import Cardano.MPFS.Cage.Config
     ( CageConfig (..)
     )
-import Cardano.MPFS.Cage.OnChain
+import Cardano.MPFS.Cage.Types
     ( CageDatum (..)
     , OnChainOperation (..)
     , OnChainRequest (..)
@@ -174,7 +174,7 @@ import Cardano.MPFS.Cage.OnChain
     , OnChainTxOutRef (..)
     )
 import Cardano.MPFS.Cage.Provider (Provider (..))
-import Cardano.MPFS.Cage.Types
+import Cardano.MPFS.Cage.Ledger
     ( AssetName (..)
     , Coin (..)
     , ConwayEra

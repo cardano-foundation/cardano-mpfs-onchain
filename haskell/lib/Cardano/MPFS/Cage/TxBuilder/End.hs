@@ -54,7 +54,7 @@ import PlutusTx.Builtins.Internal
 import Cardano.MPFS.Cage.Config
     ( CageConfig (..)
     )
-import Cardano.MPFS.Cage.OnChain
+import Cardano.MPFS.Cage.Types
     ( CageDatum (..)
     , MintRedeemer (..)
     , OnChainTokenState (..)
@@ -62,7 +62,7 @@ import Cardano.MPFS.Cage.OnChain
     )
 import Cardano.MPFS.Cage.Provider (Provider (..))
 import Cardano.MPFS.Cage.TxBuilder.Internal
-import Cardano.MPFS.Cage.Types
+import Cardano.MPFS.Cage.Ledger
     ( ConwayEra
     , TokenId (..)
     )

@@ -65,7 +65,7 @@ import PlutusTx.Builtins.Internal
 import Cardano.MPFS.Cage.Config
     ( CageConfig (..)
     )
-import Cardano.MPFS.Cage.OnChain
+import Cardano.MPFS.Cage.Types
     ( CageDatum (..)
     , OnChainOperation (..)
     , OnChainRequest (..)
@@ -83,7 +83,7 @@ import Cardano.MPFS.Cage.Trie
     , TrieManager (..)
     )
 import Cardano.MPFS.Cage.TxBuilder.Internal
-import Cardano.MPFS.Cage.Types
+import Cardano.MPFS.Cage.Ledger
     ( Coin (..)
     , ConwayEra
     , PParams
@@ -335,12 +335,12 @@ buildProgram
     upperSlot = do
         let stateRef = txInToRef stateIn
             OnChainTokenState
-                { stateTip = tipAmount
+                { stateMaxFee = tipAmount
                 } = oldState
             nReqs =
                 fromIntegral (length reqUtxos)
                     :: Integer
-        let actions = map UpdateAction proofs
+        let actions = map Update proofs
         _ <- Tx.spendScript stateIn (Modify actions)
         mapM_
             ( \(rIn, _) ->

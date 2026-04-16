@@ -75,7 +75,7 @@ import Cardano.MPFS.Cage.TxBuilder.Update
     ( updateTokenImpl
     )
 import Cardano.MPFS.Cage.Trie (TrieManager (..))
-import Cardano.MPFS.Cage.Types
+import Cardano.MPFS.Cage.Ledger
     ( Coin (..)
     , ConwayEra
     , TokenId (..)

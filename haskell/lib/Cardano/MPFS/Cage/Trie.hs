@@ -20,8 +20,8 @@ module Cardano.MPFS.Cage.Trie
 
 import Data.ByteString (ByteString)
 
-import Cardano.MPFS.Cage.OnChain (ProofStep)
-import Cardano.MPFS.Cage.Types (Root, TokenId)
+import Cardano.MPFS.Cage.Ledger (Root, TokenId)
+import Cardano.MPFS.Cage.Types (ProofStep)
 
 -- | Manager for per-token tries.
 data TrieManager m = TrieManager

@@ -46,17 +46,17 @@ import Cardano.Ledger.BaseTypes (Inject (..))
 import Cardano.MPFS.Cage.Config
     ( CageConfig (..)
     )
-import Cardano.MPFS.Cage.OnChain
+import Cardano.MPFS.Cage.Types
     ( OnChainOperation (..)
     )
-import Cardano.MPFS.Cage.Provider (Provider (..))
-import Cardano.MPFS.Cage.TxBuilder.Internal
-import Cardano.MPFS.Cage.Types
+import Cardano.MPFS.Cage.Ledger
     ( Coin (..)
     , ConwayEra
     , PParams
     , TokenId
     )
+import Cardano.MPFS.Cage.Provider (Provider (..))
+import Cardano.MPFS.Cage.TxBuilder.Internal
 import Cardano.Node.Client.Balance
     ( BalanceResult (..)
     , balanceTx

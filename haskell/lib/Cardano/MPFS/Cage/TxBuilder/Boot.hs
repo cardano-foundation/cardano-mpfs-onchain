@@ -61,20 +61,20 @@ import PlutusTx.Builtins.Internal
 import Cardano.MPFS.Cage.Config
     ( CageConfig (..)
     )
-import Cardano.MPFS.Cage.OnChain
+import Cardano.MPFS.Cage.AssetName (deriveAssetName)
+import Cardano.MPFS.Cage.Ledger
+    ( AssetName (..)
+    , Coin (..)
+    , ConwayEra
+    )
+import Cardano.MPFS.Cage.Provider (Provider (..))
+import Cardano.MPFS.Cage.TxBuilder.Internal
+import Cardano.MPFS.Cage.Types
     ( CageDatum (..)
     , Mint (..)
     , MintRedeemer (..)
     , OnChainRoot (..)
     , OnChainTokenState (..)
-    , deriveAssetName
-    )
-import Cardano.MPFS.Cage.Provider (Provider (..))
-import Cardano.MPFS.Cage.TxBuilder.Internal
-import Cardano.MPFS.Cage.Types
-    ( AssetName (..)
-    , Coin (..)
-    , ConwayEra
     )
 
 -- | Build a boot-token minting transaction.
@@ -118,7 +118,7 @@ bootTokenImpl cfg prov addr = do
                                     )
                             , stateRoot =
                                 OnChainRoot emptyRoot
-                            , stateTip =
+                            , stateMaxFee =
                                 let Coin c =
                                         defaultTip cfg
                                 in  c

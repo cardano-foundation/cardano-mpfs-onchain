@@ -47,7 +47,7 @@ import MPF.Test.Lib
 
 import Cardano.MPFS.Cage.Proof (toProofSteps)
 import Cardano.MPFS.Cage.Trie (Trie (..))
-import Cardano.MPFS.Cage.Types (Root (..))
+import Cardano.MPFS.Cage.Ledger (Root (..))
 
 -- | Create a new empty 'Trie IO' backed by a fresh
 -- 'IORef' holding an empty in-memory MPF database.

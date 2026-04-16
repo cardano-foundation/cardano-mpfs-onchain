@@ -63,7 +63,7 @@ import PlutusTx.Builtins.Internal
 import Cardano.MPFS.Cage.Config
     ( CageConfig (..)
     )
-import Cardano.MPFS.Cage.OnChain
+import Cardano.MPFS.Cage.Types
     ( CageDatum (..)
     , OnChainRequest (..)
     , OnChainTokenState (..)
@@ -74,7 +74,7 @@ import Cardano.MPFS.Cage.Provider
     ( Provider (..)
     )
 import Cardano.MPFS.Cage.TxBuilder.Internal
-import Cardano.MPFS.Cage.Types
+import Cardano.MPFS.Cage.Ledger
     ( Coin (..)
     , ConwayEra
     , PParams
@@ -313,7 +313,7 @@ buildRejectProgram
     lowerSlot = do
         let stateRef = txInToRef stateIn
             OnChainTokenState
-                { stateTip = tipAmount
+                { stateMaxFee = tipAmount
                 } = oldState
             nReqs =
                 fromIntegral (length reqUtxos)

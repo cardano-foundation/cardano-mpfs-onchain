@@ -32,7 +32,7 @@ import Cardano.Ledger.Api.Tx.Out (TxOut)
 import Cardano.Ledger.Plutus (ExUnits)
 import Cardano.Slotting.Slot (SlotNo (..))
 
-import Cardano.MPFS.Cage.Types
+import Cardano.MPFS.Cage.Ledger
     ( Addr
     , ConwayEra
     , PParams
