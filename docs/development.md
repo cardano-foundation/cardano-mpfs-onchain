@@ -19,7 +19,7 @@ The output is a symlink `result` pointing to the produced `plutus.json`.
 
 ## Development shell
 
-Drop into a shell with `aiken` available:
+The default shell provides GHC, cabal, Aiken, Lean, fourmolu, and hlint:
 
 ```sh
 just develop
@@ -27,21 +27,95 @@ just develop
 nix develop
 ```
 
+An Aiken-only lightweight shell is also available:
+
+```sh
+just develop-aiken
+# or: nix develop .#aiken
+```
+
 ## Testing
 
-Run the Aiken test suite (requires aiken in PATH or from `nix develop`):
+### Aiken tests
+
+Run the Aiken test suite (unit tests + property tests):
 
 ```sh
 just test
 ```
 
+### Haskell tests
+
+Run QuickCheck property tests for PlutusData roundtrips and constructor indices:
+
+```sh
+nix run .#cage-tests
+```
+
+### Lean proofs
+
+Build the formal proofs (phase exclusivity, token handling):
+
+```sh
+cd lean && lake build
+```
+
+## Nix checks and apps
+
+The flake exposes checks (sandboxed derivations) and apps (runnable wrappers):
+
+| Check | What it verifies |
+|-------|-----------------|
+| `library` | Haskell cage library compiles |
+| `cage-tests` | QuickCheck property tests pass |
+| `cage-test-vectors` | Test vector generator builds |
+| `lint` | fourmolu + hlint pass |
+| `vectors-freshness` | Committed `cage_vectors.ak` matches generated output |
+
+```sh
+# Build all checks
+nix build .#checks.x86_64-linux.library
+nix build .#checks.x86_64-linux.cage-tests
+
+# Run tests with stdout visible
+nix run .#cage-tests
+nix run .#lint
+```
+
+## Test vectors
+
+The Haskell cage library includes a test vector generator
+(`cage-test-vectors`) that produces deterministic test data in
+two formats:
+
+- **Aiken** (`--aiken`): generates `cage_vectors.ak` used by the
+  Aiken unit tests for cross-language validation
+- **JSON** (default): language-neutral vectors for any backend
+
+```sh
+# Regenerate Aiken vectors and format them
+just generate-vectors
+
+# Check committed vectors are up to date
+just vectors-check
+```
+
+CI runs `vectors-freshness` to ensure committed vectors match the
+Haskell reference.
+
 ## Justfile recipes
 
-| Recipe        | Description                              |
-| ------------- | ---------------------------------------- |
-| `just build`  | Build `plutus.json` via Nix              |
-| `just develop`| Enter dev shell with `aiken`             |
-| `just test`   | Run `aiken check` tests                  |
+| Recipe | Description |
+|--------|-------------|
+| `just build` | Build `plutus.json` via Nix |
+| `just develop` | Enter dev shell (Haskell + Aiken + Lean) |
+| `just develop-aiken` | Enter Aiken-only dev shell |
+| `just aiken-build` | Build blueprint directly with `aiken` |
+| `just test` | Run `aiken check` tests |
+| `just generate-vectors` | Regenerate `cage_vectors.ak` from Haskell |
+| `just vectors-check` | Verify committed vectors are fresh |
+| `just haskell-build` | Build Haskell cage library with cabal |
+| `just haskell-e2e` | Run Haskell E2E tests against a devnet |
 
 ## How the Nix build works
 
@@ -53,10 +127,7 @@ using `fetchFromGitHub` and populates `build/packages/` before
 running `aiken build`. This avoids network access inside the Nix
 sandbox.
 
-## Upstream
-
-The validators originate from the
-[cardano-foundation/mpfs](https://github.com/cardano-foundation/mpfs)
-repository (`on_chain/` directory). See the upstream
-[documentation](https://cardano-foundation.github.io/mpfs/) for the
-full MPFS system including the off-chain TypeScript service.
+The Haskell cage library is built via
+[haskell.nix](https://github.com/input-output-hk/haskell.nix)
+with GHC 9.8.4 and dependencies from
+[CHaP](https://github.com/intersectmbo/cardano-haskell-packages).

@@ -123,22 +123,34 @@ type MintRedeemer {
 ### Spending Redeemer
 
 ```aiken
+type RequestAction {
+    Update(List<Proof>)
+    Rejected
+}
+
 type UpdateRedeemer {
     End
     Contribute(OutputReference)
-    Modify(List<Proof>)
+    Modify(List<RequestAction>)
     Retract(OutputReference)
-    Reject
 }
 ```
+
+Each request in a `Modify` transaction carries a `RequestAction`:
+
+| Constructor | Index | Fields | Description |
+|---|---|---|---|
+| `Update` | 0 | `List<Proof>` | Apply proofs to update the MPF root |
+| `Rejected` | 1 | — | Reject an expired request (Phase 3 or dishonest `submitted_at`) |
+
+The spending redeemer:
 
 | Constructor | Index | Fields | Description |
 |---|---|---|---|
 | `End` | 0 | — | Destroy the MPF instance |
-| `Contribute` | 1 | `OutputReference` | Spend a request during update or reject; points to the state UTxO |
-| `Modify` | 2 | `List<Proof>` | Update the MPF root; one proof per request. Phase 1 only |
-| `Retract` | 3 | `OutputReference` | Cancel a request and reclaim ADA. Points to the State UTxO (included as reference input). Phase 2 only |
-| `Reject` | 4 | — | Discard expired/dishonest requests, refund ADA minus fee. Phase 3 or dishonest `submitted_at` |
+| `Contribute` | 1 | `OutputReference` | Spend a request during Modify; points to the state UTxO |
+| `Modify` | 2 | `List<RequestAction>` | Process requests — each can be updated or rejected in a single transaction |
+| `Retract` | 3 | `OutputReference` | Cancel a request and reclaim ADA. Points to the State UTxO (reference input). Phase 2 only |
 
 ## Plutus Data Encoding
 

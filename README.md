@@ -1,10 +1,18 @@
 # Cardano MPFS Onchain
 
-Aiken validators for [Merkle Patricia Forestry](https://github.com/aiken-lang/merkle-patricia-forestry) on Cardano (Plutus V3).
+Aiken validators and Haskell off-chain library for [Merkle Patricia Forestry](https://github.com/aiken-lang/merkle-patricia-forestry) on Cardano (Plutus V3).
 
-The on-chain component defines a **cage** pattern: an NFT locked at a script address carries the current MPF root hash as its datum. Modifications are verified on-chain via cryptographic proofs.
+The on-chain component defines a **cage** pattern: an NFT locked at a script address carries the current MPF root hash as its datum. Modifications are verified on-chain via cryptographic proofs. Time-gated phases prevent race conditions between the oracle and requesters.
 
-This repository contains the on-chain validators extracted from [cardano-foundation/mpfs](https://github.com/cardano-foundation/mpfs) (`on_chain/` directory). See the upstream [documentation](https://cardano-foundation.github.io/mpfs/) for the full MPFS system including the off-chain TypeScript service.
+## Repository structure
+
+| Directory | Language | Contents |
+|-----------|----------|----------|
+| `validators/` | Aiken | Cage minting policy + spending validator |
+| `lean/` | Lean 4 | Formal proofs of phase exclusivity and token handling |
+| `haskell/` | Haskell | Off-chain types, tx builders, test vectors, E2E tests |
+
+The `haskell/` package (`cardano-mpfs-cage`) is the single source of truth for all Haskell cage code — PlutusData type encodings, transaction builders, MPF proof serialization, and cross-language test vectors.
 
 ## Documentation
 
@@ -15,19 +23,23 @@ Full documentation is available at **[cardano-foundation.github.io/cardano-mpfs-
 - [Validators](https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/validators/) — minting policy and spending validator logic
 - [Types & Encodings](https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/types/) — datum, redeemer, and operation structures
 - [Proof System](https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/proofs/) — MPF proof format, verification, and performance
-- [Security Properties](https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/properties/) — 17 invariants verified by 44 tests
+- [Security Properties](https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/properties/) — 16 categories verified by 80 tests
+- [Haskell Cage Library](https://cardano-foundation.github.io/cardano-mpfs-onchain/haskell-cage/) — off-chain types, tx builders, test vectors
 
-## Quick Start
+## Quick start
 
 ```sh
-# Build plutus.json
+# Build plutus.json (Aiken validators)
 nix build
 
-# Enter dev shell
-nix develop
+# Run Aiken tests
+nix run .#cage-tests
 
-# Run tests (44 tests, 242 checks)
-nix develop --command aiken check
+# Run Haskell QuickCheck tests
+nix run .#cage-tests
+
+# Enter dev shell (Haskell + Aiken + Lean)
+nix develop
 ```
 
 ## License
