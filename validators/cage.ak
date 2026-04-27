@@ -112,9 +112,9 @@ use cardano/transaction.{
 }
 use lib.{TokenId, assetName, quantity, tokenFromValue}
 use types.{
-  Burning, CageDatum, Contribute, Delete, End, Insert, Migrating, Migration, Mint,
+  Burning, CageDatum, Contribute, Delete, End, Insert, Migrating, Migration,
   MintRedeemer, Minting, Modify, Rejected, Request, RequestAction, RequestDatum,
-  Retract, State, StateDatum, Update, UpdateAction, UpdateRedeemer,
+  Retract, State, StateDatum, Sweep, Update, UpdateAction, UpdateRedeemer,
 }
 
 /// The main validator for caged MPF tokens.
@@ -130,10 +130,11 @@ use types.{
 /// spending validator (`spend`) runs because the UTxO is at this script's
 /// address. The `else(_)` handler rejects any other purpose (e.g.,
 /// withdrawal, certify).
-validator mpfCage(_version: Int) {
+validator mpfCage(seed: OutputReference) {
   /// Minting policy: validates creation and destruction of caged tokens.
   ///
   /// - `Minting`: Creates a new caged token with an empty MPF root.
+  ///   Authorization comes from consuming the `seed` parameter UTxO.
   ///   Delegates to `validateMint` which enforces all invariants.
   /// - `Burning`: Returns `True` unconditionally. This is safe because
   ///   the spending validator (`End` redeemer) handles the actual burn
@@ -149,13 +150,13 @@ validator mpfCage(_version: Int) {
   mint(redeemer: MintRedeemer, policyId: PolicyId, tx: Transaction) {
     trace @"minting": redeemer
     when redeemer is {
-      Minting(mint) -> {
-        trace "minting": mint
-        validateMint(mint, policyId, tx)
+      Minting -> {
+        trace @"minting": seed
+        validateMint(seed, policyId, tx)
       }
       Migrating(migration) -> {
         trace "migrating": migration
-        validateMigration(migration, policyId, tx)
+        validateMigration(seed, migration, policyId, tx)
       }
       Burning -> True
     }
@@ -206,73 +207,95 @@ validator mpfCage(_version: Int) {
     self: OutputReference,
     tx: Transaction,
   ) {
-    // Fail if the UTxO has no datum. All cage UTxOs must have inline datums.
-    // This guards against accidentally sending ADA to the script without a datum.
-    expect Some(datum) = maybeDatum
-    // Dispatch based on redeemer type
+    // The cage's canonical token id, derived from the validator's `seed`
+    // parameter. Used by Sweep to authorize via the state UTxO and by the
+    // Modify/End defense-in-depth check to confirm the spent UTxO is the
+    // legitimate cage state.
+    let cageToken = TokenId { assetName: assetName(seed) }
+    // Sweep is dispatched first so it can handle UTxOs whose datum failed
+    // to decode as `CageDatum` (which arrive as `None`). Every other path
+    // requires `Some(_)`.
     when redeemer is {
-      Retract(stateRef) -> {
-        // --- RETRACT PATH ---
-        // Only valid for Request UTxOs during Phase 2 (retract window).
-        // The State UTxO must be included as a reference input so we can
-        // read the time params (process_time, retract_time) from its datum.
-        expect RequestDatum(request) = datum
-        let Request { requestOwner, requestToken, submitted_at, .. } = request
-        let Transaction {
-          extra_signatories,
-          validity_range,
-          reference_inputs,
-          ..
-        } = tx
-        expect has(extra_signatories, requestOwner)
-        // Find State UTxO in reference inputs and read time params
-        expect Some(stateInput) =
-          find(
-            reference_inputs,
-            fn(input) { input.output_reference == stateRef },
-          )
-        expect Some(tokenId) = tokenFromValue(stateInput.output.value)
-        expect requestToken == tokenId
-        let State { process_time, retract_time, .. } =
-          readState(stateInput)
-        // Phase 2: retract window is open
-        expect
-          in_phase2(validity_range, submitted_at, process_time, retract_time)
-        True
-      }
-      Contribute(tokenRef) -> {
-        // --- CONTRIBUTE PATH ---
-        // Valid for Request UTxOs in Phase 1 or when rejectable.
-        // Time params are read from the State UTxO's datum.
-        expect RequestDatum(request) = datum
-        validRequest(request, tokenRef, tx)
-      }
+      Sweep(stateRef) -> validateSweep(stateRef, maybeDatum, self, cageToken, tx)
       _ -> {
-        // --- MODIFY / END PATH ---
-        // Both Modify and End operate on State UTxOs and require the
-        // state owner's signature.
-        //
-        // Fail if datum is not a StateDatum
-        expect StateDatum(state) = datum
-        // Fail if the state owner hasn't signed the transaction.
-        // This is the authorization check -- only the cage owner can
-        // modify the MPF state or end the cage.
-        expect validateOwnership(state, tx)
-        // Extract the caged token from the input being spent.
-        // This gives us the Input (for address checks later) and the
-        // TokenId (for identifying which token is being operated on).
-        let (input, tokenId) = extractToken(self, tx)
+        // Fail if the UTxO has no datum. All non-Sweep paths require it.
+        expect Some(datum) = maybeDatum
         when redeemer is {
-          Modify(actions) ->
-            validModify(state, input, tokenId, tx, actions)
-          End -> {
+          Retract(stateRef) -> {
+            // --- RETRACT PATH ---
+            // Only valid for Request UTxOs during Phase 2 (retract window).
+            // The State UTxO must be included as a reference input so we can
+            // read the time params (process_time, retract_time) from its datum.
+            expect RequestDatum(request) = datum
+            let Request { requestOwner, requestToken, submitted_at, .. } = request
+            let Transaction {
+              extra_signatories,
+              validity_range,
+              reference_inputs,
+              ..
+            } = tx
+            expect has(extra_signatories, requestOwner)
+            // Find State UTxO in reference inputs and read time params
+            expect Some(stateInput) =
+              find(
+                reference_inputs,
+                fn(input) { input.output_reference == stateRef },
+              )
+            expect Some(tokenId) = tokenFromValue(stateInput.output.value)
+            expect requestToken == tokenId
+            let State { process_time, retract_time, .. } =
+              readState(stateInput)
+            // Phase 2: retract window is open
+            expect
+              in_phase2(validity_range, submitted_at, process_time, retract_time)
+            True
+          }
+          Contribute(tokenRef) -> {
+            // --- CONTRIBUTE PATH ---
+            // Valid for Request UTxOs in Phase 1 or when rejectable.
+            // Time params are read from the State UTxO's datum.
+            expect RequestDatum(request) = datum
+            validRequest(request, tokenRef, tx)
+          }
+          _ -> {
+            // --- MODIFY / END PATH ---
+            // Both Modify and End operate on State UTxOs and require the
+            // state owner's signature.
+            //
+            // Fail if datum is not a StateDatum
+            expect StateDatum(state) = datum
+            // Fail if the state owner hasn't signed the transaction.
+            // This is the authorization check -- only the cage owner can
+            // modify the MPF state or end the cage.
+            expect validateOwnership(state, tx)
+            // Locate the spent input directly so we can derive THIS
+            // validator's policy id and verify the cage token is held under
+            // it (not just the asset name — a foreign-policy token with the
+            // same asset name must NOT pass).
+            expect Some(input) =
+              find(tx.inputs, fn(i) { i.output_reference == self })
             expect address.Script(policyId) =
               input.output.address.payment_credential
-            validateEnd(policyId, tokenId, tx)
+            // Defense-in-depth: the spent UTxO MUST carry exactly one of THIS
+            // cage's token under THIS validator's policy id. This rejects:
+            //   - foreign-NFT fake-state UTxOs (different policy, any asset),
+            //   - same-asset foreign-policy UTxOs (asset-name collision under
+            //     a different policy id),
+            //   - tokenless / wrong-quantity UTxOs.
+            expect
+              when quantity(policyId, input.output.value, cageToken) is {
+                Some(qty) -> qty == 1
+                None -> False
+              }
+            when redeemer is {
+              Modify(actions) ->
+                validModify(state, input, policyId, cageToken, tx, actions)
+              End -> validateEnd(policyId, cageToken, tx)
+              // Defensive: should never reach here since Retract, Contribute,
+              // and Sweep are handled above. Included for exhaustiveness.
+              _ -> fail
+            }
           }
-          // Defensive: should never reach here since Retract and Contribute
-          // are handled above. Included for exhaustiveness.
-          _ -> fail
         }
       }
     }
@@ -639,6 +662,7 @@ fn sumRefunds(
 fn validModify(
   state: State,
   input: Input,
+  policyId: PolicyId,
   tokenId: TokenId,
   tx: Transaction,
   actions: List<RequestAction>,
@@ -675,14 +699,126 @@ fn validModify(
   expect (mpf.root(expectedNewRoot) == newRoot)?
   expect
     output.address.payment_credential == input.output.address.payment_credential
+  // The continuing State output MUST hold the cage token under THIS policy.
+  // Without this, the state can be advanced (root updated, time params
+  // preserved) while the NFT is moved to a wallet — leaving a tokenless
+  // StateDatum at the cage address.
+  expect
+    when quantity(policyId, output.value, tokenId) is {
+      Some(qty) -> qty == 1
+      None -> False
+    }
 
   // Verify refund outputs via conservation equation.
   // Total refunded must equal total input lovelace minus tx fee minus N * tip.
+  //
+  // ## Zero-request short-circuit
+  // When `n == 0` (no legitimate request inputs were folded), there is no
+  // request economics to balance: the conservation equation reduces to
+  // `0 == -tx_fee` which is unsatisfiable for any non-zero fee. We accept
+  // such transactions outright — the root-unchanged invariant has already
+  // been enforced above (the fold returns the identity root). This is the
+  // steady-state Oracle tick where there are no requests to process but
+  // the state needs to be touched (e.g. alongside a `Sweep` of garbage).
   let n = list.length(owners)
-  expect [_, ..refundOutputs] = outputs
-  let orderedOwners = list.reverse(owners)
-  let totalRefunded = sumRefunds(refundOutputs, orderedOwners)
-  expect totalRefunded == totalInputLovelace - tx_fee - n * tip
+  when n is {
+    0 -> True
+    _ -> {
+      expect [_, ..refundOutputs] = outputs
+      let orderedOwners = list.reverse(owners)
+      let totalRefunded = sumRefunds(refundOutputs, orderedOwners)
+      expect totalRefunded == totalInputLovelace - tx_fee - n * tip
+      True
+    }
+  }
+}
+
+/// Validate a Sweep operation: the cage owner reclaims a non-legitimate
+/// UTxO at the cage's address.
+///
+/// ## Authorization
+/// 1. The redeemer carries the state UTxO's `OutputReference` so the
+///    validator can locate it directly (in `tx.inputs ++ tx.reference_inputs`).
+/// 2. The pointed-to UTxO must carry exactly one of `cageToken` under
+///    THIS validator's policy id (derived from the spent UTxO's address).
+///    This ties the Sweep to the legitimate cage state — a fake state
+///    UTxO with a foreign NFT cannot authorize sweeping.
+/// 3. The state's `owner` must be in `tx.extra_signatories`.
+///
+/// ## Garbage predicate
+/// The spent UTxO at `self` is sweepable iff it is neither:
+/// - the legitimate state UTxO (`Some(StateDatum(_))` AND value carries
+///   `cageToken` under `policyId`), nor
+/// - a legitimate request UTxO for this cage (`Some(RequestDatum(req))`
+///   AND `req.requestToken == cageToken`).
+///
+/// This excludes the cage's own state from sweep (use `End` to destroy
+/// the cage) and the cage's own legitimate requests (use Retract/Contribute).
+/// Everything else — no datum, foreign datum shapes, RequestDatums for
+/// other tokens, StateDatums without the cage NFT — is garbage.
+///
+/// ## Output destination
+/// Unconstrained. The sweeper takes the dust as compensation for the tx fee.
+fn validateSweep(
+  stateRef: OutputReference,
+  maybeDatum: Option<CageDatum>,
+  self: OutputReference,
+  cageToken: TokenId,
+  tx: Transaction,
+) -> Bool {
+  let Transaction {
+    inputs,
+    reference_inputs,
+    extra_signatories,
+    ..
+  } = tx
+  // Find the spent UTxO at `self` to read its datum/value and to extract
+  // this validator's policy id from its script address.
+  expect Some(spent) =
+    find(inputs, fn(input) { input.output_reference == self })
+  expect address.Script(policyId) =
+    spent.output.address.payment_credential
+  // Find the state UTxO via the redeemer's pointer (in inputs first,
+  // then in reference_inputs for standalone sweeps).
+  let stateInput =
+    when find(inputs, fn(i) { i.output_reference == stateRef }) is {
+      Some(input) -> input
+      None -> {
+        expect Some(input) =
+          find(
+            reference_inputs,
+            fn(i) { i.output_reference == stateRef },
+          )
+        input
+      }
+    }
+  // Verify the redeemer's claim: stateRef points at a UTxO carrying
+  // exactly one of THIS cage's token.
+  expect
+    when quantity(policyId, stateInput.output.value, cageToken) is {
+      Some(qty) -> qty == 1
+      None -> False
+    }
+  // Read the state datum and require the owner has signed.
+  let State { owner, .. } = readState(stateInput)
+  expect has(extra_signatories, owner)
+  // Garbage predicate at `self`.
+  let isLegitState =
+    when maybeDatum is {
+      Some(StateDatum(_)) ->
+        when quantity(policyId, spent.output.value, cageToken) is {
+          Some(qty) -> qty == 1
+          None -> False
+        }
+      _ -> False
+    }
+  let isLegitRequest =
+    when maybeDatum is {
+      Some(RequestDatum(req)) -> req.requestToken == cageToken
+      _ -> False
+    }
+  expect !isLegitState
+  expect !isLegitRequest
   True
 }
 
@@ -747,15 +883,18 @@ fn validModify(
 /// - Datum is RequestDatum instead of StateDatum -> fail
 /// - No inline datum -> fail
 /// - Asset name doesn't match hash of OutputReference -> impossible (computed internally)
-pub fn validateMint(minting: Mint, policyId: PolicyId, tx: Transaction) {
-  let Mint { asset } = minting
+pub fn validateMint(
+  seed: OutputReference,
+  policyId: PolicyId,
+  tx: Transaction,
+) {
   let Transaction { outputs, mint, inputs, .. } = tx
-  // Compute the unique asset name from the OutputReference hash
-  let tokenId = TokenId { assetName: assetName(asset) }
-  // Verify the OutputReference is consumed in this transaction.
+  // Compute the unique asset name from the seed parameter's hash
+  let tokenId = TokenId { assetName: assetName(seed) }
+  // Verify the seed UTxO is consumed in this transaction.
   // This is the uniqueness guarantee: once spent, this UTxO can never
   // be used to mint the same asset name again.
-  expect is_some(find_input(inputs, asset))
+  expect is_some(find_input(inputs, seed))
   // Verify exactly one token is minted with this policy + asset name.
   // The quantity function returns None if the token is absent, or
   // Some(n) with the quantity. We require exactly 1.
@@ -778,6 +917,15 @@ pub fn validateMint(minting: Mint, policyId: PolicyId, tx: Transaction) {
   // The initial MPF root must be the hash of an empty trie.
   // `root(empty)` computes this known constant value.
   expect tokenRoot == root(empty)
+  // The State output's value MUST hold the newly minted cage token.
+  // Without this, the mint succeeds but the token can be sent to any other
+  // output (e.g. a wallet) while a tokenless StateDatum remains at the
+  // script address. Pin the token to the State output explicitly.
+  expect
+    when quantity(policyId, output.value, tokenId) is {
+      Some(qty) -> qty == 1
+      None -> False
+    }
   True
 }
 
@@ -787,14 +935,27 @@ pub fn validateMint(minting: Mint, policyId: PolicyId, tx: Transaction) {
 /// that the old token is burned atomically. The MPF root is carried over
 /// (no empty root check), preserving the existing data.
 ///
+/// ## Asset-name pin
+/// Per-token addressing means each instance can only ever mint a token
+/// whose asset name matches `assetName(seed)`. The migration redeemer
+/// declares an `oldPolicy` and a `tokenId`; the validator pins the
+/// declared `tokenId.assetName` to `assetName(seed)` so the migration
+/// cannot relabel the token across the boundary.
+///
 /// Uniqueness is guaranteed by the burn: the old token can only be burned
 /// once, so this migration mint can only succeed once.
 pub fn validateMigration(
+  seed: OutputReference,
   migration: Migration,
   policyId: PolicyId,
   tx: Transaction,
 ) {
   let Migration { oldPolicy, tokenId } = migration
+  let TokenId { assetName: declaredName } = tokenId
+  // Pin the migrated token's asset name to the new instance's parameter.
+  // Without this, a migration could mint under the new policy id with an
+  // arbitrary asset name, breaking the per-token invariant.
+  expect declaredName == assetName(seed)
   let Transaction { outputs, mint, .. } = tx
   // Verify the old token is burned (quantity -1 under old policy)
   expect
@@ -814,6 +975,13 @@ pub fn validateMigration(
   expect targetScriptHash == policyId
   expect InlineDatum(tokenState) = output.datum
   expect StateDatum(State { .. }) = tokenState
+  // The State output's value MUST hold the newly migrated cage token under
+  // the new policy. Same rationale as the matching pin in `validateMint`.
+  expect
+    when quantity(policyId, output.value, tokenId) is {
+      Some(qty) -> qty == 1
+      None -> False
+    }
   True
 }
 

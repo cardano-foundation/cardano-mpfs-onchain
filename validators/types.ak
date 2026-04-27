@@ -63,25 +63,6 @@ use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference}
 use lib.{TokenId}
 
-/// Parameters for minting a new caged token.
-///
-/// The `asset` field is an `OutputReference` that serves a dual purpose:
-/// 1. Its hash becomes the asset name (via `lib.assetName`), guaranteeing
-///    uniqueness since an output reference can only be consumed once.
-/// 2. The referenced UTxO must be consumed in the minting transaction,
-///    enforced by `validateMint` in `cage.ak`. This prevents replaying
-///    the same mint parameters in a future transaction.
-///
-/// ## Test Hints
-/// - Mint with a valid consumed output reference -> should succeed
-/// - Mint with an output reference NOT in the transaction inputs -> should fail
-/// - Mint twice with the same output reference -> second must fail (UTxO already spent)
-pub type Mint {
-  /// The output reference used to derive the asset name (via hash).
-  /// This must be one of the transaction inputs to ensure uniqueness.
-  asset: OutputReference,
-}
-
 /// Parameters for migrating a caged token from an old validator to a new one.
 ///
 /// During migration, the old token is burned (under `oldPolicy`) and a new
@@ -101,6 +82,8 @@ pub type Migration {
 ///
 /// The minting policy handles three cases:
 /// - `Minting`: Full validation is applied (see `validateMint` in `cage.ak`).
+///   The seed `OutputReference` that authorizes the mint and derives the
+///   asset name is the validator's parameter, not a redeemer field.
 /// - `Migrating`: Mints a token with a carried-over (possibly non-empty) root,
 ///   validated by `validateMigration` in `cage.ak`. Requires the old token to
 ///   be burned atomically in the same transaction.
@@ -116,8 +99,9 @@ pub type Migration {
 /// 2. The `End` spending validator ensures the State UTxO owner signed the tx.
 /// 3. The `End` validator checks the mint field contains the token being burned.
 pub type MintRedeemer {
-  /// Mint a new caged token with the given parameters
-  Minting(Mint)
+  /// Mint a new caged token. Authorization comes from consuming the
+  /// validator's `seed` parameter UTxO; no redeemer payload is needed.
+  Minting
   /// Migrate a caged token from an old validator to this one
   Migrating(Migration)
   /// Burn an existing caged token (no additional validation)
@@ -143,16 +127,26 @@ pub type RequestAction {
 
 /// Redeemer for spending caged UTxOs.
 ///
-/// This redeemer is used by the spending validator in `cage.ak`. The four
-/// variants correspond to four distinct operations, each requiring a
+/// This redeemer is used by the spending validator in `cage.ak`. The five
+/// variants correspond to five distinct operations, each requiring a
 /// different datum type on the UTxO being spent:
 ///
-/// | Redeemer       | Required Datum  | Who Can Execute         | Purpose                        |
-/// |----------------|-----------------|-------------------------|--------------------------------|
-/// | `End`          | `StateDatum`    | State owner             | Burn the caged NFT             |
-/// | `Contribute`   | `RequestDatum`  | Anyone (permissionless) | Link a request to a State UTxO |
-/// | `Modify`       | `StateDatum`    | State owner             | Process requests (update/reject)|
-/// | `Retract`      | `RequestDatum`  | Request owner           | Reclaim an unprocessed request |
+/// | Redeemer       | Required Datum         | Who Can Execute         | Purpose                                    |
+/// |----------------|------------------------|-------------------------|--------------------------------------------|
+/// | `End`          | `StateDatum`           | State owner             | Burn the caged NFT                         |
+/// | `Contribute`   | `RequestDatum`         | Anyone (permissionless) | Link a request to a State UTxO             |
+/// | `Modify`       | `StateDatum`           | State owner             | Process requests (update/reject)           |
+/// | `Retract`      | `RequestDatum`         | Request owner           | Reclaim an unprocessed request             |
+/// | `Sweep`        | any (incl. `None`)     | State owner             | Reclaim non-legitimate UTxOs at the cage   |
+///
+/// ## Sweep redeemer payload
+///
+/// `Sweep(stateRef)` carries the `OutputReference` of the cage's legitimate
+/// state UTxO so the validator can locate it in O(1) instead of scanning.
+/// The state UTxO can be either a regular input (when bundled with `Modify`
+/// or `End`) or a reference input (when sweeping standalone). The validator
+/// confirms the pointed-to UTxO actually carries this cage's `cageToken`
+/// before reading its datum for the owner-signature check.
 ///
 /// ## Test Hints
 /// - Using `End` on a `RequestDatum` UTxO -> should fail (expects StateDatum)
@@ -160,6 +154,10 @@ pub type RequestAction {
 /// - Using `Modify` without owner signature -> should fail
 /// - Using `Contribute` with a request targeting a different token -> should fail
 /// - Using `Retract` without request owner signature -> should fail
+/// - Using `Sweep` without state-owner signature -> should fail
+/// - Using `Sweep` with `stateRef` pointing at a UTxO without `cageToken` -> should fail
+/// - Using `Sweep` on the legitimate state UTxO -> should fail (state is not garbage)
+/// - Using `Sweep` on a legitimate request UTxO for this cage -> should fail
 pub type UpdateRedeemer {
   /// Destroy the caged token (burns the NFT). Requires State datum.
   End
@@ -173,6 +171,10 @@ pub type UpdateRedeemer {
   Modify(List<RequestAction>)
   /// Allow the request owner to reclaim their Request UTxO.
   Retract(OutputReference)
+  /// Allow the state owner to reclaim non-legitimate UTxOs at the cage's
+  /// address. The `OutputReference` payload is the cage's state UTxO,
+  /// where the validator reads the owner key for signature verification.
+  Sweep(OutputReference)
 }
 
 /// The state of a caged token, stored as inline datum.
