@@ -53,6 +53,30 @@ jobs:
       - name: Run cage QuickCheck tests
         run: nix run .#cage-tests
 
+  e2e:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: paolino/dev-assets/setup-nix@v0.0.1
+        with:
+          cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Build plutus.json blueprint
+        run: nix build
+
+      - name: Run cage devnet E2E tests
+        env:
+          # Pass the freshly-built blueprint to the E2E suite. The
+          # test starts a cardano-node devnet, applies the seed
+          # parameter to the blueprint at runtime, and submits
+          # transactions against the devnet — verifying that the
+          # Haskell encoding matches what the Aiken validator
+          # decodes (Constitution Principle I).
+          MPFS_BLUEPRINT: ${{ github.workspace }}/result
+        run: nix run .#cage-tests-e2e
+
   lint:
     needs: build
     runs-on: ubuntu-latest

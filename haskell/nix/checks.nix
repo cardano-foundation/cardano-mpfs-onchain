@@ -2,6 +2,7 @@
 {
   library = components.library;
   cage-tests = components.tests.cage-tests;
+  cage-tests-e2e = components.tests.e2e-tests;
   cage-test-vectors = components.exes.cage-test-vectors;
   lint = pkgs.writeShellApplication {
     name = "lint";
