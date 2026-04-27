@@ -19,7 +19,6 @@ module Cardano.MPFS.Cage.Types (
     -- * On-chain datum\/redeemer types
     CageDatum (..),
     MintRedeemer (..),
-    Mint (..),
     Migration (..),
     UpdateRedeemer (..),
     RequestAction (..),
@@ -150,23 +149,19 @@ data CageDatum
 
 {- | Minting redeemer. Matches Aiken
 @types\/MintRedeemer@.
+
+The seed @OutputReference@ that authorizes a fresh
+mint and derives the asset name is the validator's
+parameter, not a redeemer field — so 'Minting' is a
+unit constructor.
 -}
 data MintRedeemer
     = -- | Mint a new cage token (Constr 0)
-      Minting !Mint
+      Minting
     | -- | Migrate from old validator (Constr 1)
       Migrating !Migration
     | -- | Burn a cage token (Constr 2)
       Burning
-    deriving stock (Show, Eq)
-
-{- | Minting parameters. Matches Aiken
-@types\/Mint@.
--}
-newtype Mint = Mint
-    { mintAsset :: OnChainTxOutRef
-    -- ^ UTxO consumed to derive the unique asset name
-    }
     deriving stock (Show, Eq)
 
 {- | Migration parameters. Matches Aiken
@@ -192,6 +187,11 @@ data RequestAction
 
 {- | Spending redeemer. Matches Aiken
 @types\/UpdateRedeemer@.
+
+@Sweep stateRef@ is gated by the cage owner's
+signature; the @stateRef@ payload points at the
+cage's legitimate state UTxO so the validator can
+locate it directly in @tx.inputs ++ tx.reference_inputs@.
 -}
 data UpdateRedeemer
     = -- | End the token (Constr 0)
@@ -202,6 +202,9 @@ data UpdateRedeemer
       Modify ![RequestAction]
     | -- | Reclaim a pending request (Constr 3)
       Retract !OnChainTxOutRef
+    | -- | Reclaim a non-legitimate UTxO at the cage's
+      -- address (Constr 4). Owner-signed.
+      Sweep !OnChainTxOutRef
     deriving stock (Show, Eq)
 
 {- | A single step in an MPF Merkle proof, matching
@@ -486,22 +489,6 @@ instance UnsafeFromData CageDatum where
                 unsafeFromBuiltinData (mkD d)
         _ -> error "unsafeFromBuiltinData: CageDatum"
 
-instance ToData Mint where
-    toBuiltinData (Mint ref) =
-        mkD $ Constr 0 [unD (toBuiltinData ref)]
-
-instance FromData Mint where
-    fromBuiltinData bd = case unD bd of
-        Constr 0 [d] ->
-            Mint <$> fromBuiltinData (mkD d)
-        _ -> Nothing
-
-instance UnsafeFromData Mint where
-    unsafeFromBuiltinData bd = case unD bd of
-        Constr 0 [d] ->
-            Mint $ unsafeFromBuiltinData (mkD d)
-        _ -> error "unsafeFromBuiltinData: Mint"
-
 instance ToData Migration where
     toBuiltinData Migration{..} =
         mkD $
@@ -535,8 +522,8 @@ instance UnsafeFromData Migration where
                 "unsafeFromBuiltinData: Migration"
 
 instance ToData MintRedeemer where
-    toBuiltinData (Minting m) =
-        mkD $ Constr 0 [unD (toBuiltinData m)]
+    toBuiltinData Minting =
+        mkD $ Constr 0 []
     toBuiltinData (Migrating m) =
         mkD $ Constr 1 [unD (toBuiltinData m)]
     toBuiltinData Burning =
@@ -544,8 +531,7 @@ instance ToData MintRedeemer where
 
 instance FromData MintRedeemer where
     fromBuiltinData bd = case unD bd of
-        Constr 0 [d] ->
-            Minting <$> fromBuiltinData (mkD d)
+        Constr 0 [] -> Just Minting
         Constr 1 [d] ->
             Migrating <$> fromBuiltinData (mkD d)
         Constr 2 [] -> Just Burning
@@ -553,8 +539,7 @@ instance FromData MintRedeemer where
 
 instance UnsafeFromData MintRedeemer where
     unsafeFromBuiltinData bd = case unD bd of
-        Constr 0 [d] ->
-            Minting $ unsafeFromBuiltinData (mkD d)
+        Constr 0 [] -> Minting
         Constr 1 [d] ->
             Migrating $
                 unsafeFromBuiltinData (mkD d)
@@ -678,6 +663,8 @@ instance ToData UpdateRedeemer where
                 ]
     toBuiltinData (Retract ref) =
         mkD $ Constr 3 [unD (toBuiltinData ref)]
+    toBuiltinData (Sweep ref) =
+        mkD $ Constr 4 [unD (toBuiltinData ref)]
 
 instance FromData UpdateRedeemer where
     fromBuiltinData bd = case unD bd of
@@ -691,6 +678,8 @@ instance FromData UpdateRedeemer where
                     as
         Constr 3 [d] ->
             Retract <$> fromBuiltinData (mkD d)
+        Constr 4 [d] ->
+            Sweep <$> fromBuiltinData (mkD d)
         _ -> Nothing
 
 instance UnsafeFromData UpdateRedeemer where
@@ -706,6 +695,9 @@ instance UnsafeFromData UpdateRedeemer where
                     as
         Constr 3 [d] ->
             Retract $
+                unsafeFromBuiltinData (mkD d)
+        Constr 4 [d] ->
+            Sweep $
                 unsafeFromBuiltinData (mkD d)
         _ ->
             error

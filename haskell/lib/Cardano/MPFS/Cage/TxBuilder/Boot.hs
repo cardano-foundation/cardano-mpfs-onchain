@@ -72,7 +72,6 @@ import Cardano.MPFS.Cage.Provider (Provider (..))
 import Cardano.MPFS.Cage.TxBuilder.Internal
 import Cardano.MPFS.Cage.Types (
     CageDatum (..),
-    Mint (..),
     MintRedeemer (..),
     OnChainRoot (..),
     OnChainTokenState (..),
@@ -148,8 +147,7 @@ bootTokenImpl cfg prov addr = do
                                 datumData
             let script = mkCageScript cfg
                 scriptHash = hashScript script
-                redeemer =
-                    Minting (Mint onChainRef)
+                redeemer = Minting
                 mintPurpose =
                     ConwayMinting (AsIx 0)
                 redeemers =

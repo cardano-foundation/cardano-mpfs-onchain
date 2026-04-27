@@ -109,16 +109,13 @@ genCageDatum =
         , StateDatum <$> genTokenState
         ]
 
-genMint :: Gen Mint
-genMint = Mint <$> genTxOutRef
-
 genMigration :: Gen Migration
 genMigration = Migration <$> genBBS <*> genTokenId
 
 genMintRedeemer :: Gen MintRedeemer
 genMintRedeemer =
     oneof
-        [ Minting <$> genMint
+        [ pure Minting
         , Migrating <$> genMigration
         , pure Burning
         ]
@@ -137,6 +134,7 @@ genUpdateRedeemer =
         , Contribute <$> genTxOutRef
         , Modify <$> listOf genRequestAction
         , Retract <$> genTxOutRef
+        , Sweep <$> genTxOutRef
         ]
 
 -- ---------------------------------------------------------
@@ -268,9 +266,8 @@ spec = do
             property $
                 forAll genMintRedeemer roundtrips
         it "Minting uses constructor 0" $
-            property $
-                forAll (Minting <$> genMint) $
-                    \x -> constrIndex x === 0
+            constrIndex Minting
+                `shouldBe` 0
         it "Migrating uses constructor 1" $
             property $
                 forAll (Migrating <$> genMigration) $
@@ -311,9 +308,13 @@ spec = do
             property $
                 forAll (Retract <$> genTxOutRef) $
                     \x -> constrIndex x === 3
-        it "rejects old Constr 4 encoding" $
+        it "Sweep uses constructor 4" $
+            property $
+                forAll (Sweep <$> genTxOutRef) $
+                    \x -> constrIndex x === 4
+        it "rejects unused Constr 5 encoding" $
             fromBuiltinData
-                (BuiltinData (Constr 4 []))
+                (BuiltinData (Constr 5 []))
                 `shouldBe` (Nothing :: Maybe UpdateRedeemer)
 
     describe "deriveAssetName" $ do
