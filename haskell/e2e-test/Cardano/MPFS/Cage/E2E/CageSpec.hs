@@ -41,7 +41,7 @@ import Cardano.Ledger.Mary.Value (
 import Cardano.Ledger.TxIn (TxIn (..))
 
 import Cardano.MPFS.Cage.Blueprint (
-    applyVersion,
+    applyOutputRef,
     extractCompiledCode,
     loadBlueprint,
  )
@@ -65,7 +65,9 @@ import Cardano.MPFS.Cage.TxBuilder.Internal (
     cageAddrFromCfg,
     cagePolicyIdFromCfg,
     computeScriptHash,
+    txInToRef,
  )
+import Cardano.MPFS.Cage.Types (OnChainTxOutRef)
 import Cardano.MPFS.Cage.TxBuilder.Request (
     requestInsertImpl,
  )
@@ -135,11 +137,13 @@ spec = describe "Cage E2E" $ do
                                     "cage script not \
                                     \found in blueprint"
                         Just scriptBytes ->
-                            let applied =
-                                    applyVersion
-                                        1
-                                        scriptBytes
-                             in cageFlowSpec applied
+                            -- Pass the unparameterized blueprint
+                            -- bytes through; `withE2E` picks the
+                            -- seed UTxO from the genesis wallet
+                            -- and applies it via `applyOutputRef`
+                            -- after the node is up. Each test run
+                            -- gets its own per-cage parameterization.
+                            cageFlowSpec scriptBytes
 
 -- ---------------------------------------------------------
 -- Test implementation
@@ -300,6 +304,7 @@ cageFlowSpec scriptBytes =
 build Provider and Submitter, then run.
 -}
 withE2E ::
+    -- | Unparameterized blueprint compiled-code bytes
     SBS.ShortByteString ->
     ( CageConfig ->
       Cage.Provider IO ->
@@ -308,7 +313,7 @@ withE2E ::
       IO a
     ) ->
     IO a
-withE2E scriptBytes action = do
+withE2E unparamBytes action = do
     gDir <- genesisDir
     withCardanoNode gDir $ \sock _startMs -> do
         lsqCh <- newLSQChannel 16
@@ -345,9 +350,24 @@ withE2E scriptBytes action = do
         let submit = mkN2CSubmitter ltxsCh
         -- Build TrieManager
         tm <- mkPureTrieManager
-        let cfg = cageCfg scriptBytes
         -- Verify connection works
         _ <- Cage.queryProtocolParams prov
+        -- Pick the seed from the genesis wallet and apply it
+        -- to the unparameterized blueprint to get this cage's
+        -- parameterized script bytes.
+        utxos <- Cage.queryUTxOs prov genesisAddr
+        seedRef <- case utxos of
+            [] ->
+                error
+                    "withE2E: no UTxOs in genesis \
+                    \wallet — cannot pick a seed"
+            (txIn, _) : _ -> pure (txInToRef txIn)
+        let appliedBytes =
+                applyOutputRef seedRef unparamBytes
+            cfg =
+                cageCfg
+                    appliedBytes
+                    seedRef
         result <- action cfg prov submit tm
         cancel nodeThread
         pure result
@@ -410,14 +430,19 @@ awaitTx = threadDelay 5_000_000
 -- Config
 -- ---------------------------------------------------------
 
--- | Build a 'CageConfig' from applied script bytes.
+-- | Build a 'CageConfig' from applied script bytes
+-- and the seed @OutputReference@ that was applied
+-- as the validator parameter.
 cageCfg ::
-    SBS.ShortByteString -> CageConfig
-cageCfg sb =
+    SBS.ShortByteString ->
+    OnChainTxOutRef ->
+    CageConfig
+cageCfg sb seed =
     CageConfig
         { cageScriptBytes = sb
         , cfgScriptHash =
             computeScriptHash sb
+        , cageSeed = seed
         , defaultProcessTime = 30_000
         , defaultRetractTime = 30_000
         , defaultTip = Coin 1_000_000
