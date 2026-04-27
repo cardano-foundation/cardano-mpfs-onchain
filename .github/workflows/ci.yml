@@ -75,6 +75,11 @@ jobs:
           # Haskell encoding matches what the Aiken validator
           # decodes (Constitution Principle I).
           MPFS_BLUEPRINT: ${{ github.workspace }}/result
+          # The devnet bootstrap genesis files are checked into
+          # haskell/e2e-test/genesis/ (mirrored from the upstream
+          # cardano-node-clients package). Override the default
+          # relative path so the test finds them regardless of CWD.
+          E2E_GENESIS_DIR: ${{ github.workspace }}/haskell/e2e-test/genesis
         run: nix run .#cage-tests-e2e
 
   lint:

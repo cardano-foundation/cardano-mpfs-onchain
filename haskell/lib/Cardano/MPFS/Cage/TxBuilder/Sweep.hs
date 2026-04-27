@@ -96,8 +96,9 @@ sweepUtxoImpl ::
     TokenId ->
     -- | UTxO reference of the garbage to sweep
     TxIn ->
-    -- | State owner's address (signs the tx; collateral
-    --   and balancing come from this wallet)
+    {- | State owner's address (signs the tx; collateral
+    and balancing come from this wallet)
+    -}
     Addr ->
     IO (Tx ConwayEra)
 sweepUtxoImpl cfg prov tid garbTxIn addr = do
