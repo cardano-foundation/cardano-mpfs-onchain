@@ -76,6 +76,7 @@ library
     Cardano.MPFS.Cage.TxBuilder.Reject
     Cardano.MPFS.Cage.TxBuilder.Request
     Cardano.MPFS.Cage.TxBuilder.Retract
+    Cardano.MPFS.Cage.TxBuilder.Sweep
     Cardano.MPFS.Cage.TxBuilder.Update
     Cardano.MPFS.Cage.Types
 
