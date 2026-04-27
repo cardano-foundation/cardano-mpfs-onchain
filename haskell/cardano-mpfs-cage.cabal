@@ -128,6 +128,7 @@ test-suite e2e-tests
     , base
     , bytestring
     , cardano-ledger-api
+    , cardano-ledger-core
     , cardano-ledger-mary
     , cardano-mpfs-cage
     , cardano-node-clients
