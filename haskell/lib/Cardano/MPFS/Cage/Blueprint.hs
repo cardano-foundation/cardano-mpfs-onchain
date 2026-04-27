@@ -15,8 +15,8 @@ The blueprint also carries optional @compiledCode@
 fields (hex-encoded double-CBOR PlutusV3 scripts).
 'extractCompiledCode' decodes these into
 'ShortByteString' suitable for 'PlutusBinary', and
-'applyVersion' applies the version parameter to
-produce the final on-chain script.
+'applyOutputRef' applies the seed @OutputReference@
+parameter to produce the final on-chain script.
 -}
 module Cardano.MPFS.Cage.Blueprint (
     -- * Schema types
@@ -38,7 +38,8 @@ module Cardano.MPFS.Cage.Blueprint (
     extractCompiledCode,
 
     -- * Parameter application
-    applyVersion,
+    applyDataParam,
+    applyOutputRef,
 ) where
 
 import Data.Aeson (
@@ -64,12 +65,16 @@ import PlutusLedgerApi.V3 (
     serialiseUPLC,
     uncheckedDeserialiseUPLC,
  )
+import PlutusTx.Builtins.Internal (BuiltinData (..))
+import PlutusTx.IsData.Class (ToData (..))
 import UntypedPlutusCore (
     Program (..),
     applyProgram,
  )
 import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.DeBruijn ()
+
+import Cardano.MPFS.Cage.Types (OnChainTxOutRef)
 
 -- | A single constructor alternative in a schema.
 data Constructor = Constructor
@@ -352,19 +357,19 @@ decodeHex t
                     )
         | otherwise = Nothing
 
-{- | Apply the version parameter to a UPLC script.
+{- | Apply a 'Data' parameter to a UPLC script.
 The blueprint's @compiledCode@ is a flat-encoded
-UPLC program that expects one parameter (the
-version integer). This function applies the
-integer, producing the final script bytes.
+UPLC program that expects one parameter. This
+function applies the supplied 'Data' value to that
+parameter slot, producing the final script bytes.
 -}
-applyVersion ::
-    -- | Version number to apply
-    Integer ->
+applyDataParam ::
+    -- | Encoded parameter value
+    Data ->
     -- | Flat-encoded UPLC program
     SBS.ShortByteString ->
     SBS.ShortByteString
-applyVersion ver sbs =
+applyDataParam d sbs =
     let
         prog = uncheckedDeserialiseUPLC sbs
         argProg =
@@ -376,7 +381,7 @@ applyVersion ver sbs =
                     ( PLC.Some
                         ( PLC.ValueOf
                             PLC.DefaultUniData
-                            (I ver)
+                            d
                         )
                     )
                 )
@@ -384,9 +389,27 @@ applyVersion ver sbs =
             Right p -> p
             Left e ->
                 error $
-                    "applyVersion: "
+                    "applyDataParam: "
                         <> show e
      in
         serialiseUPLC applied
   where
     progVer (Program _ v _) = v
+
+{- | Apply an 'OnChainTxOutRef' parameter to a UPLC
+script. Wraps 'applyDataParam' with the canonical
+@Constr 0 [bytes, integer]@ encoding produced by the
+'ToData OnChainTxOutRef' instance — matching what the
+on-chain validator's parameter slot expects when the
+Aiken validator is parameterized by an
+@OutputReference@.
+-}
+applyOutputRef ::
+    -- | Output reference to apply as the seed parameter
+    OnChainTxOutRef ->
+    -- | Flat-encoded UPLC program
+    SBS.ShortByteString ->
+    SBS.ShortByteString
+applyOutputRef ref sbs =
+    let BuiltinData d = toBuiltinData ref
+     in applyDataParam d sbs

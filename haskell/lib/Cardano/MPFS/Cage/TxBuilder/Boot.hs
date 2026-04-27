@@ -75,7 +75,20 @@ import Cardano.MPFS.Cage.Types (
     MintRedeemer (..),
     OnChainRoot (..),
     OnChainTokenState (..),
+    OnChainTxOutRef,
  )
+
+import Cardano.Ledger.TxIn (TxIn)
+import Cardano.Ledger.Core (TxOut)
+import Data.List (find)
+
+-- | Locate the wallet UTxO whose on-chain reference matches @cageSeed@.
+lookupSeed ::
+    OnChainTxOutRef ->
+    [(TxIn, TxOut ConwayEra)] ->
+    Maybe (TxIn, TxOut ConwayEra)
+lookupSeed target =
+    find (\(tin, _) -> txInToRef tin == target)
 
 -- | Build a boot-token minting transaction.
 bootTokenImpl ::
@@ -86,109 +99,120 @@ bootTokenImpl ::
 bootTokenImpl cfg prov addr = do
     pp <- queryProtocolParams prov
     utxos <- queryUTxOs prov addr
-    case utxos of
-        [] -> error "bootToken: no UTxOs"
-        (seedUtxo : rest) -> do
-            let (seedRef, _seedOut) = seedUtxo
-                allInputUtxos = case rest of
-                    [] -> [seedUtxo]
-                    (u : _) -> [seedUtxo, u]
-            let onChainRef = txInToRef seedRef
-                assetNameBs =
-                    deriveAssetName onChainRef
-                assetName =
-                    AssetName
-                        (SBS.toShort assetNameBs)
-            let policyId =
-                    cagePolicyIdFromCfg cfg
-                mintMA =
-                    MultiAsset
-                        $ Map.singleton
-                            policyId
-                        $ Map.singleton
-                            assetName
-                            1
-            let stateDatum =
-                    StateDatum
-                        OnChainTokenState
-                            { stateOwner =
-                                BuiltinByteString
-                                    ( addrKeyHashBytes
-                                        addr
-                                    )
-                            , stateRoot =
-                                OnChainRoot emptyRoot
-                            , stateMaxFee =
-                                let Coin c =
-                                        defaultTip cfg
-                                 in c
-                            , stateProcessTime =
-                                defaultProcessTime
-                                    cfg
-                            , stateRetractTime =
-                                defaultRetractTime
-                                    cfg
-                            }
-                datumData = toPlcData stateDatum
-            let scriptAddr =
-                    cageAddrFromCfg
-                        cfg
-                        (network cfg)
-                outValue =
-                    MaryValue
-                        (Coin 2_000_000)
-                        mintMA
-                txOut =
-                    mkBasicTxOut
-                        scriptAddr
-                        outValue
-                        & datumTxOutL
-                            .~ mkInlineDatum
-                                datumData
-            let script = mkCageScript cfg
-                scriptHash = hashScript script
-                redeemer = Minting
-                mintPurpose =
-                    ConwayMinting (AsIx 0)
-                redeemers =
-                    Redeemers $
-                        Map.singleton
-                            mintPurpose
-                            ( toLedgerData redeemer
-                            , placeholderExUnits
+    -- The seed UTxO is the one the validator was parameterized with
+    -- (via 'applyOutputRef' at config-construction time). We MUST
+    -- consume that exact UTxO — any other input would fail the
+    -- validator's `find_input(inputs, seed)` check. Locate it in the
+    -- caller's wallet and use it as the seed input.
+    let seedRefOnChain = cageSeed cfg
+    seedUtxo <- case lookupSeed seedRefOnChain utxos of
+        Just u -> pure u
+        Nothing ->
+            error
+                "bootToken: cfg's cageSeed UTxO is not in the\
+                \ caller's wallet — cfg may have been built for\
+                \ a different seed than the wallet currently\
+                \ holds"
+    let (seedRef, _seedOut) = seedUtxo
+        rest = filter (/= seedUtxo) utxos
+        allInputUtxos = case rest of
+            [] -> [seedUtxo]
+            (u : _) -> [seedUtxo, u]
+        assetNameBs =
+            deriveAssetName seedRefOnChain
+        assetName =
+            AssetName
+                (SBS.toShort assetNameBs)
+    let policyId =
+            cagePolicyIdFromCfg cfg
+        mintMA =
+            MultiAsset
+                $ Map.singleton
+                    policyId
+                $ Map.singleton
+                    assetName
+                    1
+    let stateDatum =
+            StateDatum
+                OnChainTokenState
+                    { stateOwner =
+                        BuiltinByteString
+                            ( addrKeyHashBytes
+                                addr
                             )
-            let integrity =
-                    computeScriptIntegrity
-                        pp
-                        redeemers
-                body =
-                    mkBasicTxBody
-                        & inputsTxBodyL
-                            .~ Set.singleton
-                                seedRef
-                        & outputsTxBodyL
-                            .~ StrictSeq.singleton
-                                txOut
-                        & mintTxBodyL .~ mintMA
-                        & collateralInputsTxBodyL
-                            .~ Set.singleton
-                                ( fst $
-                                    last
-                                        allInputUtxos
-                                )
-                        & scriptIntegrityHashTxBodyL
-                            .~ integrity
-                tx =
-                    mkBasicTx body
-                        & witsTxL . scriptTxWitsL
-                            .~ Map.singleton
-                                scriptHash
-                                script
-                        & witsTxL . rdmrsTxWitsL
-                            .~ redeemers
-            evaluateAndBalance
-                prov
+                    , stateRoot =
+                        OnChainRoot emptyRoot
+                    , stateMaxFee =
+                        let Coin c =
+                                defaultTip cfg
+                         in c
+                    , stateProcessTime =
+                        defaultProcessTime
+                            cfg
+                    , stateRetractTime =
+                        defaultRetractTime
+                            cfg
+                    }
+        datumData = toPlcData stateDatum
+    let scriptAddr =
+            cageAddrFromCfg
+                cfg
+                (network cfg)
+        outValue =
+            MaryValue
+                (Coin 2_000_000)
+                mintMA
+        txOut =
+            mkBasicTxOut
+                scriptAddr
+                outValue
+                & datumTxOutL
+                    .~ mkInlineDatum
+                        datumData
+    let script = mkCageScript cfg
+        scriptHash = hashScript script
+        redeemer = Minting
+        mintPurpose =
+            ConwayMinting (AsIx 0)
+        redeemers =
+            Redeemers $
+                Map.singleton
+                    mintPurpose
+                    ( toLedgerData redeemer
+                    , placeholderExUnits
+                    )
+    let integrity =
+            computeScriptIntegrity
                 pp
-                allInputUtxos
-                addr
-                tx
+                redeemers
+        body =
+            mkBasicTxBody
+                & inputsTxBodyL
+                    .~ Set.singleton
+                        seedRef
+                & outputsTxBodyL
+                    .~ StrictSeq.singleton
+                        txOut
+                & mintTxBodyL .~ mintMA
+                & collateralInputsTxBodyL
+                    .~ Set.singleton
+                        ( fst $
+                            last
+                                allInputUtxos
+                        )
+                & scriptIntegrityHashTxBodyL
+                    .~ integrity
+        tx =
+            mkBasicTx body
+                & witsTxL . scriptTxWitsL
+                    .~ Map.singleton
+                        scriptHash
+                        script
+                & witsTxL . rdmrsTxWitsL
+                    .~ redeemers
+    evaluateAndBalance
+        prov
+        pp
+        allInputUtxos
+        addr
+        tx
