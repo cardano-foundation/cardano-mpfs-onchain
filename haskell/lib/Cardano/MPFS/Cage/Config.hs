@@ -46,8 +46,9 @@ data CageConfig = CageConfig
     , cfgScriptHash :: !ScriptHash
     -- ^ Hash of the PlutusV3 script
     , cageSeed :: !OnChainTxOutRef
-    -- ^ Seed @OutputReference@ the validator was
-    -- parameterized with. Boot consumes this UTxO.
+    {- ^ Seed @OutputReference@ the validator was
+    parameterized with. Boot consumes this UTxO.
+    -}
     , defaultProcessTime :: !Integer
     -- ^ Phase 1 window (ms) for oracle processing
     , defaultRetractTime :: !Integer

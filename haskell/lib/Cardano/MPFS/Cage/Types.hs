@@ -202,8 +202,9 @@ data UpdateRedeemer
       Modify ![RequestAction]
     | -- | Reclaim a pending request (Constr 3)
       Retract !OnChainTxOutRef
-    | -- | Reclaim a non-legitimate UTxO at the cage's
-      -- address (Constr 4). Owner-signed.
+    | {- | Reclaim a non-legitimate UTxO at the cage's
+      address (Constr 4). Owner-signed.
+      -}
       Sweep !OnChainTxOutRef
     deriving stock (Show, Eq)
 

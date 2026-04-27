@@ -50,11 +50,13 @@ import Cardano.Ledger.Api.Tx.Wits (
 import Cardano.Ledger.Conway.Scripts (
     ConwayPlutusPurpose (..),
  )
-import Cardano.Ledger.Core (hashScript)
+import Cardano.Ledger.Core (TxOut, hashScript)
 import Cardano.Ledger.Mary.Value (
     MaryValue (..),
     MultiAsset (..),
  )
+import Cardano.Ledger.TxIn (TxIn)
+import Data.List (find)
 import PlutusTx.Builtins.Internal (
     BuiltinByteString (..),
  )
@@ -77,10 +79,6 @@ import Cardano.MPFS.Cage.Types (
     OnChainTokenState (..),
     OnChainTxOutRef,
  )
-
-import Cardano.Ledger.TxIn (TxIn)
-import Cardano.Ledger.Core (TxOut)
-import Data.List (find)
 
 -- | Locate the wallet UTxO whose on-chain reference matches @cageSeed@.
 lookupSeed ::

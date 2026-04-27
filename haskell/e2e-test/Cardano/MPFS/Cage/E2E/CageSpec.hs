@@ -67,7 +67,6 @@ import Cardano.MPFS.Cage.TxBuilder.Internal (
     computeScriptHash,
     txInToRef,
  )
-import Cardano.MPFS.Cage.Types (OnChainTxOutRef)
 import Cardano.MPFS.Cage.TxBuilder.Request (
     requestInsertImpl,
  )
@@ -77,6 +76,7 @@ import Cardano.MPFS.Cage.TxBuilder.Retract (
 import Cardano.MPFS.Cage.TxBuilder.Update (
     updateTokenImpl,
  )
+import Cardano.MPFS.Cage.Types (OnChainTxOutRef)
 import Cardano.Node.Client.E2E.Devnet (
     withCardanoNode,
  )
@@ -430,9 +430,10 @@ awaitTx = threadDelay 5_000_000
 -- Config
 -- ---------------------------------------------------------
 
--- | Build a 'CageConfig' from applied script bytes
--- and the seed @OutputReference@ that was applied
--- as the validator parameter.
+{- | Build a 'CageConfig' from applied script bytes
+and the seed @OutputReference@ that was applied
+as the validator parameter.
+-}
 cageCfg ::
     SBS.ShortByteString ->
     OnChainTxOutRef ->
