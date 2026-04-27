@@ -22,6 +22,12 @@
         "github:intersectmbo/cardano-haskell-packages/a46182e9c039737bf43cdb5286df49bbe0edf6fb";
       flake = false;
     };
+    # Pinned cardano-node, used as a subprocess by the devnet E2E
+    # tests. Version tracks the upstream cardano-node-clients
+    # devnet Dockerfile.
+    cardano-node = {
+      url = "github:IntersectMBO/cardano-node/10.5.4";
+    };
   };
 
   outputs =
@@ -31,6 +37,7 @@
       haskellNix,
       iohkNix,
       CHaP,
+      cardano-node,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -121,6 +128,8 @@
         haskellChecks = import ./haskell/nix/checks.nix {
           inherit pkgs components;
           shell = project.project.shell;
+          cardanoNode =
+            cardano-node.packages.${system}.cardano-node;
         };
 
         haskellApps = import ./haskell/nix/apps.nix {
