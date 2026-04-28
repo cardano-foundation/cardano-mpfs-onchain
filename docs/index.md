@@ -17,6 +17,7 @@ oracle and requesters.
 |-----------|----------|----------|
 | `validators/` | Aiken | State and request validators |
 | `lean/` | Lean 4 | Formal proofs of phase, token, and split-validator invariants |
+| `lean-blaster/` | Lean 4 + Blaster | SMT-backed properties over compiled UPLC |
 | `haskell/` | Haskell | Off-chain types, tx builders, test vectors, E2E tests |
 
 ## Documentation
@@ -26,5 +27,6 @@ oracle and requesters.
 - [Validators](architecture/validators.md) — minting policy and spending validator logic
 - [Types & Encodings](architecture/types.md) — datum, redeemer, and operation structures
 - [Proof System](architecture/proofs.md) — MPF proof format, verification, and performance
+- [Blaster UPLC Properties](architecture/blaster.md) — Nix-backed compiled-code property checks
 - [Security Properties](architecture/properties.md) — on-chain invariants and proof links
 - [Haskell Cage Library](haskell-cage.md) — off-chain types, tx builders, test vectors

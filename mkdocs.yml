@@ -5,7 +5,20 @@ repo_url: https://github.com/cardano-foundation/cardano-mpfs-onchain
 theme:
   name: material
   palette:
-    scheme: slate
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
   features:
     - navigation.indexes
     - navigation.sections
@@ -48,4 +61,5 @@ nav:
       - Validators: architecture/validators.md
       - Types & Encodings: architecture/types.md
       - Proof System: architecture/proofs.md
+      - Blaster UPLC Properties: architecture/blaster.md
       - Security Properties: architecture/properties.md

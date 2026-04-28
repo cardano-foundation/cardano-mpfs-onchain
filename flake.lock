@@ -294,6 +294,23 @@
         "type": "github"
       }
     },
+    "cardanoLedgerApiBlaster": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1777290903,
+        "narHash": "sha256-EORoTM/YbdjV7sc+7e1VTl7IuP2IyIgBvT0Oe9HhxSk=",
+        "owner": "input-output-hk",
+        "repo": "CardanoLedgerApiBlaster",
+        "rev": "577e3eb03b5be09354cfdb1c0d0c12e9e16541a0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "input-output-hk",
+        "repo": "CardanoLedgerApiBlaster",
+        "rev": "577e3eb03b5be09354cfdb1c0d0c12e9e16541a0",
+        "type": "github"
+      }
+    },
     "customConfig": {
       "locked": {
         "lastModified": 1630400035,
@@ -388,6 +405,42 @@
         "owner": "input-output-hk",
         "ref": "hkm/gitlab-fix",
         "repo": "flake-compat",
+        "type": "github"
+      }
+    },
+    "flake-parts": {
+      "inputs": {
+        "nixpkgs-lib": "nixpkgs-lib"
+      },
+      "locked": {
+        "lastModified": 1772408722,
+        "narHash": "sha256-rHuJtdcOjK7rAHpHphUb1iCvgkU3GpfvicLMwwnfMT0=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "f20dc5d9b8027381c474144ecabc9034d6a839a3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
+      }
+    },
+    "flake-parts_2": {
+      "inputs": {
+        "nixpkgs-lib": "nixpkgs-lib_2"
+      },
+      "locked": {
+        "lastModified": 1765835352,
+        "narHash": "sha256-XswHlK/Qtjasvhd1nOa1e8MgZ8GS//jBoTqWtrS1Giw=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "a34fae9c08a15ad73f295041fec82323541400a9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
         "type": "github"
       }
     },
@@ -1204,6 +1257,50 @@
         "type": "github"
       }
     },
+    "lean4-nix": {
+      "inputs": {
+        "flake-parts": "flake-parts_2",
+        "nixpkgs": "nixpkgs_2"
+      },
+      "locked": {
+        "lastModified": 1771875971,
+        "narHash": "sha256-D3PN4o8RtyHEjlAtsLa6M9xRjIwtMUk4pIkfsNSMAvQ=",
+        "owner": "lenianiva",
+        "repo": "lean4-nix",
+        "rev": "faebfa2e0d7093fea3ffaa493b316bf3449c1dbf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "lenianiva",
+        "repo": "lean4-nix",
+        "type": "github"
+      }
+    },
+    "leanBlaster": {
+      "inputs": {
+        "flake-parts": "flake-parts",
+        "lean4-nix": "lean4-nix",
+        "nixpkgs": [
+          "leanBlaster",
+          "lean4-nix",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1777324806,
+        "narHash": "sha256-pXH5QpO7bJEmmtfOTkSdU31lF6tVZROjRLea+i+Hya0=",
+        "owner": "paolino",
+        "repo": "Lean-blaster",
+        "rev": "d57a9079a164ca25e58f119112162efea617b5e6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "paolino",
+        "ref": "feat/nix-flake",
+        "repo": "Lean-blaster",
+        "type": "github"
+      }
+    },
     "lowdown-src": {
       "flake": false,
       "locked": {
@@ -1480,6 +1577,36 @@
         "type": "github"
       }
     },
+    "nixpkgs-lib": {
+      "locked": {
+        "lastModified": 1772328832,
+        "narHash": "sha256-e+/T/pmEkLP6BHhYjx6GmwP5ivonQQn0bJdH9YrRB+Q=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "c185c7a5e5dd8f9add5b2f8ebeff00888b070742",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
+    "nixpkgs-lib_2": {
+      "locked": {
+        "lastModified": 1765674936,
+        "narHash": "sha256-k00uTP4JNfmejrCLJOwdObYC9jHRrr/5M/a/8L2EIdo=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "2075416fcb47225d9b68ac469a5c4801a9c4dd85",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
     "nixpkgs-regression": {
       "locked": {
         "lastModified": 1643052045,
@@ -1528,6 +1655,22 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1765779637,
+        "narHash": "sha256-KJ2wa/BLSrTqDjbfyNx70ov/HdgNBCBBSQP3BIzKnv4=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "old-ghc-nix": {
       "flake": false,
       "locked": {
@@ -1562,17 +1705,45 @@
         "type": "github"
       }
     },
+    "plutusCoreBlaster": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1776166975,
+        "narHash": "sha256-tzdKOl9R9f/N1uQ2Algk6zTbbb119uBGByejNQOOe1U=",
+        "owner": "input-output-hk",
+        "repo": "PlutusCoreBlaster",
+        "rev": "17cee18a2058790bca36282d82c19146587fb2d1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "input-output-hk",
+        "repo": "PlutusCoreBlaster",
+        "rev": "17cee18a2058790bca36282d82c19146587fb2d1",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "CHaP": "CHaP",
         "cardano-node": "cardano-node",
+        "cardanoLedgerApiBlaster": "cardanoLedgerApiBlaster",
         "flake-utils": "flake-utils_2",
         "haskellNix": "haskellNix_2",
         "iohkNix": "iohkNix_2",
+        "lean4Nix": [
+          "leanBlaster",
+          "lean4-nix"
+        ],
+        "leanBlaster": "leanBlaster",
+        "leanNixpkgs": [
+          "leanBlaster",
+          "nixpkgs"
+        ],
         "nixpkgs": [
           "haskellNix",
           "nixpkgs-unstable"
-        ]
+        ],
+        "plutusCoreBlaster": "plutusCoreBlaster"
       }
     },
     "secp256k1": {
