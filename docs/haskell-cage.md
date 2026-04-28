@@ -42,7 +42,7 @@ for convergent fee balancing:
 | `TxBuilder.Boot` | Mint | Create a new cage token with empty trie |
 | `TxBuilder.Request` | Pay-to-script | Submit an insert/delete/update request |
 | `TxBuilder.Update` | Modify | Process requests, update root, refund requesters |
-| `TxBuilder.Reject` | Modify (rejected) | Discard expired Phase 3 requests |
+| `TxBuilder.Reject` | Modify with `Rejected` actions | Discard expired or dishonest requests |
 | `TxBuilder.Retract` | Retract | Cancel a request in Phase 2 |
 | `TxBuilder.End` | Burn | Destroy the cage token |
 

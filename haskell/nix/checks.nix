@@ -28,8 +28,8 @@ in
     excludeShellChecks = [ "SC2046" "SC2086" ];
     text = ''
       cd "${../. + "/"}"
-      fourmolu -m check $(find lib app test -name '*.hs')
-      hlint lib app test
+      fourmolu -m check $(find lib app test e2e-test -name '*.hs')
+      hlint lib app test e2e-test
     '';
   };
   vectors-freshness = pkgs.runCommand "vectors-freshness" {

@@ -1,237 +1,237 @@
 # Validators
 
-The on-chain logic lives in a single script
-([`cage.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/cage.ak))
-that implements both a **minting policy** and a **spending validator**.
-Helper functions are in
+The on-chain logic is split across two validator modules:
+
+- [`state.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/state.ak)
+  defines the global state minting policy and the state UTxO spending rules.
+- [`request.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/request.ak)
+  defines the per-cage request spending rules.
+
+Shared predicates live in
+[`shared.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/shared.ak),
+and token helpers live in
 [`lib.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/lib.ak).
 
 ## Validator Parameters
 
-The cage validator is parameterized by a single immutable value,
-set at deployment time:
+The state validator is unparameterized:
 
 ```aiken
-validator mpfCage(_version: Int) {
+validator state {
+```
+
+Its policy ID is the global discovery anchor for all cages of this
+validator version. A specific cage is identified by the pair
+`(statePolicyId, cageToken)`, where `cageToken` is the asset name minted
+under the state policy.
+
+The request validator is parameterized per cage:
+
+```aiken
+validator request(statePolicyId: PolicyId, cageTokenName: AssetName) {
 ```
 
 | Parameter | Type | Description |
 |---|---|---|
-| `_version` | `Int` | Version tag (enables migration between validator versions) |
+| `statePolicyId` | `PolicyId` | Policy ID of the global state validator |
+| `cageTokenName` | `AssetName` | Asset name of the cage token handled by this request instance |
 
-Different parameter values produce different script hashes and
-addresses. The parameter is baked into the compiled script, so
-it cannot be changed after deployment.
+Wallets can derive the canonical request address from the audited request
+blueprint plus `(statePolicyId, cageTokenName)`. Request spends then
+authenticate the referenced state UTxO by checking that it carries exactly
+one `(statePolicyId, cageTokenName)` token.
 
-!!! note "Time parameters in datum"
-    `process_time` and `retract_time` are stored in the `State`
-    datum rather than as validator parameters. This ensures all
-    oracle configurations share a single script hash and address,
-    which is critical for the off-chain indexer. See
-    [Types & Encodings](types.md#state) for details.
+## State Minting Policy
 
----
+### Boot (`Minting(seed)`)
 
-## Minting Policy (`mpfCage.mint`)
+Creates a new cage token under the global state policy.
 
-Controls creation, migration, and destruction of MPF tokens.
+Validation rules:
 
-### Boot (Minting)
-
-Creates a new MPF token instance.
-
-**Validation rules:**
-
-1. Asset name is the SHA2-256 hash of a consumed UTxO reference
-   (ensures global uniqueness).
-2. Exactly one token is minted.
-3. The token is sent to the script address.
-4. The output datum is a `StateDatum` with an empty MPF root
-   (`root(empty)`).
-5. The owner field is unrestricted (any `VerificationKeyHash`).
+1. The `seed` `OutputReference` is consumed by the transaction.
+2. The asset name is `assetName(seed)`.
+3. The mint field contains exactly one asset under the state policy:
+   `(policyId, assetName(seed)) = 1`.
+4. No other asset under the state policy is minted or burned.
+5. The first output is locked at the state script address.
+6. The output datum is `StateDatum` with `root(empty)`.
+7. The output value contains exactly one cage token.
 
 ```mermaid
 graph LR
-    TX["Boot Transaction"]
-    UTXO["Consumed UTxO"]
-    TOKEN["New MPF Token<br/>asset name = SHA2-256(UTxO ref)"]
-    STATE["State UTxO<br/>owner + empty root"]
+    UTXO["Consumed seed UTxO"]
+    TX["Boot transaction"]
+    STATE["State UTxO<br/>global policy + cage asset<br/>empty MPF root"]
 
-    UTXO -->|consumed| TX
-    TX -->|mints| TOKEN
-    TX -->|produces| STATE
+    UTXO --> TX
+    TX -->|"Minting(seed)"| STATE
 ```
 
-### Migration (Migrating)
+### Migration (`Migrating(migration)`)
 
-Mints a token under the new validator by carrying over the identity
-and root from an old validator version.
+Carries a cage token identity forward from an old policy to the new global
+state policy.
 
-**Validation rules:**
+Validation rules:
 
-1. The old token (under `oldPolicy`) is burned (-1) in the same
-   transaction.
-2. Exactly one new token is minted.
-3. The token is sent to the new validator's script address.
-4. The output carries a `StateDatum` (root may be non-empty).
+1. Exactly one old token `(oldPolicy, tokenId)` is burned.
+2. Exactly one new token `(statePolicyId, tokenId)` is minted.
+3. No unrelated state-policy asset is moved.
+4. The first output is locked at the new state script address.
+5. The output carries `StateDatum`; the root may be non-empty.
 
-```mermaid
-graph LR
-    OLD["Old State UTxO<br/>(old validator)"]
-    TX["Migration Transaction"]
-    NEW["New State UTxO<br/>(new validator, same root)"]
+### Burn (`Burning(tokenId)`)
 
-    OLD -->|"End + Burn old"| TX
-    TX -->|"Mint new + Migrate"| NEW
-```
+Burns a cage token when paired with state spending redeemer `End`.
 
-### Burning
+Validation rules:
 
-Burns the MPF token when the instance is destroyed. No additional
-validation beyond the spending validator's `End` redeemer.
+1. The mint field contains exactly `-1` of `(statePolicyId, tokenId)`.
+2. No unrelated asset under the state policy is moved.
 
----
+## State Spending Validator
 
-## Spending Validator (`mpfCage.spend`)
+`state.spend` accepts only `StateDatum` inputs. The state owner must sign,
+the spent input must be locked at the state validator's script credential,
+and the input value must carry exactly one cage token under the state policy.
 
-Handles five operations on UTxOs locked at the script address.
+Accepted redeemers:
 
-### Modify (ConStr2)
+| Redeemer | Purpose |
+|---|---|
+| `Modify(List<RequestAction>)` | Process matching request inputs |
+| `End` | Burn and destroy the cage token |
 
-The token owner applies pending requests to the MPF trie.
-Only allowed during **Phase 1** of each request.
+All other redeemers fail at the state address.
 
-**Redeemer:** `Modify(List<Proof>)` — one proof per consumed request.
+### Modify
 
-**Validation rules:**
+The owner applies pending requests to the MPF trie. The transaction spends
+the state UTxO with `Modify(actions)` and spends each request UTxO with the
+request validator's `Contribute(stateRef)` redeemer.
 
-- Owner must sign the transaction.
-- The transaction validity range must be entirely within Phase 1
-  for every consumed request (`tx valid before submitted_at + process_time`).
-- Each request's `fee` must equal `state.max_fee`.
-- All consumed request UTxOs reference the correct token.
-- Each request is paired with a valid MPF proof.
-- The proofs are folded left-to-right over the current root to
-  compute the new root.
-- The output datum's root must equal the computed new root.
-- The output datum's `process_time` and `retract_time` must equal
-  the input values (immutability enforced).
-- The token remains at the script address.
-- Each requester receives a refund of `lovelace - fee`.
+Validation rules:
+
+1. The owner signs the transaction.
+2. The first output remains at the state script credential.
+3. The first output carries exactly one same cage token.
+4. `tip`, `process_time`, and `retract_time` are immutable.
+5. Matching request inputs are those with `RequestDatum.requestToken` equal
+   to the cage token.
+6. Each matching request consumes one `RequestAction` in input order.
+7. `UpdateAction(proof)` is allowed only in Phase 1 and folds the MPF proof
+   into the root.
+8. `Rejected` is allowed only for rejectable requests: Phase 3 or dishonest
+   future `submitted_at`.
+9. The output root equals the folded root.
+10. Refund outputs pay request owners `total input lovelace - tx fee -
+    n * state.tip`.
 
 ```mermaid
 graph TD
-    STATE_IN["State UTxO<br/>(current root)<br/>redeemer: Modify [p1, p2]"]
-    REQ1["Request UTxO 1<br/>redeemer: Contribute(stateRef)"]
-    REQ2["Request UTxO 2<br/>redeemer: Contribute(stateRef)"]
-    FOLD["Fold proofs over root"]
-    STATE_OUT["State UTxO<br/>(new root)"]
+    STATE_IN["State UTxO<br/>redeemer: Modify [actions]"]
+    REQ1["Request UTxO<br/>redeemer: Contribute(stateRef)"]
+    REQ2["Request UTxO<br/>redeemer: Contribute(stateRef)"]
+    FOLD["Fold update actions<br/>skip rejected actions"]
+    STATE_OUT["State UTxO<br/>new or unchanged root"]
+    REFUNDS["Requester refunds"]
 
-    STATE_IN -->|Modify| FOLD
-    REQ1 -->|Contribute| FOLD
-    REQ2 -->|Contribute| FOLD
+    STATE_IN --> FOLD
+    REQ1 --> FOLD
+    REQ2 --> FOLD
     FOLD --> STATE_OUT
+    FOLD --> REFUNDS
 ```
 
-**Proof folding:** For each request, the validator calls the
-appropriate MPF function based on the operation type:
+### End
 
-| Operation | MPF Function | Proof Shows |
-|---|---|---|
-| Insert(value) | `mpf.insert(root, key, value, proof)` | Key is absent |
-| Delete(value) | `mpf.delete(root, key, value, proof)` | Key is present with value |
-| Update(old, new) | `mpf.update(root, key, proof, old, new)` | Key is present with old value |
+Destroys the cage token instance.
 
-### Contribute (ConStr1)
+Validation rules:
 
-Spends a request UTxO during an update or reject. Used together
-with `Modify` or `Reject` in the same transaction — the state
-UTxO uses `Modify`/`Reject`, while each request UTxO uses
-`Contribute`.
+1. The owner signs the transaction.
+2. The mint field burns exactly the cage token from the spent state input.
+3. No unrelated asset under the state policy is moved.
 
-**Redeemer:** `Contribute(OutputReference)` — points to the
-state UTxO being updated.
+## Request Spending Validator
 
-**Validation rules:**
+`request(statePolicyId, cageTokenName).spend` accepts request-side operations
+for one cage. It does not update the MPF state directly; it authenticates the
+referenced state UTxO and enforces the request lifecycle rules.
 
-- The referenced state UTxO is consumed in the same transaction.
-- The request's `requestToken` matches the state's token.
-- The request must be in **Phase 1** (for Modify) or **rejectable**
-  (Phase 3 or dishonest `submitted_at`). Phase 2 is blocked to
-  protect the requester's exclusive retract window.
+Accepted redeemers:
 
-### Retract (ConStr3)
+| Redeemer | Purpose |
+|---|---|
+| `Contribute(OutputReference)` | Spend a request with state `Modify` |
+| `Retract(OutputReference)` | Let the request owner reclaim a Phase 2 request |
+| `Sweep(OutputReference)` | Let the state owner clean up request-address garbage |
 
-Allows a request owner to cancel a pending request and reclaim
-their locked ADA. Only allowed during **Phase 2**.
+All other redeemers fail at the request address.
 
-**Redeemer:** `Retract(OutputReference)` — points to the State UTxO,
-which must be included as a **reference input** (not consumed). The
-validator reads `process_time` and `retract_time` from the State
-datum to enforce phase boundaries.
+### Contribute
 
-**Validation rules:**
+Validation rules:
 
-- The request owner must sign the transaction.
-- The State UTxO referenced by the `OutputReference` must be present
-  in the transaction's reference inputs.
-- The request's `requestToken` must match the token in the State UTxO.
-- The transaction validity range must be entirely within Phase 2
-  (`tx valid after submitted_at + process_time - 1` and
-  `tx valid before submitted_at + process_time + retract_time`).
+1. The spent UTxO must carry `RequestDatum`.
+2. `requestToken` must equal the request validator's `cageTokenName`.
+3. `stateRef` must be present in regular `tx.inputs`, not only in
+   `tx.reference_inputs`.
+4. The state input's redeemer must be `Modify`; `End` or any other state
+   spend cannot be used to authorize request consumption.
+5. The referenced state input must carry exactly one
+   `(statePolicyId, cageTokenName)` token.
+6. The request must be in Phase 1 or be rejectable.
 
-### Reject (ConStr4)
+The regular-input plus `Modify`-redeemer requirement prevents request
+consumption without state `Modify` also running the root and refund checks.
 
-Allows the oracle to discard expired or dishonest requests.
-The oracle keeps the fee and refunds the remaining lovelace
-to each requester. The MPF root must **not** change.
+### Retract
 
-**Redeemer:** `Reject` — applied to the state UTxO. Each request
-UTxO uses `Contribute`.
+Validation rules:
 
-**Validation rules:**
+1. The spent UTxO must carry `RequestDatum`.
+2. `requestToken` must equal the request validator's `cageTokenName`.
+3. The request owner signs the transaction.
+4. `stateRef` may be in regular inputs or reference inputs.
+5. The referenced state UTxO must carry exactly one
+   `(statePolicyId, cageTokenName)` token.
+6. The request must be in Phase 2.
 
-- Owner must sign the transaction.
-- Each request must be **rejectable**: either in Phase 3
-  (`tx valid after submitted_at + process_time + retract_time - 1`)
-  or have a dishonest `submitted_at` (in the future).
-- The output root must equal the input root (no MPF changes).
-- The output datum's `process_time` and `retract_time` must equal
-  the input values (immutability enforced).
-- The token remains at the script address.
-- Each requester receives a refund of `lovelace - fee`.
+### Sweep
 
-```mermaid
-graph TD
-    STATE_IN["State UTxO<br/>(root R)<br/>redeemer: Reject"]
-    REQ1["Expired Request 1<br/>redeemer: Contribute(stateRef)"]
-    REQ2["Expired Request 2<br/>redeemer: Contribute(stateRef)"]
-    STATE_OUT["State UTxO<br/>(root R unchanged)"]
-    REF1["Refund 1<br/>lovelace - fee"]
-    REF2["Refund 2<br/>lovelace - fee"]
+`Sweep` exists because anyone can send arbitrary UTxOs to a request address.
+Without a cleanup path, no-datum or malformed matching-token spam could be
+locked forever.
 
-    STATE_IN --> STATE_OUT
-    REQ1 --> REF1
-    REQ2 --> REF2
-```
+Validation rules:
 
-### End (ConStr0)
+1. `stateRef` may be in regular inputs or reference inputs.
+2. The referenced state UTxO must carry exactly one
+   `(statePolicyId, cageTokenName)` token.
+3. The current state owner signs the transaction.
+4. The spent UTxO is not a processable request for the referenced state.
 
-Destroys the MPF token instance.
+A request is protected from sweep only when all of these hold:
 
-**Validation rules:**
+1. It has `RequestDatum`.
+2. `requestToken == cageTokenName`.
+3. `request.tip == state.tip`.
+4. The spent request value contains at least `state.tip` lovelace.
 
-- The token owner must sign the transaction.
-- The token is burned (mint field contains -1 of the token).
+Therefore no-datum UTxOs, wrong-token requests, mismatched-tip requests, and
+underfunded matching-token requests are sweepable. Processable legitimate
+requests are not sweepable.
 
----
+## Helper Predicates
 
-## Helper Functions (`lib.ak`)
-
-| Function | Signature | Purpose |
-|---|---|---|
-| `quantity` | `(PolicyId, Value, TokenId) -> Option<Int>` | Get token quantity in a value |
-| `assetName` | `OutputReference -> AssetName` | Compute unique asset name via SHA2-256 |
-| `valueFromToken` | `(PolicyId, TokenId) -> Value` | Construct value with exactly 1 token |
-| `tokenFromValue` | `Value -> Option<TokenId>` | Extract single non-ADA token from value |
-| `extractTokenFromInputs` | `(OutputReference, List<Input>) -> Option<(Input, TokenId)>` | Find input by ref and extract its token |
+| Function | Purpose |
+|---|---|
+| `exactQuantity` | Requires exactly one asset under a policy with the expected quantity |
+| `tokenFromPolicy` | Extracts the sole asset name under a specific policy |
+| `carriesStateToken` | Authenticates a state UTxO by `(statePolicyId, cageToken)` |
+| `in_phase1` | Checks the oracle processing window |
+| `in_phase2` | Checks the requester retract window |
+| `is_rejectable` | Checks Phase 3 or dishonest future `submitted_at` |
+| `processableRequest` | Defines which request UTxOs are protected from `Sweep` |

@@ -5,71 +5,72 @@
 The on-chain validators are one half of the
 [MPFS system](https://github.com/cardano-foundation/mpfs)
 ([documentation](https://cardano-foundation.github.io/mpfs/)).
-They enforce the rules for creating, updating, and destroying MPF
-token instances on the Cardano blockchain. The off-chain service
-that builds transactions and manages the trie lives in the
-[`off_chain/`](https://github.com/cardano-foundation/mpfs/tree/main/off_chain)
-directory of the upstream repository.
+They enforce the rules for creating, updating, cleaning up, and destroying
+MPF-backed cage tokens on Cardano.
+
+Issue #49 splits the cage into:
+
+- a global **state validator** whose policy ID is the discovery anchor; and
+- a parameterized **request validator** applied per cage with
+  `(statePolicyId, cageToken)`.
 
 ```mermaid
 graph TD
     subgraph Blockchain
-        V["Cage Validators"]
-        S1["Token X<br/>State UTxO"]
-        R1["Request UTxOs"]
+        SV["State validator<br/>global policy"]
+        RV["Request validator<br/>parameterized per cage"]
+        S1["Cage X State UTxO<br/>(statePolicyId, token X)"]
+        R1["Cage X Request UTxOs"]
     end
 
-    O["Oracle<br/>(token owner)"]
+    O["Oracle<br/>(state owner)"]
     A["Requester A"]
     B["Requester B"]
     Obs["Observer"]
 
-    O -->|"Boot / Modify / Reject / End"| V
+    O -->|"Boot / Modify / End"| SV
+    O -->|"Sweep malformed request UTxOs"| RV
     A -->|"Submit request"| R1
-    B -->|"Submit / Retract request"| R1
-    R1 -->|"consumed by Modify or Reject"| S1
+    B -->|"Submit / Retract request"| RV
+    R1 -->|"Contribute with state Modify"| SV
+    SV --> S1
+    RV --> R1
     Obs -.->|"read chain history"| Blockchain
 ```
 
-The **oracle** (token owner) controls the MPF token: it boots
-the token, applies pending requests via `Modify`, rejects
-expired or dishonest requests via `Reject`, and can destroy
-it with `End`. **Requesters** submit modification requests as
-UTxOs at the script address and can retract them during Phase 2.
-**Observers** read the MPF state from the blockchain history —
-no on-chain interaction is needed.
+The **oracle** controls the state UTxO through `State.owner`. Requesters
+submit modification requests to the per-cage request address and can retract
+them during Phase 2. Observers reconstruct state from chain history.
 
 ## Transaction Lifecycle
 
-The token and requests have separate lifecycles that intersect
-when the oracle processes a `Modify` transaction.
-
 ```mermaid
 stateDiagram-v2
-    state "Token Lifecycle" as TL {
-        [*] --> Active: Boot (Mint)
-        Active --> Active: Modify / Reject
-        Active --> Active: Migrate (new validator)
-        Active --> [*]: End (Burn)
+    state "State lifecycle" as SL {
+        [*] --> Active: Boot / Minting(seed)
+        Active --> Active: Modify update actions
+        Active --> Active: Modify rejected actions
+        Active --> Active: Migrate to new state policy
+        Active --> [*]: End / Burning(token)
     }
 
-    state "Request Lifecycle" as RL {
-        [*] --> Phase1: Submit (pay to script)
-        Phase1 --> Consumed: Contribute + Modify
+    state "Request lifecycle" as RL {
+        [*] --> Phase1: Submit to request address
+        Phase1 --> Consumed: Contribute + state Modify
         Phase1 --> Phase2: process_time elapsed
         Phase2 --> [*]: Retract
         Phase2 --> Phase3: retract_time elapsed
-        Phase3 --> Rejected: Reject (refund minus fee)
+        Phase3 --> Rejected: Contribute + Modify Rejected
+        Phase1 --> Swept: Sweep if malformed
+        Phase2 --> Swept: Sweep if malformed
+        Phase3 --> Swept: Sweep if malformed
     }
 ```
 
-### Time-Gated Phases
+## Time-Gated Phases
 
-Each request passes through three exclusive time phases,
-enforced on-chain via `tx.validity_range`. The phase boundaries
-are determined by the request's `submitted_at` timestamp and the
-State datum's `process_time` and `retract_time` fields (set at
-mint time and enforced immutable across Modify/Reject operations).
+Each request passes through three exclusive time phases, enforced with
+`tx.validity_range`. Phase parameters come from the referenced state datum.
 
 ```mermaid
 gantt
@@ -78,29 +79,31 @@ gantt
     axisFormat %s
 
     section Phases
-    Phase 1 - Oracle Modify   :active, p1, 0, 10
-    Phase 2 - Requester Retract :crit, p2, 10, 20
-    Phase 3 - Oracle Reject    :done, p3, 20, 30
+    Phase 1 - Oracle Modify       :active, p1, 0, 10
+    Phase 2 - Requester Retract   :crit, p2, 10, 20
+    Phase 3 - Oracle Reject       :done, p3, 20, 30
 ```
 
-| Phase | Window | Allowed Operations | Actor |
+| Phase | Window | Allowed operation | Actor |
 |---|---|---|---|
-| Phase 1 | `[submitted_at, submitted_at + process_time)` | Modify, Contribute | Oracle |
-| Phase 2 | `[submitted_at + process_time, submitted_at + process_time + retract_time)` | Retract | Requester |
-| Phase 3 | `[submitted_at + process_time + retract_time, ...)` | Reject | Oracle |
+| Phase 1 | `[submitted_at, submitted_at + process_time)` | `Modify(UpdateAction)` + `Contribute` | Oracle |
+| Phase 2 | `[submitted_at + process_time, submitted_at + process_time + retract_time)` | `Retract` | Requester |
+| Phase 3 | `[submitted_at + process_time + retract_time, ...)` | `Modify(Rejected)` + `Contribute` | Oracle |
 
-A request with a **dishonest `submitted_at`** (in the future) is
-immediately rejectable by the oracle, regardless of phase.
+A request with a dishonest future `submitted_at` is immediately rejectable by
+the oracle.
 
-| Transaction | Action | Validator | Phase |
-|---|---|---|---|
-| Boot | Mint a new MPF token with empty root | Minting policy | — |
-| Submit | Lock ADA at script with a modification request | — (pay to script, no validator) | — |
-| Modify | Oracle applies pending requests, updates MPF root | Spending validator (Modify on state + Contribute on each request) | 1 |
-| Retract | Request owner cancels a pending request, reclaims ADA | Spending validator (Retract) | 2 |
-| Reject | Oracle discards expired/dishonest requests, refunds ADA minus fee | Spending validator (Reject on state + Contribute on each request) | 3 |
-| Migrate | Move token to a new validator version | Minting policy (Burning old + Migrating new) + Spending validator (End) | — |
-| End | Burn the MPF token, destroy the instance | Minting policy (Burning) + Spending validator (End) | — |
+## Operation Table
+
+| Transaction | Validator path | Purpose |
+|---|---|---|
+| Boot | `state.mint(Minting(seed))` | Mint one cage token and create empty state |
+| Submit | pay to `request(statePolicyId, cageToken)` | Lock a pending request |
+| Modify | `state.spend(Modify(actions))` + `request.spend(Contribute(stateRef))` | Apply or reject matching requests |
+| Retract | `request.spend(Retract(stateRef))` | Let requester reclaim a Phase 2 request |
+| Sweep | `request.spend(Sweep(stateRef))` | Let state owner clean malformed request-address UTxOs |
+| Migrate | old burn + `state.mint(Migrating(...))` | Move identity and root to a new validator |
+| End | `state.spend(End)` + `state.mint(Burning(token))` | Destroy the cage token |
 
 ## Protocol Flow
 
@@ -108,77 +111,64 @@ immediately rejectable by the oracle, regardless of phase.
 sequenceDiagram
     participant O as Oracle
     participant B as Blockchain
-    participant A as Alice (requester)
-    participant C as Bob (requester)
+    participant A as Alice
+    participant C as Bob
 
-    O->>B: Boot Token X (Mint)
-    Note over B: Token X created with empty root
+    O->>B: Boot cage X with state Minting(seed)
+    Note over B: State UTxO carries (statePolicyId, token X)
 
-    A->>B: Submit Request: Insert("keyA", "valA")
-    C->>B: Submit Request: Insert("keyB", "valB")
-    Note over B: Two Request UTxOs at script address
+    A->>B: Submit Insert request to request(statePolicyId, X)
+    C->>B: Submit Insert request to request(statePolicyId, X)
 
-    rect rgb(40, 80, 40)
-        Note over O,B: Phase 1 — Oracle processes requests
-        O->>B: Modify Token X (consumes both requests)
-        Note over B: Root updated: empty → root(keyA, keyB)
-    end
-
-    A->>B: Submit Request: Delete("keyB", "valB")
     rect rgb(40, 80, 40)
         Note over O,B: Phase 1
-        O->>B: Modify Token X
-        Note over B: Root updated: root(keyA, keyB) → root(keyA)
+        O->>B: State Modify + request Contribute
+        Note over B: Root updated and requesters refunded
     end
 
-    C->>B: Submit Request: Delete("keyA", "valA")
+    C->>B: Submit Delete request
     rect rgb(80, 80, 40)
-        Note over C,B: Phase 2 — Requester retracts
-        C->>B: Retract own request
-        Note over B: Request UTxO reclaimed, root unchanged
+        Note over C,B: Phase 2
+        C->>B: Retract with state as reference input
+        Note over B: Request reclaimed, state unchanged
     end
 
-    A->>B: Submit Request: Insert("spam", "data")
+    A->>B: Submit malformed matching-token request
     rect rgb(80, 40, 40)
-        Note over O,B: Phase 3 — Oracle rejects expired request
-        O->>B: Reject (refund ADA minus fee, root unchanged)
+        Note over O,B: Cleanup
+        O->>B: Sweep malformed request with state owner signature
+        Note over B: Legitimate processable requests remain protected
     end
 
-    O->>B: End Token X (Burn)
+    O->>B: End cage X with Burning(token X)
     Note over B: Token destroyed
 ```
 
 ## Security Properties
 
-The validators enforce invariants across 16 categories, each
-verified by the inline test suite (80 tests):
+The validators enforce these core invariants:
 
-1. **Ownership** — only the oracle (token owner) can modify, reject, or destroy a token.
-2. **Integrity** — every MPF modification carries a cryptographic proof
-   verified on-chain; the output root must match the proof computation.
-3. **Uniqueness** — token IDs are derived from spent UTxOs, guaranteed
-   unique by the ledger.
-4. **Confinement** — the token must remain at the script address after
-   every operation.
-5. **Retractability** — request owners can reclaim their locked ADA during Phase 2.
-6. **Request binding** — a request's target token is validated on-chain
-   before it can be consumed.
-7. **Type safety** — each redeemer/datum combination is enforced; mismatches
-   are rejected.
-8. **Time-gated phases** — each request passes through three exclusive phases
-   (oracle Modify, requester Retract, oracle Reject), preventing race conditions.
-9. **DDoS protection** — expired or dishonest requests can be rejected by the
-   oracle, who keeps the fee and refunds the rest.
-10. **Fee enforcement** — oracle fees are validated on-chain; requesters are
-    refunded correctly.
+1. Token IDs derive from consumed UTxOs.
+2. State minting and burning move exactly one asset under the state policy.
+3. State references are authenticated by both policy ID and asset name.
+4. `Contribute` requires the state UTxO as a regular input spent with
+   `Modify`.
+5. `Retract` can use a reference state UTxO but requires the request owner.
+6. State `Modify` preserves token, address, tip, and phase parameters.
+7. MPF root updates are justified by Merkle proofs.
+8. Request phase windows are exclusive.
+9. Malformed request-address spam can be swept by the state owner.
+10. Processable legitimate requests are protected from sweep.
 
-See [Security Properties](properties.md) for the complete list with
-test cross-references.
+The corresponding Lean model lives in
+[`lean/MpfsCage/SplitValidators.lean`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/lean/MpfsCage/SplitValidators.lean),
+with phase proofs in
+[`lean/MpfsCage/Phases.lean`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/lean/MpfsCage/Phases.lean).
 
 ## Aiken Dependencies
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| [aiken-lang/stdlib](https://github.com/aiken-lang/stdlib) | v2.2.0 | Standard library (assets, transactions, addresses) |
+| [aiken-lang/stdlib](https://github.com/aiken-lang/stdlib) | v2.2.0 | Standard library |
 | [aiken-lang/merkle-patricia-forestry](https://github.com/aiken-lang/merkle-patricia-forestry) | v2.0.0 | MPF trie operations and proof verification |
-| [aiken-lang/fuzz](https://github.com/aiken-lang/fuzz) | v2.1.1 | Property-based testing (used in test suite only) |
+| [aiken-lang/fuzz](https://github.com/aiken-lang/fuzz) | v2.1.1 | Property-based testing |

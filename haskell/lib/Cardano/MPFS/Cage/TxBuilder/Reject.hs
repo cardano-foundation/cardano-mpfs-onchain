@@ -103,6 +103,7 @@ rejectRequestsImpl cfg prov tid addr = do
     let (_stateIn, stateOut) = stateUtxo
     let (oldState, newStateOut, script, ownerKh) =
             prepareRejectState cfg stateOut
+        requestScript = mkRequestScript cfg tid
     lowerSlot <-
         computeLowerSlot prov oldState reqUtxos
     let evalTx = mkRejectEvalTx prov
@@ -116,6 +117,7 @@ rejectRequestsImpl cfg prov tid addr = do
                 oldState
                 newStateOut
                 script
+                requestScript
                 ownerKh
                 lowerSlot
     result <-
@@ -148,14 +150,17 @@ queryRejectContext ::
         , PParams ConwayEra
         )
 queryRejectContext cfg prov tid addr = do
-    let scriptAddr =
+    let stateAddr =
             cageAddrFromCfg cfg (network cfg)
-    cageUtxos <- queryUTxOs prov scriptAddr
+        reqAddr =
+            requestAddrFromCfg cfg tid (network cfg)
+    stateUtxos <- queryUTxOs prov stateAddr
+    requestUtxos <- queryUTxOs prov reqAddr
     let policyId = cagePolicyIdFromCfg cfg
     stateUtxo <- case findStateUtxo
         policyId
         tid
-        cageUtxos of
+        stateUtxos of
         Nothing ->
             error
                 "rejectRequests: state UTxO \
@@ -165,7 +170,7 @@ queryRejectContext cfg prov tid addr = do
     now <- currentPosixMs
     let allReqs =
             sortOn fst $
-                findRequestUtxos tid cageUtxos
+                findRequestUtxos tid requestUtxos
         oldState =
             case extractCageDatum stateOut of
                 Just (StateDatum s) -> s
@@ -300,6 +305,7 @@ buildRejectProgram ::
     OnChainTokenState ->
     TxOut ConwayEra ->
     Script ConwayEra ->
+    Script ConwayEra ->
     KeyHash 'Witness ->
     SlotNo ->
     Tx.TxBuild NoCtx Void ()
@@ -312,6 +318,7 @@ buildRejectProgram
     oldState
     newStateOut
     script
+    requestScript
     ownerKh
     lowerSlot = do
         let stateRef = txInToRef stateIn
@@ -369,6 +376,7 @@ buildRejectProgram
             )
             reqUtxos
         Tx.attachScript script
+        Tx.attachScript requestScript
         Tx.requireSignature ownerKh
         Tx.collateral (fst feeUtxo)
         Tx.validFrom lowerSlot

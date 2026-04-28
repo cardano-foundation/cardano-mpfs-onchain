@@ -117,6 +117,7 @@ updateTokenImpl cfg prov tm tid addr = do
                 cfg
                 stateOut
                 newRoot
+        requestScript = mkRequestScript cfg tid
     upperSlot <-
         computeUpperSlot prov oldState reqUtxos
     let evalTx = mkEvalTx prov
@@ -131,6 +132,7 @@ updateTokenImpl cfg prov tm tid addr = do
                 oldState
                 newStateOut
                 script
+                requestScript
                 ownerKh
                 proofs
                 upperSlot
@@ -164,14 +166,17 @@ queryContext ::
         , PParams ConwayEra
         )
 queryContext cfg prov tid addr = do
-    let scriptAddr =
+    let stateAddr =
             cageAddrFromCfg cfg (network cfg)
-    cageUtxos <- queryUTxOs prov scriptAddr
+        reqAddr =
+            requestAddrFromCfg cfg tid (network cfg)
+    stateUtxos <- queryUTxOs prov stateAddr
+    requestUtxos <- queryUTxOs prov reqAddr
     let policyId = cagePolicyIdFromCfg cfg
     stateUtxo <- case findStateUtxo
         policyId
         tid
-        cageUtxos of
+        stateUtxos of
         Nothing ->
             error
                 "updateToken: state UTxO \
@@ -179,7 +184,7 @@ queryContext cfg prov tid addr = do
         Just x -> pure x
     let reqUtxos =
             sortOn fst $
-                findRequestUtxos tid cageUtxos
+                findRequestUtxos tid requestUtxos
     when (null reqUtxos) $
         error "updateToken: no pending requests"
     pp <- queryProtocolParams prov
@@ -320,6 +325,7 @@ buildProgram ::
     OnChainTokenState ->
     TxOut ConwayEra ->
     Script ConwayEra ->
+    Script ConwayEra ->
     KeyHash 'Witness ->
     [[ProofStep]] ->
     SlotNo ->
@@ -334,6 +340,7 @@ buildProgram
     oldState
     newStateOut
     script
+    requestScript
     ownerKh
     proofs
     upperSlot = do
@@ -389,6 +396,7 @@ buildProgram
             )
             (zip [0 ..] reqUtxos)
         Tx.attachScript script
+        Tx.attachScript requestScript
         Tx.requireSignature ownerKh
         Tx.collateral (fst feeUtxo)
         Tx.validTo upperSlot

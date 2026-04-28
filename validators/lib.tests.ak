@@ -1,3 +1,12 @@
+use aiken/fuzz
+use cardano/assets.{from_asset}
+use cardano/transaction.{OutputReference}
+use lib.{TokenId, assetName, quantity, tokenFromValue, valueFromToken}
+
+// ============================================================================
+// assetName tests
+// ============================================================================
+
 /// Unit tests and property tests for the token handling library (lib.ak).
 ///
 /// These test the foundational functions that the cage validator relies on:
@@ -12,24 +21,11 @@
 ///
 /// - **quantity**: Looks up how many of a specific token exist in a Value.
 ///   Used to verify exactly 1 token is minted or exactly -1 is burned.
-use aiken/fuzz
-use cardano/assets
-use cardano/assets.{from_asset}
-use cardano/transaction.{OutputReference}
-use lib.{TokenId, assetName, quantity, tokenFromValue, valueFromToken}
+const ref_a = OutputReference { transaction_id: "tx_aaaaaa", output_index: 0 }
 
-// ============================================================================
-// assetName tests
-// ============================================================================
+const ref_b = OutputReference { transaction_id: "tx_bbbbbb", output_index: 0 }
 
-const ref_a =
-  OutputReference { transaction_id: "tx_aaaaaa", output_index: 0 }
-
-const ref_b =
-  OutputReference { transaction_id: "tx_bbbbbb", output_index: 0 }
-
-const ref_c =
-  OutputReference { transaction_id: "tx_aaaaaa", output_index: 1 }
+const ref_c = OutputReference { transaction_id: "tx_aaaaaa", output_index: 1 }
 
 /// Same OutputReference always produces the same hash. This is the basic
 /// determinism requirement — without it, minting and later spending would
@@ -61,10 +57,7 @@ test assetName_different_index() {
 /// hypothetical non-determinism bug here would prevent catastrophic token
 /// identity confusion.
 test prop_assetName_deterministic(
-  params via fuzz.tuple(
-    fuzz.bytearray_fixed(32),
-    fuzz.int_between(0, 65535),
-  ),
+  params via fuzz.tuple(fuzz.bytearray_fixed(32), fuzz.int_between(0, 65535)),
 ) {
   let (tx_id, idx) = params
   let ref = OutputReference { transaction_id: tx_id, output_index: idx }

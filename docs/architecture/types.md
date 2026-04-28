@@ -2,185 +2,193 @@
 
 All on-chain data structures are defined in
 [`types.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/types.ak)
-and compiled to Plutus V3 data encodings.
+and compile to Plutus V3 `Data`.
 
 ## Token Identity
 
 ```aiken
 type TokenId {
-    assetName: AssetName
+  assetName: AssetName,
 }
 ```
 
-`TokenId` wraps only the `AssetName`. The `PolicyId` is always
-the cage script's own hash (since the minting policy and spending
-validator share the same script) and is passed separately where
-needed.
+`TokenId` stores the cage token asset name. The policy ID is supplied by
+context:
 
-The `AssetName` is derived from a consumed UTxO reference via
-SHA2-256, guaranteeing global uniqueness.
+- state UTxOs use the global state validator policy ID;
+- request validators receive `statePolicyId` as a parameter.
+
+The asset name is `SHA2-256(tx_id ++ output_index)` of the seed
+`OutputReference` carried by `Minting(seed)`.
 
 ## Datum
 
-Every UTxO at the script address carries a `CageDatum`:
-
 ```aiken
 type CageDatum {
-    RequestDatum(Request)
-    StateDatum(State)
+  RequestDatum(Request)
+  StateDatum(State)
 }
 ```
 
 ### State
 
-Attached to the UTxO that holds the MPF token.
+Attached to the UTxO that holds the cage token.
 
 ```aiken
 type State {
-    owner: VerificationKeyHash
-    root: ByteArray      -- 32-byte MPF root hash
-    max_fee: Int         -- max lovelace fee per request
-    process_time: Int    -- Phase 1 duration (ms)
-    retract_time: Int    -- Phase 2 duration (ms)
+  owner: VerificationKeyHash
+  root: ByteArray
+  tip: Int
+  process_time: Int
+  retract_time: Int
 }
 ```
 
 | Field | Encoding | Description |
 |---|---|---|
-| `owner` | 28 bytes | Ed25519 public key hash of the token owner |
-| `root` | 32 bytes | Current MPF root (Blake2b-256). Empty trie has a well-known null hash |
-| `max_fee` | integer | Maximum fee (in lovelace) the oracle charges per request. Requesters must agree to this fee |
-| `process_time` | integer | Duration (ms) of Phase 1 — oracle-exclusive processing window. Set at mint time; enforced immutable across Modify/Reject |
-| `retract_time` | integer | Duration (ms) of Phase 2 — requester-exclusive retract window. Set at mint time; enforced immutable across Modify/Reject |
+| `owner` | 28 bytes | Verification key hash that controls state `Modify` and `End` |
+| `root` | bytes | Current MPF root; boot starts at `root(empty)` |
+| `tip` | integer | Oracle tip per processed request |
+| `process_time` | integer | Phase 1 duration; immutable across `Modify` |
+| `retract_time` | integer | Phase 2 duration; immutable across `Modify` |
 
 ### Request
 
-Attached to UTxOs representing pending modification requests.
+Attached to request UTxOs.
 
 ```aiken
 type Request {
-    requestToken: TokenId
-    requestOwner: VerificationKeyHash
-    requestKey: ByteArray
-    requestValue: Operation
-    fee: Int
-    submitted_at: Int
+  requestToken: TokenId
+  requestOwner: VerificationKeyHash
+  requestKey: ByteArray
+  requestValue: Operation
+  tip: Int
+  submitted_at: Int
 }
 ```
 
 | Field | Encoding | Description |
 |---|---|---|
-| `requestToken` | `TokenId` | Target MPF token (asset name only; policy ID is implicit) |
-| `requestOwner` | 28 bytes | Who can retract this request |
-| `requestKey` | variable | Key in the MPF trie |
-| `requestValue` | `Operation` | What to do with this key |
-| `fee` | integer | Fee (in lovelace) the requester agrees to pay. Must match `state.max_fee` at Modify time |
-| `submitted_at` | integer | POSIXTime (ms) when the request was submitted. Determines which time phase the request is in |
+| `requestToken` | `TokenId` | Target cage token asset name |
+| `requestOwner` | 28 bytes | Key allowed to retract the request |
+| `requestKey` | bytes | MPF key |
+| `requestValue` | `Operation` | Insert, delete, or update payload |
+| `tip` | integer | Tip the requester agrees to pay the oracle |
+| `submitted_at` | integer | POSIX time used for phase checks |
 
 ## Operations
 
 ```aiken
 type Operation {
-    Insert(ByteArray)               -- new_value
-    Delete(ByteArray)               -- old_value
-    Update(ByteArray, ByteArray)    -- old_value, new_value
+  Insert(ByteArray)
+  Delete(ByteArray)
+  Update(ByteArray, ByteArray)
 }
 ```
 
-| Constructor | Index | Fields | Description |
-|---|---|---|---|
-| `Insert` | 0 | `new_value` | Insert a new key-value pair (key must not exist) |
-| `Delete` | 1 | `old_value` | Remove an existing key (must exist with this value) |
-| `Update` | 2 | `old_value, new_value` | Change the value of an existing key |
+| Constructor | Index | Fields |
+|---|---|---|
+| `Insert` | 0 | `new_value` |
+| `Delete` | 1 | `old_value` |
+| `Update` | 2 | `old_value`, `new_value` |
 
-## Redeemers
-
-### Minting Redeemer
+## Minting Redeemer
 
 ```aiken
-type Mint {
-    asset: OutputReference
-}
-
 type Migration {
-    oldPolicy: PolicyId
-    tokenId: TokenId
+  oldPolicy: PolicyId,
+  tokenId: TokenId,
 }
 
 type MintRedeemer {
-    Minting(Mint)
-    Migrating(Migration)
-    Burning
+  Minting(OutputReference)
+  Migrating(Migration)
+  Burning(TokenId)
 }
 ```
 
 | Constructor | Index | Fields | Description |
 |---|---|---|---|
-| `Minting` | 0 | `Mint { asset: OutputReference }` | Boot a new token. `asset` identifies which UTxO to consume for unique naming |
-| `Migrating` | 1 | `Migration { oldPolicy, tokenId }` | Migrate a token from an old validator. The old token must be burned atomically |
-| `Burning` | 2 | — | Burn the token (paired with `End` on the spending side) |
+| `Minting` | 0 | `OutputReference` | Seed consumed by boot and used to derive the asset name |
+| `Migrating` | 1 | `Migration` | Burn old policy token and mint same asset under state policy |
+| `Burning` | 2 | `TokenId` | Burn the selected cage token under the state policy |
 
-### Spending Redeemer
+`Burning(TokenId)` is intentionally explicit. The state policy is global, so
+the redeemer tells the policy which asset must be burned and lets
+`exactQuantity` reject unrelated movement under the same policy ID.
+
+## Spending Redeemers
+
+### RequestAction
 
 ```aiken
 type RequestAction {
-    Update(List<Proof>)
-    Rejected
-}
-
-type UpdateRedeemer {
-    End
-    Contribute(OutputReference)
-    Modify(List<RequestAction>)
-    Retract(OutputReference)
+  UpdateAction(Proof)
+  Rejected
 }
 ```
 
-Each request in a `Modify` transaction carries a `RequestAction`:
-
 | Constructor | Index | Fields | Description |
 |---|---|---|---|
-| `Update` | 0 | `List<Proof>` | Apply proofs to update the MPF root |
-| `Rejected` | 1 | — | Reject an expired request (Phase 3 or dishonest `submitted_at`) |
+| `UpdateAction` | 0 | `Proof` | Apply one MPF proof in Phase 1 |
+| `Rejected` | 1 | none | Skip root update for a rejectable request |
 
-The spending redeemer:
+`Modify(List<RequestAction>)` consumes one action for each matching request
+input in transaction input order.
 
-| Constructor | Index | Fields | Description |
+### UpdateRedeemer
+
+```aiken
+type UpdateRedeemer {
+  End
+  Contribute(OutputReference)
+  Modify(List<RequestAction>)
+  Retract(OutputReference)
+  Sweep(OutputReference)
+}
+```
+
+| Constructor | Index | State validator | Request validator |
 |---|---|---|---|
-| `End` | 0 | — | Destroy the MPF instance |
-| `Contribute` | 1 | `OutputReference` | Spend a request during Modify; points to the state UTxO |
-| `Modify` | 2 | `List<RequestAction>` | Process requests — each can be updated or rejected in a single transaction |
-| `Retract` | 3 | `OutputReference` | Cancel a request and reclaim ADA. Points to the State UTxO (reference input). Phase 2 only |
+| `End` | 0 | accepted | rejected |
+| `Contribute` | 1 | rejected | accepted |
+| `Modify` | 2 | accepted | rejected |
+| `Retract` | 3 | rejected | accepted |
+| `Sweep` | 4 | rejected | accepted |
+
+`Contribute`, `Retract`, and `Sweep` carry the referenced state UTxO. The
+request validator authenticates that UTxO by `(statePolicyId, cageToken)`.
+`Contribute` requires the state UTxO as a regular input spent with `Modify`;
+`Retract` and `Sweep` may use a reference input.
 
 ## Plutus Data Encoding
 
-All types compile to standard Plutus V3 `Data` constructors.
-The constructor indices match the order listed above (0-indexed).
+Constructor indices match the order listed above.
 
-**Example — StateDatum on-chain encoding:**
+Example `StateDatum`:
 
-```
-Constr(1,           -- CageDatum.StateDatum
-  [ Constr(0,       -- State
+```text
+Constr(1,
+  [ Constr(0,
       [ Bytes(owner_pkh)
       , Bytes(root_hash)
-      , Int(max_fee)
+      , Int(tip)
       , Int(process_time)
       , Int(retract_time)
       ])
   ])
 ```
 
-**Example — RequestDatum with Insert:**
+Example `RequestDatum` with `Insert`:
 
-```
-Constr(0,           -- CageDatum.RequestDatum
-  [ Constr(0,       -- Request
-      [ Constr(0, [Bytes(asset_name)])  -- TokenId
+```text
+Constr(0,
+  [ Constr(0,
+      [ Constr(0, [Bytes(asset_name)])
       , Bytes(owner_pkh)
       , Bytes(key)
-      , Constr(0, [Bytes(new_value)])   -- Insert
-      , Int(fee)
+      , Constr(0, [Bytes(new_value)])
+      , Int(tip)
       , Int(submitted_at)
       ])
   ])
