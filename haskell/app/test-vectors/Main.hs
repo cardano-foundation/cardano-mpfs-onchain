@@ -348,18 +348,24 @@ datumEncodingVectors =
             , "type" .= txt "CageDatum"
             , "plutusData" .= toDataJson (RequestDatum req)
             ]
-    , Aeson.object
-        [ "description" .= txt "MintRedeemer Minting"
-        , "type" .= txt "MintRedeemer"
-        , -- `Minting` is a unit constructor; the seed is the
-          -- validator parameter, not a redeemer field.
-          "plutusData" .= toDataJson Minting
-        ]
-    , Aeson.object
-        [ "description" .= txt "MintRedeemer Burning"
-        , "type" .= txt "MintRedeemer"
-        , "plutusData" .= toDataJson Burning
-        ]
+    , let ref =
+            OnChainTxOutRef
+                (BuiltinByteString $ BS.replicate 32 0xab)
+                1
+       in Aeson.object
+            [ "description" .= txt "MintRedeemer Minting"
+            , "type" .= txt "MintRedeemer"
+            , "plutusData" .= toDataJson (Minting ref)
+            ]
+    , let tokenId =
+            OnChainTokenId $
+                BuiltinByteString $
+                    BS.replicate 32 0xcc
+       in Aeson.object
+            [ "description" .= txt "MintRedeemer Burning"
+            , "type" .= txt "MintRedeemer"
+            , "plutusData" .= toDataJson (Burning tokenId)
+            ]
     , Aeson.object
         [ "description" .= txt "UpdateRedeemer End"
         , "type" .= txt "UpdateRedeemer"

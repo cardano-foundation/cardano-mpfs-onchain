@@ -1,3 +1,7 @@
+use aiken/fuzz
+use cardano/assets.{from_asset}
+use lib.{TokenId, quantity, tokenFromValue, valueFromToken}
+
 /// Token handling property tests (fuzz) — mirror Lean theorems in MpfsCage/Lib.lean.
 ///
 /// These property tests verify the token manipulation functions from `lib.ak`
@@ -22,10 +26,6 @@
 /// for policy IDs, matching Cardano's script hash length; 32 bytes for asset
 /// names, matching SHA2-256 output). Non-empty policy IDs are guaranteed by
 /// the fixed length, satisfying the `p ≠ ""` precondition.
-use aiken/fuzz
-use cardano/assets.{from_asset}
-use lib.{TokenId, quantity, tokenFromValue, valueFromToken}
-
 /// **Lean: valueFromToken_roundtrip**
 ///
 /// `tokenFromValue(valueFromToken(pid, tid))` always returns `Some(tid)`
@@ -57,7 +57,10 @@ test prop_valueFromToken_roundtrip(
 /// could be mistaken for a cage, letting an attacker spend it via Modify
 /// or End as if it held a real token.
 test prop_tokenFromValue_ada_only(
-  params via fuzz.tuple(fuzz.bytearray_fixed(32), fuzz.int_between(1, 1_000_000)),
+  params via fuzz.tuple(
+    fuzz.bytearray_fixed(32),
+    fuzz.int_between(1, 1_000_000),
+  ),
 ) {
   let (asset, qty) = params
   let v = from_asset("", asset, qty)

@@ -120,7 +120,7 @@ endTokenImpl cfg prov tid addr = do
         stateIx =
             spendingIndex stateIn allInputs
         spendRedeemer = End
-        mintRedeemer = Burning
+        mintRedeemer = Burning (onChainTokenId tid)
         redeemers =
             Redeemers $
                 Map.fromList

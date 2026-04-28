@@ -4,9 +4,9 @@ Description : Owner-sweep transaction
 License     : Apache-2.0
 
 Builds a sweep transaction. The cage owner spends a
-non-legitimate UTxO at the cage's address (no datum,
-or a request datum targeting a different token, or
-a state datum without the cage NFT) while
+non-legitimate UTxO at the per-cage request address
+(no datum, a request datum targeting a different
+token, or another malformed request UTxO) while
 referencing the state UTxO from which the validator
 reads the owner's public-key hash for the signature
 check.
@@ -102,16 +102,19 @@ sweepUtxoImpl ::
     Addr ->
     IO (Tx ConwayEra)
 sweepUtxoImpl cfg prov tid garbTxIn addr = do
-    let scriptAddr =
+    let reqAddr =
+            requestAddrFromCfg cfg tid (network cfg)
+        stateAddr =
             cageAddrFromCfg cfg (network cfg)
-    cageUtxos <- queryUTxOs prov scriptAddr
+    requestUtxos <- queryUTxOs prov reqAddr
+    stateUtxos <- queryUTxOs prov stateAddr
     -- Locate the garbage UTxO being swept.
     garbUtxoPair <-
-        case findUtxoByTxIn garbTxIn cageUtxos of
+        case findUtxoByTxIn garbTxIn requestUtxos of
             Nothing ->
                 error
                     "sweepUtxo: garbage UTxO not \
-                    \found at the cage address"
+                    \found at the request address"
             Just x -> pure x
     let (garbIn, _garbOut) = garbUtxoPair
     -- Locate the legitimate state UTxO (carries
@@ -121,11 +124,11 @@ sweepUtxoImpl cfg prov tid garbTxIn addr = do
         case findStateUtxo
             policyId
             tid
-            cageUtxos of
+            stateUtxos of
             Nothing ->
                 error
                     "sweepUtxo: state UTxO not \
-                    \found at the cage address"
+                    \found at the state address"
             Just x -> pure x
     let (stateIn, stateOut) = stateUtxo
     pp <- queryProtocolParams prov
@@ -148,7 +151,7 @@ sweepUtxoImpl cfg prov tid garbTxIn addr = do
                 BuiltinByteString ownerBs
             } = stateDatum
         ownerKh = addrWitnessKeyHash ownerBs
-    let script = mkCageScript cfg
+    let script = mkRequestScript cfg tid
         scriptHash = hashScript script
         allInputs =
             Set.fromList [garbIn, fst feeUtxo]

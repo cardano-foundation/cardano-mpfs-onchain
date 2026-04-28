@@ -134,6 +134,7 @@ test-suite e2e-tests
     , cardano-mpfs-cage
     , cardano-node-clients
     , cardano-node-clients:devnet
+    , cardano-strict-containers
     , containers
     , hspec
     , microlens

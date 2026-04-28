@@ -115,9 +115,9 @@ genMigration = Migration <$> genBBS <*> genTokenId
 genMintRedeemer :: Gen MintRedeemer
 genMintRedeemer =
     oneof
-        [ pure Minting
+        [ Minting <$> genTxOutRef
         , Migrating <$> genMigration
-        , pure Burning
+        , Burning <$> genTokenId
         ]
 
 genRequestAction :: Gen RequestAction
@@ -266,15 +266,17 @@ spec = do
             property $
                 forAll genMintRedeemer roundtrips
         it "Minting uses constructor 0" $
-            constrIndex Minting
-                `shouldBe` 0
+            property $
+                forAll (Minting <$> genTxOutRef) $
+                    \x -> constrIndex x === 0
         it "Migrating uses constructor 1" $
             property $
                 forAll (Migrating <$> genMigration) $
                     \x -> constrIndex x === 1
         it "Burning uses constructor 2" $
-            constrIndex Burning
-                `shouldBe` 2
+            property $
+                forAll (Burning <$> genTokenId) $
+                    \x -> constrIndex x === 2
 
     describe "RequestAction" $ do
         it "roundtrips via ToData/FromData" $

@@ -58,6 +58,22 @@ def quantity (p : PolicyId) (a : AssetName) (v : Value) : Option Int :=
   | [e] => some e.qty
   | _   => none
 
+/-- Entries belonging to a specific policy.
+    This models the policy-local token dictionary used by Aiken
+    `exactQuantity`. -/
+def assetsUnderPolicy (p : PolicyId) (v : Value) : Value :=
+  v.filter (fun e => e.policy == p)
+
+/-- The policy-local token map contains exactly one asset, with exactly
+    the expected quantity.
+
+    This is stricter than `quantity`: it rejects a mint or burn field that
+    moves the target token and also moves an unrelated asset under the same
+    policy ID. Other policies are intentionally ignored. -/
+def exactQuantity
+    (p : PolicyId) (a : AssetName) (expected : Int) (v : Value) : Prop :=
+  assetsUnderPolicy p v = [⟨p, a, expected⟩]
+
 -- ============================================================
 -- Theorems
 -- ============================================================
@@ -185,3 +201,29 @@ theorem quantity_valueFromToken
     (p : PolicyId) (a : AssetName) :
     quantity p a (valueFromToken p a) = some 1 := by
   simp [valueFromToken, quantity_present]
+
+/-- A policy-local singleton with the target asset and quantity satisfies
+    `exactQuantity`.
+
+    Mirrors the state minting and burning checks used by the split state
+    validator. -/
+theorem exactQuantity_singleton
+    (p : PolicyId) (a : AssetName) (q : Int) :
+    exactQuantity p a q (fromAsset p a q) := by
+  simp [exactQuantity, assetsUnderPolicy, fromAsset]
+
+/-- Extra assets under the same policy invalidate `exactQuantity`.
+
+    This is the formal counterpart of the issue #49 correction that the
+    global state policy must not allow unrelated asset movement under the
+    state policy ID during mint or burn. -/
+theorem exactQuantity_rejects_extra_same_policy_asset
+    (p : PolicyId) (a extra : AssetName) (q extraQty : Int) :
+    ¬ exactQuantity
+        p
+        a
+        q
+        (⟨p, a, q⟩ :: ⟨p, extra, extraQty⟩ :: []) := by
+  intro h
+  simp [exactQuantity, assetsUnderPolicy] at h
+  cases h

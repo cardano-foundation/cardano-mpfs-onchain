@@ -7,8 +7,9 @@ License     : Apache-2.0
 
 Builds request transactions for inserting, deleting,
 or updating a key in a token's trie. No script
-execution occurs — the transaction simply pays to
-the cage address with an inline 'RequestDatum'.
+execution occurs -- the transaction simply pays to
+the per-cage request address with an inline
+'RequestDatum'.
 The locked ADA includes the token's @tip@ plus a
 fee buffer for the oracle's update transaction.
 -}
@@ -161,7 +162,7 @@ requestImpl cfg prov (Coin mf) tid key op addr = do
     let datum =
             mkRequestDatum tid addr key op mf now
         scriptAddr =
-            cageAddrFromCfg cfg (network cfg)
+            requestAddrFromCfg cfg tid (network cfg)
         draftOut =
             mkBasicTxOut
                 scriptAddr

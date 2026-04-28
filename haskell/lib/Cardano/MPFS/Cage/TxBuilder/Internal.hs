@@ -17,11 +17,14 @@ conversion.
 module Cardano.MPFS.Cage.TxBuilder.Internal (
     -- * Script construction
     mkCageScript,
+    mkRequestScript,
     computeScriptHash,
 
     -- * Derived identity
     cagePolicyIdFromCfg,
     cageAddrFromCfg,
+    requestAddrFromCfg,
+    onChainTokenId,
 
     -- * Datum helpers
     mkRequestDatum,
@@ -134,7 +137,7 @@ import Cardano.Ledger.Credential (
     Credential (..),
     StakeReference (..),
  )
-import Cardano.Ledger.Hashes (ScriptHash)
+import Cardano.Ledger.Hashes (ScriptHash (..))
 import Cardano.Ledger.Keys (
     KeyHash (..),
     KeyRole (..),
@@ -164,6 +167,9 @@ import PlutusTx.IsData.Class (
     ToData (..),
  )
 
+import Cardano.MPFS.Cage.Blueprint (
+    applyRequestParams,
+ )
 import Cardano.MPFS.Cage.Config (
     CageConfig (..),
  )
@@ -281,16 +287,36 @@ mkCageScript ::
     CageConfig ->
     Script ConwayEra
 mkCageScript cfg =
+    scriptFromBytes
+        "mkCageScript"
+        (cageScriptBytes cfg)
+
+-- | Build the per-cage request 'Script' from config bytes.
+mkRequestScript ::
+    CageConfig ->
+    TokenId ->
+    Script ConwayEra
+mkRequestScript cfg tid =
+    scriptFromBytes
+        "mkRequestScript"
+        (requestScriptBytesFromCfg cfg tid)
+
+scriptFromBytes ::
+    String ->
+    SBS.ShortByteString ->
+    Script ConwayEra
+scriptFromBytes label sbs =
     let plutus =
             Plutus @PlutusV3 $
-                PlutusBinary $
-                    cageScriptBytes cfg
+                PlutusBinary sbs
      in case mkPlutusScript plutus of
             Just ps -> fromPlutusScript ps
             Nothing ->
                 error
-                    "mkCageScript: invalid \
-                    \PlutusV3 script"
+                    ( label
+                        <> ": invalid PlutusV3 \
+                           \script"
+                    )
 
 -- | Compute the 'ScriptHash' from raw script bytes.
 computeScriptHash ::
@@ -325,6 +351,44 @@ cageAddrFromCfg cfg net =
         (ScriptHashObj $ cfgScriptHash cfg)
         StakeRefNull
 
+-- | Compute the request script address for a token.
+requestAddrFromCfg ::
+    CageConfig ->
+    TokenId ->
+    Network ->
+    Addr
+requestAddrFromCfg cfg tid net =
+    Addr
+        net
+        ( ScriptHashObj $
+            computeScriptHash
+                (requestScriptBytesFromCfg cfg tid)
+        )
+        StakeRefNull
+
+-- | Convert a ledger token id to its on-chain token id.
+onChainTokenId :: TokenId -> OnChainTokenId
+onChainTokenId tid =
+    OnChainTokenId $
+        BuiltinByteString $
+            SBS.fromShort $
+                let AssetName sbs = unTokenId tid
+                 in sbs
+
+requestScriptBytesFromCfg ::
+    CageConfig ->
+    TokenId ->
+    SBS.ShortByteString
+requestScriptBytesFromCfg cfg tid =
+    applyRequestParams
+        (scriptHashBytes $ cfgScriptHash cfg)
+        (onChainTokenId tid)
+        (requestScriptBytes cfg)
+
+scriptHashBytes :: ScriptHash -> ByteString
+scriptHashBytes (ScriptHash h) =
+    hashToBytes h
+
 -- | Build a 'CageDatum' for a request.
 mkRequestDatum ::
     TokenId ->
@@ -335,15 +399,9 @@ mkRequestDatum ::
     Integer ->
     PLC.Data
 mkRequestDatum tid addr key op fee submittedAt =
-    let onChainTid =
-            OnChainTokenId $
-                BuiltinByteString $
-                    SBS.fromShort $
-                        let AssetName sbs = unTokenId tid
-                         in sbs
-        datum =
+    let datum =
             OnChainRequest
-                { requestToken = onChainTid
+                { requestToken = onChainTokenId tid
                 , requestOwner =
                     BuiltinByteString
                         (addrKeyHashBytes addr)

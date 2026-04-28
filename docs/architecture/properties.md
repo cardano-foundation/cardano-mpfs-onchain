@@ -1,364 +1,216 @@
 # Security Properties
 
-This page documents the on-chain security properties of the MPF Cage
-validators. Each property is stated as an invariant and cross-referenced
-with the test(s) that verify it.
+This page documents the security properties enforced by the MPF Cage
+validators. The properties are covered by the Aiken test suite, Haskell
+encoding tests, and the Lean models in `lean/MpfsCage`.
 
-The properties are derived from the
-[upstream MPFS specification](https://cardano-foundation.github.io/mpfs/)
-([architecture](https://cardano-foundation.github.io/mpfs/architecture/),
-[on-chain code docs](https://cardano-foundation.github.io/mpfs/code/on-chain/))
-and verified by the inline test suite in
-[`cage.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/cage.ak)
-and
-[`lib.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/lib.ak).
-Run `aiken check` (or `just test`) to check all 80 tests.
-
----
+Run `aiken check` (or `just test`) for validator tests. Run `lake build` in
+`lean/` for the formal phase, token, and split-validator proofs.
 
 ## Roles
 
-The upstream MPFS documentation defines three roles:
-
-- **Oracle** (token owner): controls which facts are added or removed
-  from an MPF token. Maps to the `State.owner` field.
-- **Requester**: proposes fact changes via `RequestDatum` UTxOs. Maps
-  to `Request.requestOwner`.
-- **Observer**: reads the MPF state from the blockchain. No on-chain
-  role; all knowledge is reconstructable from the chain history.
-
-The on-chain validators enforce the boundaries between these roles.
-
----
+- **Oracle**: the state owner. Can modify state, reject expired or dishonest
+  requests through `Modify(Rejected)`, sweep malformed request-address UTxOs,
+  and end the cage.
+- **Requester**: the request owner. Can submit requests and retract them during
+  Phase 2.
+- **Observer**: reconstructs MPF state from chain history.
 
 ## On-chain vs Off-chain Guarantees
 
-The validators enforce **what must hold on-chain**. Some guarantees
-depend on off-chain behaviour:
-
 | Guarantee | Enforced by |
 |---|---|
-| Token identity is unique | On-chain (UTxO consumption) |
-| Only the oracle can update the MPF root | On-chain (signature check) |
-| Every modification carries a valid Merkle proof | On-chain (proof verification) |
-| Output root matches proof computation | On-chain (fold + compare) |
-| Token stays at the script address | On-chain (address check) |
-| Requesters can reclaim locked ADA in Phase 2 | On-chain (Retract + phase check) |
-| Expired requests are cleaned up | On-chain (Reject + phase check) |
-| Oracle fees are enforced | On-chain (fee == max_fee check) |
-| Refunds are paid correctly | On-chain (verifyRefunds) |
-| Time phases are exclusive | On-chain (validity_range checks) |
-| The oracle honestly processes matching requests | Off-chain (oracle behaviour) |
-| Proofs are computed against the correct trie state | Off-chain (proof generation) |
-| All knowledge is reconstructable from history | Blockchain (ledger property) |
-
----
+| Token identity is unique | State mint policy consumes the seed UTxO |
+| State policy moves exactly one state-policy asset | `exactQuantity` |
+| State UTxO references are authentic | `(statePolicyId, cageToken)` check |
+| Only the oracle updates or ends state | `State.owner` signature |
+| Only the requester retracts a request | `Request.requestOwner` signature |
+| Request updates carry valid MPF proofs | On-chain MPF proof verification |
+| Output root matches proof computation | State `Modify` fold |
+| Requesters can reclaim Phase 2 requests | Request `Retract` |
+| Expired or dishonest requests can be rejected | `Modify(Rejected)` |
+| Malformed request-address UTxOs can be cleaned up | Request `Sweep` |
+| Processable requests cannot be swept | `processableRequest` guard |
+| Phase windows are exclusive | Validity-range checks and Lean proofs |
+| Oracle honestly chooses which valid requests to process | Off-chain behavior |
+| Proofs are generated against the intended trie state | Off-chain behavior |
+| History is reconstructable | Ledger property |
 
 ## 1. Token Uniqueness
 
-> *Upstream: "The new token-id is unique"*
+**Invariant:** a cage token asset name is derived from a consumed
+`OutputReference`.
 
-**Invariant:** Two distinct `OutputReference` values always produce
-different token asset names.
+The asset name is `SHA2-256(tx_id ++ output_index)`. Since the seed UTxO can
+be consumed only once, the ledger gives uniqueness.
 
-The asset name is `SHA2-256(tx_id ++ output_index)`. Since an
-`OutputReference` can only be consumed once, the minting policy
-guarantees that no two tokens share the same identity.
+Representative tests: `assetName_deterministic`,
+`assetName_different_txid`, `assetName_different_index`,
+`prop_assetName_deterministic`.
 
-| Property | Test | File |
-|---|---|---|
-| Same reference yields same hash (deterministic) | `assetName_deterministic` | `lib.ak` |
-| Different `tx_id` yields different hash | `assetName_different_txid` | `lib.ak` |
-| Different `output_index` yields different hash | `assetName_different_index` | `lib.ak` |
-| Determinism holds for arbitrary references | `prop_assetName_deterministic` | `lib.ak` |
+## 2. State-Policy Mint and Burn Integrity
 
-## 2. Minting Integrity
+**Invariant:** every mint, migration, and burn under the global state policy
+moves exactly one asset under that policy.
 
-> *Upstream: "The hash in the token is null" (at boot)*
+`Minting(seed)` requires exactly `+1` of `assetName(seed)`.
+`Migrating` requires exactly `-1` under the old policy and `+1` under the
+state policy. `Burning(tokenId)` requires exactly `-1` of that token. Extra
+assets under the state policy are rejected.
 
-**Invariant:** A token can only be minted when all of the following
-hold simultaneously:
+Representative tests: `canMint`, `mint_missing_input`,
+`mint_quantity_two`, `mint_extra_state_policy_asset`, `canMigrate`,
+`end_happy`, `end_with_extra_state_policy_asset`.
 
-1. The `OutputReference` is consumed in the transaction.
-2. Exactly one token is minted (quantity = 1).
-3. The output goes to the validator's own script address.
-4. The output carries a `StateDatum` with `root = root(empty)`.
+Lean theorem: `exactQuantity_rejects_extra_same_policy_asset`.
 
-Violating any single condition causes the minting policy to reject
-the transaction.
+## 3. Split Validator Authentication
 
-| Property | Test | Violated condition |
-|---|---|---|
-| Happy path (all conditions met) | `canMint` | -- |
-| Reference not consumed | `mint_missing_input` | (1) |
-| Quantity = 2 | `mint_quantity_two` | (2) |
-| Output to wallet address | `mint_to_wallet` | (3) |
-| Output to different script | `mint_to_wrong_script` | (3) |
-| Non-empty initial root | `mint_nonempty_root` | (4) |
-| Datum is `RequestDatum` | `mint_request_datum` | (4) |
-| Output has `NoDatum` | `mint_no_datum` | (4) |
-| Roundtrip: any valid reference produces a valid mint | `prop_mint_roundtrip` | -- |
+**Invariant:** request spends authenticate the referenced state UTxO by both
+policy ID and asset name.
 
-## 3. Ownership & Authorization
+The request validator is parameterized by `(statePolicyId, cageTokenName)`.
+It rejects fake state UTxOs that carry the same asset name under a foreign
+policy.
 
-> *Upstream: "MPF tokens can be modified only by their owner"*
+Representative tests: `contribute_rejects_foreign_policy_state_same_asset`,
+`wrong_request_parameter_rejects_this_cage_token`.
 
-**Invariant:** Only the holder of the correct verification key can
-perform privileged operations.
+Lean theorems: `contribute_rejects_foreign_policy_state_same_asset`,
+`wrong_request_parameter_rejects_cage_token`.
 
-- **Modify / Reject / End** (oracle operations): require the
-  `State.owner` signature.
-- **Retract** (requester operation): requires the
-  `Request.requestOwner` signature.
-- **Contribute**: permissionless — anyone can link a request to a
-  state UTxO.
+## 4. Contribute Cannot Bypass State Modify
 
-| Property | Test | Operation |
-|---|---|---|
-| Oracle signs Modify | `canCage` | Modify |
-| Missing oracle signature blocks Modify | `modify_missing_signature` | Modify |
-| Missing oracle signature blocks End | `end_missing_signature` | End |
-| Missing oracle signature blocks Reject | `reject_missing_signature` | Reject |
-| Requester signs Retract | `retract_happy` | Retract |
-| Wrong signer blocks Retract | `retract_wrong_signer` | Retract |
-| Random signer != requester fails Retract | `prop_retract_requires_owner` | Retract |
-| Random signer != oracle fails Modify | `prop_modify_requires_owner` | Modify |
+**Invariant:** `Contribute(stateRef)` requires `stateRef` in regular
+transaction inputs, not only reference inputs, and the state input must be
+spent with `Modify`.
 
-## 4. Token Confinement
+This prevents a request UTxO from being consumed without state `Modify`
+running the root and refund checks.
 
-**Invariant:** The caged token must remain at the same script
-address after a `Modify` or `Reject` operation. The output's
-payment credential must equal the input's payment credential.
+Representative tests: `contribute_missing_ref`,
+`contribute_reference_only_state_rejected`,
+`contribute_with_state_end_rejected`.
 
-This prevents the oracle from extracting the token to a wallet or
-redirecting it to a different script during an update.
+Lean theorems: `contribute_rejects_reference_only_state`,
+`contribute_rejects_state_spent_without_modify`.
 
-| Property | Test |
+## 5. Ownership and Authorization
+
+**Invariant:** privileged operations require the relevant owner signature.
+
+| Operation | Required signer |
 |---|---|
-| Output to different script address is rejected | `modify_wrong_address` |
-| Output to same address succeeds | `canCage`, `modify_owner_transfer` |
+| State `Modify` | `State.owner` |
+| State `End` | `State.owner` |
+| Request `Sweep` | current `State.owner` |
+| Request `Retract` | `Request.requestOwner` |
+| Request `Contribute` | permissionless, but authenticated against state |
 
-## 5. Ownership Transfer
+Representative tests: `modify_missing_signature`, `end_missing_signature`,
+`sweep_missing_signature`, `retract_wrong_signer`,
+`prop_retract_requires_owner`, `prop_modify_requires_owner`.
 
-**Invariant:** The `owner` field in the output datum is **not**
-checked against the input datum during `Modify`. The current oracle
-can transfer ownership to a new key by changing the `owner` field.
+## 6. State Confinement and Immutability
 
-This is intentional: it enables oracle rotation and delegation
-without burning and re-minting.
+**Invariant:** after `Modify`, the state output remains at the state script,
+carries the same cage token, and preserves `tip`, `process_time`, and
+`retract_time`.
 
-| Property | Test |
-|---|---|
-| Owner changes from `"owner"` to `"new-owner"` | `modify_owner_transfer` |
-| Existing happy path demonstrates transfer | `canCage` |
+The owner field is intentionally mutable, allowing oracle rotation through a
+normal `Modify`.
 
-## 6. State Integrity (MPF Root)
+Representative tests: `modify_wrong_address`, `modify_owner_transfer`,
+`modify_wrong_token_in_output`, `modify_tip_changes`,
+`modify_process_time_changes`, `modify_retract_time_changes`.
 
-> *Upstream: "All modifications to an MPF root have to appear
-> on-chain" and "All modifications must be consumed under a smart
-> contract validation"*
+## 7. MPF Root Integrity
 
-**Invariant:** The output root must exactly match the result of
-folding all matching request operations over the input root using
-the provided Merkle proofs. A wrong claimed root is rejected.
+**Invariant:** the output root equals the result of folding matching request
+actions over the input root.
 
-This is the core cryptographic guarantee: every state transition
-is provably correct.
+`UpdateAction(proof)` applies an MPF insert, delete, or update proof.
+`Rejected` leaves the root unchanged for that request.
 
-| Property | Test |
-|---|---|
-| Correct root after one Insert | `canCage` |
-| Wrong root in output datum | `modify_wrong_root` |
-| No requests: root must stay unchanged | `modify_no_requests` |
-| Requests for other tokens are skipped | `modify_skip_other_token` |
+Representative tests: `canCage`, `modify_wrong_root`,
+`modify_no_requests`, `modify_skip_other_token`, `modify_too_few_proofs`,
+`modify_extra_proofs`.
 
-## 7. Proof Consumption
+## 8. Refund and Tip Accounting
 
-**Invariant:** Exactly one Merkle proof is consumed per matching
-request input. Too few proofs causes failure (`uncons` on empty
-list). Extra proofs are silently ignored.
+**Invariant:** processed request owners are refunded according to the state
+validator's equation:
 
-| Property | Test |
-|---|---|
-| One proof per request (happy path) | `canCage` |
-| Zero proofs for one request | `modify_too_few_proofs` |
-| Two proofs for one request (extra ignored) | `modify_extra_proofs` |
+```text
+total request input lovelace - transaction fee - number_of_requests * state.tip
+```
 
-!!! note
-    The validator does not reject extra proofs. This is a design
-    choice: it simplifies transaction building when the exact
-    number of matching requests is uncertain at construction time.
+The request tip must match `state.tip` for processable requests.
 
-## 8. Request Binding
-
-> *Upstream: "All consumed requests reference the token being updated"*
-
-**Invariant:** A `Contribute` transaction validates that the
-request's `requestToken` matches the actual token at the referenced
-State UTxO. Requests targeting a different token are rejected.
-
-This prevents a request intended for token A from being applied
-to token B.
-
-| Property | Test |
-|---|---|
-| Matching token succeeds | `canCage` |
-| Mismatched token | `contribute_wrong_token` |
-| Referenced UTxO not in inputs | `contribute_missing_ref` |
+Representative tests: `modify_with_refund`, `modify_missing_refund`,
+`modify_insufficient_refund`, `modify_wrong_refund_address`,
+`modify_zero_fee`, `modify_fee_mismatch`.
 
 ## 9. Datum-Redeemer Type Safety
 
-**Invariant:** Each redeemer expects a specific datum constructor.
-Using the wrong combination causes the `expect` pattern match to
-fail, rejecting the transaction.
+**Invariant:** each validator path accepts only the datum and redeemer shapes
+it owns.
 
-This enforces a clean separation between State UTxOs (oracle
-operations) and Request UTxOs (requester operations).
-
-| Redeemer | Required datum | Wrong datum test |
-|---|---|---|
-| `Retract` | `RequestDatum` | `retract_on_state_datum` |
-| `Contribute` | `RequestDatum` | `contribute_on_state_datum` |
-| `Modify` | `StateDatum` | `modify_on_request_datum` |
-| `End` | `StateDatum` | `end_on_request_datum` |
-
-## 10. Datum Presence
-
-**Invariant:** The spending validator requires `Some(datum)`. A
-UTxO with no datum (e.g. accidentally sent ADA to the script
-address) cannot be spent through any redeemer.
-
-| Property | Test |
+| Validator | Accepted redeemers |
 |---|---|
-| `None` datum rejected | `spend_no_datum` |
+| state | `Modify`, `End` |
+| request | `Contribute`, `Retract`, `Sweep` |
 
-## 11. End / Burn Integrity
+Representative tests: `retract_on_state_datum`, `contribute_on_state_datum`,
+`modify_on_request_datum`, `end_on_request_datum`, `state_sweep_rejected`.
 
-**Invariant:** The `End` redeemer verifies that the mint field
-contains exactly the same token being burned. Burning a different
-token while keeping the caged one is rejected.
+## 10. Time-Gated Phases
 
-| Property | Test |
-|---|---|
-| Correct token burned | `end_happy` |
-| Different token in mint field | `end_wrong_token_in_mint` |
-| End with unrelated extra minting policy | `end_with_extra_mint_policy` |
+**Invariant:** each request is in exactly one lifecycle phase for point
+validity ranges, and straddling ranges are rejected by the validators.
+
+```text
+submitted_at          + process_time       + process_time + retract_time
+    |                        |                        |
+    |   Phase 1: Modify      |   Phase 2: Retract     |   Phase 3: Rejected
+```
+
+Representative tests: `retract_in_phase1`, `retract_happy`,
+`retract_in_phase3`, `contribute_in_phase2`, `contribute_in_phase3`,
+`modify_in_phase2`.
+
+Lean theorems: `phase1_phase2_exclusive`,
+`phase1_honest_not_rejectable`, `phase2_honest_not_rejectable`,
+`phase_coverage_point`.
+
+## 11. Request Sweep
+
+**Invariant:** the state owner can sweep request-address garbage, but cannot
+sweep a request that state `Modify` can process.
+
+Protected requests must have matching token, matching tip, and enough lovelace
+to cover `state.tip`. Wrong-token, no-datum, mismatched-tip, and underfunded
+matching-token UTxOs are sweepable.
+
+Representative tests: `sweep_no_datum`, `sweep_wrong_token_request`,
+`sweep_mismatched_tip_request`, `sweep_underfunded_matching_request`,
+`sweep_legitimate_request_rejected`.
+
+Lean theorems: `sweep_mismatched_tip_request_allowed`,
+`sweep_underfunded_matching_request_allowed`,
+`protected_request_not_sweepable`.
 
 ## 12. Token Extraction
 
-**Invariant:** `tokenFromValue` returns `Some(TokenId)` only when
-the value contains exactly one non-ADA policy with exactly one
-asset name. All other shapes return `None`.
+**Invariant:** token extraction is unambiguous.
 
-This is a safety function used throughout the validators to
-identify the caged NFT. If a UTxO somehow contains multiple tokens,
-extraction fails and the validator rejects.
+`tokenFromValue` returns a token only when the value has exactly one non-ADA
+policy with exactly one asset name. `tokenFromPolicy` scopes extraction to a
+specific policy and rejects zero or multiple assets under that policy.
 
-| Shape | Test | Result |
-|---|---|---|
-| ADA + 1 NFT | `tokenFromValue_single_nft` | `Some(TokenId)` |
-| ADA only | `tokenFromValue_ada_only` | `None` |
-| 2 non-ADA policies | `tokenFromValue_multi_policy` | `None` |
-| 1 policy, 2 asset names | `tokenFromValue_multi_asset` | `None` |
-| Roundtrip via `valueFromToken` | `tokenFromValue_roundtrip` | `Some(TokenId)` |
+Representative tests: `tokenFromValue_single_nft`, `tokenFromValue_ada_only`,
+`tokenFromValue_multi_policy`, `tokenFromValue_multi_asset`,
+`tokenFromValue_roundtrip`.
 
-## 13. Time-Gated Phases
-
-**Invariant:** Each request passes through three exclusive time
-phases. The validator enforces phase boundaries using
-`tx.validity_range` and the State datum's `process_time` /
-`retract_time` fields (set at mint time, enforced immutable).
-No operation can execute outside its designated phase.
-
-```
-submitted_at          + process_time       + process_time + retract_time
-    |                        |                        |
-    |   Phase 1: Oracle      |   Phase 2: Requester   |   Phase 3: Oracle
-    |   Modify only          |   Retract only         |   Reject only
-```
-
-This eliminates the race condition where a requester retracts while
-the oracle is building a Modify transaction.
-
-| Property | Test | Expected |
-|---|---|---|
-| Retract blocked in Phase 1 | `retract_in_phase1` | fail |
-| Retract allowed in Phase 2 | `retract_happy` | pass |
-| Retract blocked in Phase 3 | `retract_in_phase3` | fail |
-| Contribute blocked in Phase 2 | `contribute_in_phase2` | fail |
-| Contribute allowed in Phase 3 (for Reject) | `contribute_in_phase3` | pass |
-| Modify blocked in Phase 2 | `modify_in_phase2` | fail |
-
-## 14. Reject (DDoS Protection)
-
-**Invariant:** The oracle can discard requests that are past their
-retract window (Phase 3) or have a dishonest `submitted_at`
-timestamp. The oracle keeps the fee and refunds the remaining
-lovelace. The MPF root must **not** change during a Reject.
-
-This prevents DDoS attacks where requesters spam requests and
-retract them before the oracle can process them.
-
-| Property | Test | Expected |
-|---|---|---|
-| Reject in Phase 3 (happy path) | `reject_happy` | pass |
-| Reject blocked in Phase 1 | `reject_in_phase1` | fail |
-| Reject blocked in Phase 2 | `reject_in_phase2` | fail |
-| Reject with future `submitted_at` (dishonest) | `reject_future_submitted_at` | pass |
-| Reject without owner signature | `reject_missing_signature` | fail |
-| Reject must not change root | `reject_root_changes` | fail |
-| Reject with insufficient refund | `reject_wrong_refund` | fail |
-
-## 15. Fee Enforcement
-
-**Invariant:** When the oracle processes requests via `Modify`,
-each request's `fee` must equal `state.max_fee`. The oracle
-receives the fee and the requester is refunded `lovelace - fee`.
-Refunds are verified on-chain: correct amount, correct address.
-
-| Property | Test | Expected |
-|---|---|---|
-| Modify with fee and correct refund | `modify_with_refund` | pass |
-| Modify with missing refund output | `modify_missing_refund` | fail |
-| Modify with insufficient refund | `modify_insufficient_refund` | fail |
-| Modify with wrong refund address | `modify_wrong_refund_address` | fail |
-| Modify with zero fee (no refund deduction) | `modify_zero_fee` | pass |
-| Request fee != state max_fee | `modify_fee_mismatch` | fail |
-
-## 16. Migration
-
-**Invariant:** A token can be migrated from an old validator to
-a new one by atomically burning the old token and minting a new
-one. The token identity (asset name) and MPF root are preserved.
-The old token must be burned (-1) in the same transaction.
-
-| Property | Test | Expected |
-|---|---|---|
-| Migration happy path (burn old, mint new) | `canMigrate` | pass |
-| Migration without burning old token | `migrate_no_burn` | fail |
-| Migration to wallet instead of script | `migrate_to_wallet` | fail |
-| Migration with wrong old policy ID | `migrate_wrong_old_policy` | fail |
-
----
-
-## Summary
-
-| # | Category | Tests |
-|---|---|---|
-| 1 | Token uniqueness | 4 |
-| 2 | Minting integrity | 9 |
-| 3 | Ownership & authorization | 8 |
-| 4 | Token confinement | 2 |
-| 5 | Ownership transfer | 2 |
-| 6 | State integrity (MPF root) | 4 |
-| 7 | Proof consumption | 3 |
-| 8 | Request binding | 3 |
-| 9 | Datum-redeemer type safety | 4 |
-| 10 | Datum presence | 1 |
-| 11 | End / burn integrity | 3 |
-| 12 | Token extraction | 5 |
-| 13 | Time-gated phases | 6 |
-| 14 | Reject (DDoS protection) | 7 |
-| 15 | Fee enforcement | 6 |
-| 16 | Migration | 4 |
-| | **Total** | **80** |
+Lean theorems: `valueFromToken_roundtrip`, `tokenFromValue_ada_only`,
+`tokenFromValue_multi_policy`, `tokenFromValue_multi_asset`.

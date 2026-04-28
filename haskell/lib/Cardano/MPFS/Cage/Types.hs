@@ -151,17 +151,17 @@ data CageDatum
 @types\/MintRedeemer@.
 
 The seed @OutputReference@ that authorizes a fresh
-mint and derives the asset name is the validator's
-parameter, not a redeemer field — so 'Minting' is a
-unit constructor.
+mint and derives the asset name is carried by the
+redeemer because the state validator is global and
+unparameterized.
 -}
 data MintRedeemer
     = -- | Mint a new cage token (Constr 0)
-      Minting
+      Minting !OnChainTxOutRef
     | -- | Migrate from old validator (Constr 1)
       Migrating !Migration
     | -- | Burn a cage token (Constr 2)
-      Burning
+      Burning !OnChainTokenId
     deriving stock (Show, Eq)
 
 {- | Migration parameters. Matches Aiken
@@ -523,28 +523,32 @@ instance UnsafeFromData Migration where
                 "unsafeFromBuiltinData: Migration"
 
 instance ToData MintRedeemer where
-    toBuiltinData Minting =
-        mkD $ Constr 0 []
+    toBuiltinData (Minting ref) =
+        mkD $ Constr 0 [unD (toBuiltinData ref)]
     toBuiltinData (Migrating m) =
         mkD $ Constr 1 [unD (toBuiltinData m)]
-    toBuiltinData Burning =
-        mkD $ Constr 2 []
+    toBuiltinData (Burning tokenId) =
+        mkD $ Constr 2 [unD (toBuiltinData tokenId)]
 
 instance FromData MintRedeemer where
     fromBuiltinData bd = case unD bd of
-        Constr 0 [] -> Just Minting
+        Constr 0 [d] -> Minting <$> fromBuiltinData (mkD d)
         Constr 1 [d] ->
             Migrating <$> fromBuiltinData (mkD d)
-        Constr 2 [] -> Just Burning
+        Constr 2 [d] -> Burning <$> fromBuiltinData (mkD d)
         _ -> Nothing
 
 instance UnsafeFromData MintRedeemer where
     unsafeFromBuiltinData bd = case unD bd of
-        Constr 0 [] -> Minting
+        Constr 0 [d] ->
+            Minting $
+                unsafeFromBuiltinData (mkD d)
         Constr 1 [d] ->
             Migrating $
                 unsafeFromBuiltinData (mkD d)
-        Constr 2 [] -> Burning
+        Constr 2 [d] ->
+            Burning $
+                unsafeFromBuiltinData (mkD d)
         _ ->
             error
                 "unsafeFromBuiltinData: MintRedeemer"

@@ -97,11 +97,10 @@ bootTokenImpl ::
 bootTokenImpl cfg prov addr = do
     pp <- queryProtocolParams prov
     utxos <- queryUTxOs prov addr
-    -- The seed UTxO is the one the validator was parameterized with
-    -- (via 'applyOutputRef' at config-construction time). We MUST
-    -- consume that exact UTxO — any other input would fail the
-    -- validator's `find_input(inputs, seed)` check. Locate it in the
-    -- caller's wallet and use it as the seed input.
+    -- The seed UTxO is carried in the mint redeemer. We MUST consume
+    -- that exact UTxO -- any other input would fail the validator's
+    -- `find_input(inputs, seed)` check. Locate it in the caller's
+    -- wallet and use it as the seed input.
     let seedRefOnChain = cageSeed cfg
     seedUtxo <- case lookupSeed seedRefOnChain utxos of
         Just u -> pure u
@@ -169,7 +168,7 @@ bootTokenImpl cfg prov addr = do
                         datumData
     let script = mkCageScript cfg
         scriptHash = hashScript script
-        redeemer = Minting
+        redeemer = Minting seedRefOnChain
         mintPurpose =
             ConwayMinting (AsIx 0)
         redeemers =

@@ -93,11 +93,14 @@ retractRequestImpl ::
     Addr ->
     IO (Tx ConwayEra)
 retractRequestImpl cfg prov tid reqTxIn addr = do
-    let scriptAddr =
+    let reqAddr =
+            requestAddrFromCfg cfg tid (network cfg)
+        stateAddr =
             cageAddrFromCfg cfg (network cfg)
-    cageUtxos <- queryUTxOs prov scriptAddr
+    requestUtxos <- queryUTxOs prov reqAddr
+    stateUtxos <- queryUTxOs prov stateAddr
     let reqUtxo =
-            findUtxoByTxIn reqTxIn cageUtxos
+            findUtxoByTxIn reqTxIn requestUtxos
     reqUtxoPair <- case reqUtxo of
         Nothing ->
             error
@@ -110,7 +113,7 @@ retractRequestImpl cfg prov tid reqTxIn addr = do
         case findStateUtxo
             policyId
             tid
-            cageUtxos of
+            stateUtxos of
             Nothing ->
                 error
                     "retractRequest: state UTxO \
@@ -154,7 +157,7 @@ retractRequestImpl cfg prov tid reqTxIn addr = do
     SlotNo s <-
         posixMsToSlot prov phase2End
     let upperSlot = SlotNo (max 0 (s - 1))
-        script = mkCageScript cfg
+        script = mkRequestScript cfg tid
         scriptHash = hashScript script
         allInputs =
             Set.fromList [reqIn, fst feeUtxo]

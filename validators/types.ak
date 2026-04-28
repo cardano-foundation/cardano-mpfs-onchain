@@ -1,3 +1,9 @@
+use aiken/crypto.{VerificationKeyHash}
+use aiken/merkle_patricia_forestry.{Proof}
+use cardano/assets.{PolicyId}
+use cardano/transaction.{OutputReference}
+use lib.{TokenId}
+
 /// Core type definitions for the MPF Cage validator.
 ///
 /// This module defines the data structures used for:
@@ -56,13 +62,6 @@
 /// - The `Operation` variants carry the right payloads (Insert has 1 value,
 ///   Delete has 1 value, Update has 2 values)
 /// - `MintRedeemer` and `UpdateRedeemer` cover all action types exhaustively
-
-use aiken/crypto.{VerificationKeyHash}
-use aiken/merkle_patricia_forestry.{Proof}
-use cardano/assets.{PolicyId}
-use cardano/transaction.{OutputReference}
-use lib.{TokenId}
-
 /// Parameters for migrating a caged token from an old validator to a new one.
 ///
 /// During migration, the old token is burned (under `oldPolicy`) and a new
@@ -99,13 +98,14 @@ pub type Migration {
 /// 2. The `End` spending validator ensures the State UTxO owner signed the tx.
 /// 3. The `End` validator checks the mint field contains the token being burned.
 pub type MintRedeemer {
-  /// Mint a new caged token. Authorization comes from consuming the
-  /// validator's `seed` parameter UTxO; no redeemer payload is needed.
-  Minting
+  /// Mint a new caged token. The seed output reference is consumed by the
+  /// transaction and also determines the cage token asset name.
+  Minting(OutputReference)
   /// Migrate a caged token from an old validator to this one
   Migrating(Migration)
-  /// Burn an existing caged token (no additional validation)
-  Burning
+  /// Burn an existing caged token. The token id is carried so the global state
+  /// policy can reject unrelated asset movements under the same policy id.
+  Burning(TokenId)
 }
 
 /// Per-request action in a `Modify` redeemer.

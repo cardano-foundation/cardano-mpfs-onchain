@@ -14,9 +14,10 @@ against the declared schemas.
 The blueprint also carries optional @compiledCode@
 fields (hex-encoded double-CBOR PlutusV3 scripts).
 'extractCompiledCode' decodes these into
-'ShortByteString' suitable for 'PlutusBinary', and
-'applyOutputRef' applies the seed @OutputReference@
-parameter to produce the final on-chain script.
+'ShortByteString' suitable for 'PlutusBinary'.
+The state script is unparameterized; the request
+script is parameterized by @(statePolicyId,
+cageToken)@ via 'applyRequestParams'.
 -}
 module Cardano.MPFS.Cage.Blueprint (
     -- * Schema types
@@ -39,7 +40,9 @@ module Cardano.MPFS.Cage.Blueprint (
 
     -- * Parameter application
     applyDataParam,
+    applyBytesParam,
     applyOutputRef,
+    applyRequestParams,
 ) where
 
 import Data.Aeson (
@@ -65,7 +68,10 @@ import PlutusLedgerApi.V3 (
     serialiseUPLC,
     uncheckedDeserialiseUPLC,
  )
-import PlutusTx.Builtins.Internal (BuiltinData (..))
+import PlutusTx.Builtins.Internal (
+    BuiltinByteString (..),
+    BuiltinData (..),
+ )
 import PlutusTx.IsData.Class (ToData (..))
 import UntypedPlutusCore (
     Program (..),
@@ -74,7 +80,10 @@ import UntypedPlutusCore (
 import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.DeBruijn ()
 
-import Cardano.MPFS.Cage.Types (OnChainTxOutRef)
+import Cardano.MPFS.Cage.Types (
+    OnChainTokenId (..),
+    OnChainTxOutRef,
+ )
 
 -- | A single constructor alternative in a schema.
 data Constructor = Constructor
@@ -396,6 +405,16 @@ applyDataParam d sbs =
   where
     progVer (Program _ v _) = v
 
+-- | Apply a raw bytes parameter to a UPLC script.
+applyBytesParam ::
+    -- | Encoded bytes parameter
+    BS.ByteString ->
+    -- | Flat-encoded UPLC program
+    SBS.ShortByteString ->
+    SBS.ShortByteString
+applyBytesParam bs =
+    applyDataParam (B bs)
+
 {- | Apply an 'OnChainTxOutRef' parameter to a UPLC
 script. Wraps 'applyDataParam' with the canonical
 @Constr 0 [bytes, integer]@ encoding produced by the
@@ -413,3 +432,18 @@ applyOutputRef ::
 applyOutputRef ref sbs =
     let BuiltinData d = toBuiltinData ref
      in applyDataParam d sbs
+
+{- | Apply request-validator parameters in source
+order: @statePolicyId@ first, then @cageTokenName@.
+-}
+applyRequestParams ::
+    -- | State policy id bytes
+    BS.ByteString ->
+    -- | Cage token asset name
+    OnChainTokenId ->
+    -- | Flat-encoded request UPLC program
+    SBS.ShortByteString ->
+    SBS.ShortByteString
+applyRequestParams statePolicyId (OnChainTokenId (BuiltinByteString token)) sbs =
+    applyBytesParam token $
+        applyBytesParam statePolicyId sbs

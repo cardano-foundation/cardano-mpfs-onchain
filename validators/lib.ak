@@ -1,3 +1,10 @@
+use aiken/collection/dict.{get, keys}
+use aiken/collection/list.{delete, find}
+use aiken/crypto.{Hash, Sha2_256, sha2_256}
+use aiken/primitive/bytearray.{concat, from_int_big_endian}
+use cardano/assets.{AssetName, PolicyId, Value, from_asset, policies, tokens}
+use cardano/transaction.{Input, Output, OutputReference}
+
 /// Helper functions for token handling in the MPF Cage validator.
 ///
 /// This module provides utilities for:
@@ -39,14 +46,6 @@
 /// - `tokenFromValue` returns None for multi-policy values
 /// - `tokenFromValue` returns None for multi-asset-name values under one policy
 /// - `quantity` returns None when the policy or asset name is absent
-
-use aiken/collection/dict.{get, keys}
-use aiken/collection/list.{delete, find}
-use aiken/crypto.{Hash, Sha2_256, sha2_256}
-use aiken/primitive/bytearray.{concat, from_int_big_endian}
-use cardano/assets.{AssetName, PolicyId, Value, from_asset, policies, tokens}
-use cardano/transaction.{Input, Output, OutputReference}
-
 /// A unique identifier for a token, consisting of just the asset name.
 ///
 /// The policy ID is provided separately in functions that need it,
@@ -87,8 +86,42 @@ pub type TokenId {
 /// - Token not present (wrong policy) -> None
 /// - Token not present (wrong asset name) -> None
 /// - Empty value -> None
-pub fn quantity(policyId : PolicyId, value: Value, TokenId { assetName }) -> Option<Int> {
+pub fn quantity(
+  policyId: PolicyId,
+  value: Value,
+  TokenId { assetName },
+) -> Option<Int> {
   get(tokens(value, policyId), assetName)
+}
+
+/// Check that a value's token map for `policyId` contains exactly one asset,
+/// namely `tokenId`, at the expected quantity. Other policies in the value are
+/// ignored; this is used by the global state policy to avoid minting unrelated
+/// assets under the discovery policy id.
+pub fn exactQuantity(
+  policyId: PolicyId,
+  value: Value,
+  TokenId { assetName }: TokenId,
+  expected: Int,
+) -> Bool {
+  let policyTokens = tokens(value, policyId)
+  when keys(policyTokens) is {
+    [actualName] ->
+      actualName == assetName && when get(policyTokens, actualName) is {
+        Some(quantity) -> quantity == expected
+        None -> False
+      }
+    _ -> False
+  }
+}
+
+/// Extract the sole asset name under a specific policy id, ignoring other
+/// policies. Returns `None` if that policy has zero or multiple asset names.
+pub fn tokenFromPolicy(policyId: PolicyId, value: Value) -> Option<TokenId> {
+  when keys(tokens(value, policyId)) is {
+    [assetName] -> Some(TokenId { assetName })
+    _ -> None
+  }
 }
 
 /// Compute a unique asset name from an output reference.
@@ -142,7 +175,10 @@ pub fn assetName(ref: OutputReference) -> Hash<Sha2_256, OutputReference> {
 /// - The resulting value should have exactly one policy (besides ADA)
 /// - The token quantity should be exactly 1
 /// - `tokenFromValue(valueFromToken(pid, tid))` should return `Some(tid)`
-pub fn valueFromToken(policyId : PolicyId , TokenId { assetName }: TokenId) -> Value {
+pub fn valueFromToken(
+  policyId: PolicyId,
+  TokenId { assetName }: TokenId,
+) -> Value {
   from_asset(policyId, assetName, 1)
 }
 

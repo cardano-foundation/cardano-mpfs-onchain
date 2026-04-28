@@ -4,16 +4,11 @@ Description : Configuration for cage transaction builders
 License     : Apache-2.0
 
 Configuration record for the cage transaction
-builders. Holds the applied PlutusV3 script bytes,
-computed script hash, the seed @OutputReference@
-the validator was parameterized with, default token
-parameters, and network.
-
-After the introduction of per-token addressing, a
-'CageConfig' is /per-cage/: one instance per minted
-token, each with its own seed-derived script hash
-and address. Construct one via 'applyOutputRef'
-applied to the unparameterized blueprint bytes.
+builders. Holds the global state PlutusV3 script
+bytes, the unapplied request validator bytes, the
+state script hash, the seed @OutputReference@ used
+by boot minting, default token parameters, and
+network.
 -}
 module Cardano.MPFS.Cage.Config (
     -- * Configuration
@@ -32,29 +27,29 @@ import Cardano.MPFS.Cage.Types (OnChainTxOutRef)
 builders.
 
 The 'cageScriptBytes' field holds the raw
-flat-encoded UPLC script after parameter
-application. The 'cfgScriptHash' is the hash of the
-deserialized script. The 'cageSeed' records the
-@OutputReference@ that was applied as the validator
-parameter — used by 'bootTokenImpl' as the UTxO to
-consume in the mint transaction (must be present in
-the boot caller's wallet).
+flat-encoded global state UPLC script. The
+'requestScriptBytes' field holds the raw
+flat-encoded request validator before applying
+@(statePolicyId, cageToken)@. The 'cfgScriptHash'
+is the state script hash and therefore the state
+policy ID. The 'cageSeed' records the
+@OutputReference@ consumed by boot minting.
 -}
 data CageConfig = CageConfig
     { cageScriptBytes :: !ShortByteString
-    -- ^ PlutusV3 script bytes (applied parameters)
+    -- ^ PlutusV3 state script bytes
+    , requestScriptBytes :: !ShortByteString
+    -- ^ Unapplied PlutusV3 request script bytes
     , cfgScriptHash :: !ScriptHash
-    -- ^ Hash of the PlutusV3 script
+    -- ^ Hash of the state PlutusV3 script
     , cageSeed :: !OnChainTxOutRef
-    {- ^ Seed @OutputReference@ the validator was
-    parameterized with. Boot consumes this UTxO.
-    -}
+    -- ^ Seed @OutputReference@ consumed by boot
     , defaultProcessTime :: !Integer
     -- ^ Phase 1 window (ms) for oracle processing
     , defaultRetractTime :: !Integer
     -- ^ Phase 2 window (ms) for requester retract
     , defaultTip :: !Coin
-    -- ^ Default max fee for newly booted tokens
+    -- ^ Default oracle tip for newly booted tokens
     , network :: !Network
     -- ^ Target network (Mainnet or Testnet)
     }
