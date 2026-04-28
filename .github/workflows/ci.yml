@@ -27,12 +27,11 @@ jobs:
           .#checks.x86_64-linux.cage-test-vectors
           .#checks.x86_64-linux.lint
           .#checks.x86_64-linux.vectors-freshness
+          .#checks.x86_64-linux.aiken-check
+          .#checks.x86_64-linux.aiken-build
 
-      - name: Build plutus.json
-        run: nix build
-
-      - name: Run aiken tests
-        run: nix develop .#aiken --quiet --command aiken check
+      - name: Stage plutus.json artifact
+        run: nix build --quiet .#checks.x86_64-linux.aiken-build
 
       - name: Upload plutus.json
         uses: actions/upload-artifact@v6
@@ -64,7 +63,7 @@ jobs:
           cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Build plutus.json blueprint
-        run: nix build
+        run: nix build --quiet .#checks.x86_64-linux.aiken-build
 
       - name: Run cage devnet E2E tests
         env:

@@ -95,23 +95,44 @@
           source = "github"
         '';
 
+        # Stage stdlib, fuzz, and merkle-patricia-forestry into
+        # build/packages so `aiken <subcommand>` runs hermetically
+        # in the sandbox. Reused across the build and the check
+        # derivations so there is one source of truth for the
+        # Aiken prelude.
+        aikenPrelude = ''
+          mkdir -p build/packages
+          cp ${packagesToml} build/packages/packages.toml
+          cp -r ${stdlib} build/packages/aiken-lang-stdlib
+          cp -r ${fuzz} build/packages/aiken-lang-fuzz
+          cp -r ${merkle-patricia-forestry} build/packages/aiken-lang-merkle-patricia-forestry
+          chmod -R u+w build/packages
+        '';
+
         plutus-blueprint = pkgs.stdenv.mkDerivation {
           pname = "mpf-plutus-blueprint";
           version = "0.0.0";
           src = pkgs.lib.cleanSource ./.;
           nativeBuildInputs = [ pkgs.aiken ];
           buildPhase = ''
-            mkdir -p build/packages
-            cp ${packagesToml} build/packages/packages.toml
-            cp -r ${stdlib} build/packages/aiken-lang-stdlib
-            cp -r ${fuzz} build/packages/aiken-lang-fuzz
-            cp -r ${merkle-patricia-forestry} build/packages/aiken-lang-merkle-patricia-forestry
-            chmod -R u+w build/packages
+            ${aikenPrelude}
             aiken build
           '';
           installPhase = ''
             cp plutus.json $out
           '';
+        };
+
+        aiken-check = pkgs.stdenv.mkDerivation {
+          pname = "mpf-aiken-check";
+          version = "0.0.0";
+          src = pkgs.lib.cleanSource ./.;
+          nativeBuildInputs = [ pkgs.aiken ];
+          buildPhase = ''
+            ${aikenPrelude}
+            aiken check
+          '';
+          installPhase = "touch $out";
         };
 
         # -------------------------------------------------------
@@ -130,6 +151,14 @@
           shell = project.project.shell;
           cardanoNode =
             cardano-node.packages.${system}.cardano-node;
+        };
+
+        # Aiken-side checks. Exposed so CI can build them via
+        # `.#checks.<sys>.<name>` like the Haskell checks, instead
+        # of falling back to `nix develop .#aiken --command aiken …`.
+        aikenChecks = {
+          aiken-build = plutus-blueprint;
+          inherit aiken-check;
         };
 
         haskellApps = import ./haskell/nix/apps.nix {
@@ -156,7 +185,7 @@
           inherit plutus-blueprint test-vectors test-vectors-json;
         };
 
-        checks = haskellChecks;
+        checks = haskellChecks // aikenChecks;
 
         apps = haskellApps;
 
