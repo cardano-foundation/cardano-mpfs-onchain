@@ -41,3 +41,16 @@ haskell-build:
 # Run Haskell E2E tests against a devnet
 haskell-e2e:
     cd haskell && MPFS_BLUEPRINT=../plutus.json cabal test e2e-tests -O0
+
+# Generate the hex-encoded UPLC input consumed by the experimental Blaster project
+blaster-generate:
+    nix develop .#aiken -c aiken build
+    bash scripts/extract-blaster-uplc.sh plutus.json lean-blaster/generated
+
+# Update the pinned Blaster flake inputs
+blaster-update:
+    nix flake lock --update-input leanBlaster --update-input plutusCoreBlaster --update-input cardanoLedgerApiBlaster
+
+# Build the experimental Smartcode Verifier / Blaster bridge
+blaster-build:
+    nix build -L .#mpfs-cage-blaster

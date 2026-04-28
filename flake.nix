@@ -12,6 +12,19 @@
       "github:input-output-hk/haskell.nix/baa6a549ce876e9c44c494a12116f178f1becbe6";
     nixpkgs.follows = "haskellNix/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    leanBlaster.url = "github:paolino/Lean-blaster/feat/nix-flake";
+    lean4Nix.follows = "leanBlaster/lean4-nix";
+    leanNixpkgs.follows = "leanBlaster/nixpkgs";
+    plutusCoreBlaster = {
+      url =
+        "github:input-output-hk/PlutusCoreBlaster/17cee18a2058790bca36282d82c19146587fb2d1";
+      flake = false;
+    };
+    cardanoLedgerApiBlaster = {
+      url =
+        "github:input-output-hk/CardanoLedgerApiBlaster/577e3eb03b5be09354cfdb1c0d0c12e9e16541a0";
+      flake = false;
+    };
     iohkNix = {
       url =
         "github:input-output-hk/iohk-nix/0ce7cc21b9a4cfde41871ef486d01a8fafbf9627";
@@ -35,6 +48,11 @@
       nixpkgs,
       flake-utils,
       haskellNix,
+      leanBlaster,
+      lean4Nix,
+      leanNixpkgs,
+      plutusCoreBlaster,
+      cardanoLedgerApiBlaster,
       iohkNix,
       CHaP,
       cardano-node,
@@ -149,14 +167,138 @@
           ${pkgs.lib.getExe components.exes.cage-test-vectors} > $out
         '';
 
+        # -------------------------------------------------------
+        # Lean Blaster build graph
+        # -------------------------------------------------------
+
+        leanNixPkgs = import leanNixpkgs {
+          inherit system;
+          overlays = [
+            (lean4Nix.readToolchainFile {
+              toolchain = leanBlaster.outPath + "/lean-toolchain";
+              binary = true;
+            })
+            (_final: prev: {
+              z3 = prev.z3.overrideAttrs {
+                version = "4.15.2";
+                src = prev.fetchFromGitHub {
+                  owner = "Z3Prover";
+                  repo = "z3";
+                  rev = "z3-4.15.2";
+                  hash = "sha256-hUGZdr0VPxZ0mEUpcck1AC0MpyZMjiMw/kK8WX7t0xU=";
+                };
+              };
+            })
+          ];
+        };
+
+        leanPkgs = leanNixPkgs.lean;
+
+        cleanLeanSource =
+          src:
+          pkgs.lib.cleanSourceWith {
+            inherit src;
+            filter =
+              path: type:
+              let
+                baseName = builtins.baseNameOf (toString path);
+              in
+              pkgs.lib.cleanSourceFilter path type
+              && baseName != ".lake"
+              && baseName != ".direnv"
+              && baseName != "generated"
+              && !(pkgs.lib.hasPrefix "result" baseName);
+          };
+
+        lean-blaster-package =
+          leanBlaster.legacyPackages.${system}.blaster;
+
+        plutus-core-blaster-package = leanPkgs.buildLeanPackage {
+          name = "PlutusCore";
+          roots = [ "PlutusCore" ];
+          src = cleanLeanSource plutusCoreBlaster;
+          deps = [ lean-blaster-package ];
+        };
+
+        cardano-ledger-api-blaster-package =
+          leanPkgs.buildLeanPackage {
+            name = "CardanoLedgerApi";
+            roots = [ "CardanoLedgerApi" ];
+            src = cleanLeanSource cardanoLedgerApiBlaster;
+            deps = [
+              lean-blaster-package
+              plutus-core-blaster-package
+            ];
+          };
+
+        mpfs-cage-blaster-src =
+          pkgs.runCommand "mpfs-cage-blaster-src" { nativeBuildInputs = [ pkgs.jq ]; } ''
+            mkdir -p $out
+            cp -R ${cleanLeanSource ./lean-blaster}/. $out/
+            chmod -R u+w $out
+            mkdir -p $out/generated
+            extract() {
+              local title="$1"
+              local output="$2"
+              jq -er --arg title "$title" \
+                '.validators[] | select(.title == $title) | .compiledCode' \
+                ${plutus-blueprint} | tr -d '\n\r[:space:]' > "$output"
+            }
+            extract "state.state.mint" $out/generated/mpf_state_mint.flat
+            extract "state.state.spend" $out/generated/mpf_state_spend.flat
+            extract "request.request.spend" $out/generated/mpf_request_spend.flat
+            substituteInPlace $out/MpfsCageBlaster/Scripts.lean \
+              --replace-fail '"generated/mpf_state_mint.flat"' "\"$out/generated/mpf_state_mint.flat\"" \
+              --replace-fail '"generated/mpf_state_spend.flat"' "\"$out/generated/mpf_state_spend.flat\"" \
+              --replace-fail '"generated/mpf_request_spend.flat"' "\"$out/generated/mpf_request_spend.flat\""
+          '';
+
+        mpfs-cage-blaster-package = leanPkgs.buildLeanPackage {
+          name = "MpfsCageBlaster";
+          roots = [ "MpfsCageBlaster" ];
+          src = mpfs-cage-blaster-src;
+          deps = [
+            lean-blaster-package
+            plutus-core-blaster-package
+            cardano-ledger-api-blaster-package
+          ];
+          overrideBuildModAttrs = _final: prev: {
+            buildInputs = (prev.buildInputs or [ ]) ++ [ leanNixPkgs.z3 ];
+          };
+        };
+
+        lean-blaster = lean-blaster-package.modRoot;
+        lean-blaster-z3check = leanBlaster.packages.${system}.z3check;
+        plutus-core-blaster = plutus-core-blaster-package.modRoot;
+        cardano-ledger-api-blaster =
+          cardano-ledger-api-blaster-package.modRoot;
+        mpfs-cage-blaster = mpfs-cage-blaster-package.modRoot;
+
       in
       {
         packages = {
           default = plutus-blueprint;
-          inherit plutus-blueprint test-vectors test-vectors-json;
+          inherit
+            lean-blaster
+            lean-blaster-z3check
+            cardano-ledger-api-blaster
+            mpfs-cage-blaster
+            plutus-blueprint
+            plutus-core-blaster
+            test-vectors
+            test-vectors-json;
         };
 
-        checks = haskellChecks;
+        checks = haskellChecks // {
+          inherit
+            cardano-ledger-api-blaster
+            lean-blaster
+            mpfs-cage-blaster
+            plutus-core-blaster;
+          "lean-blaster-smoke-test" =
+            leanBlaster.checks.${system}.smoke-test;
+          "lean-blaster-tests" = leanBlaster.checks.${system}.tests;
+        };
 
         apps = haskellApps;
 

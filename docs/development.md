@@ -60,6 +60,19 @@ Build the formal proofs (phase exclusivity, token handling):
 cd lean && lake build
 ```
 
+### Blaster UPLC properties
+
+Build the compiled-code property checks against the Aiken-generated UPLC:
+
+```sh
+just blaster-build
+# or directly:
+nix build -L .#mpfs-cage-blaster
+```
+
+See [Blaster UPLC Properties](architecture/blaster.md) for the build graph,
+cache checks, and how to add new properties.
+
 ## Nix checks and apps
 
 The flake exposes checks (sandboxed derivations) and apps (runnable wrappers):
@@ -116,6 +129,9 @@ Haskell reference.
 | `just vectors-check` | Verify committed vectors are fresh |
 | `just haskell-build` | Build Haskell cage library with cabal |
 | `just haskell-e2e` | Run Haskell E2E tests against a devnet |
+| `just blaster-generate` | Generate local UPLC files for manual Blaster/Lake work |
+| `just blaster-update` | Update pinned Blaster flake inputs |
+| `just blaster-build` | Build the Nix-backed Blaster UPLC property package |
 
 ## How the Nix build works
 
@@ -131,3 +147,8 @@ The Haskell cage library is built via
 [haskell.nix](https://github.com/input-output-hk/haskell.nix)
 with GHC 9.8.4 and dependencies from
 [CHaP](https://github.com/intersectmbo/cardano-haskell-packages).
+
+The Blaster bridge is also built by Nix. The flake builds the Aiken blueprint,
+extracts the split validator `compiledCode` entries, injects those generated
+UPLC files into the `lean-blaster/` package, and then builds
+`.#mpfs-cage-blaster` with the pinned Lean-blaster inputs.

@@ -6,6 +6,8 @@ encoding tests, and the Lean models in `lean/MpfsCage`.
 
 Run `aiken check` (or `just test`) for validator tests. Run `lake build` in
 `lean/` for the formal phase, token, and split-validator proofs.
+Run `just blaster-build` for SMT-backed properties over the compiled UPLC; see
+[Blaster UPLC Properties](blaster.md) for the Nix-backed workflow.
 
 ## Roles
 
