@@ -31,7 +31,6 @@ import Lens.Micro ((&), (.~), (^.))
 import Cardano.Ledger.Address (Addr)
 import Cardano.Ledger.Alonzo.Scripts (AsIx)
 import Cardano.Ledger.Api.Tx (
-    Tx,
     bodyTxL,
  )
 import Cardano.Ledger.Api.Tx.Body (
@@ -82,8 +81,9 @@ import Cardano.MPFS.Cage.Types (
     RequestAction (..),
     UpdateRedeemer (..),
  )
-import Cardano.Node.Client.TxBuild qualified as Tx
 import Cardano.Slotting.Slot (SlotNo)
+import Cardano.Tx.Build qualified as Tx
+import Cardano.Tx.Ledger (ConwayTx)
 
 -- | Empty query GADT (no context needed).
 data NoCtx a
@@ -96,7 +96,7 @@ rejectRequestsImpl ::
     Provider IO ->
     TokenId ->
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 rejectRequestsImpl cfg prov tid addr = do
     (stateUtxo, reqUtxos, feeUtxo, pp) <-
         queryRejectContext cfg prov tid addr
@@ -122,10 +122,11 @@ rejectRequestsImpl cfg prov tid addr = do
                 lowerSlot
     result <-
         Tx.build
-            pp
+            (Tx.mkPParamsBound pp)
             (Tx.InterpretIO (const (pure undefined)))
             evalTx
             (feeUtxo : stateUtxo : reqUtxos)
+            []
             addr
             (prog :: Tx.TxBuild NoCtx Void ())
     case result of
@@ -208,7 +209,7 @@ prepareRejectState ::
     ( OnChainTokenState
     , TxOut ConwayEra
     , Script ConwayEra
-    , KeyHash 'Witness
+    , KeyHash Guard
     )
 prepareRejectState cfg stateOut =
     let scriptAddr =
@@ -279,7 +280,7 @@ computeLowerSlot prov oldState reqUtxos = do
 -- | Wrap the Provider's evaluateTx for the DSL.
 mkRejectEvalTx ::
     Provider IO ->
-    Tx ConwayEra ->
+    ConwayTx ->
     IO
         ( Map.Map
             (ConwayPlutusPurpose AsIx ConwayEra)
@@ -306,7 +307,7 @@ buildRejectProgram ::
     TxOut ConwayEra ->
     Script ConwayEra ->
     Script ConwayEra ->
-    KeyHash 'Witness ->
+    KeyHash Guard ->
     SlotNo ->
     Tx.TxBuild NoCtx Void ()
 buildRejectProgram

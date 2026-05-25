@@ -25,7 +25,6 @@ import Cardano.Ledger.Alonzo.TxBody (
     scriptIntegrityHashTxBodyL,
  )
 import Cardano.Ledger.Api.Tx (
-    Tx,
     mkBasicTx,
     witsTxL,
  )
@@ -56,7 +55,7 @@ import Cardano.MPFS.Cage.Config (
     CageConfig (..),
  )
 import Cardano.MPFS.Cage.Ledger (
-    ConwayEra,
+    ConwayTxBody,
     TokenId (..),
  )
 import Cardano.MPFS.Cage.Provider (Provider (..))
@@ -67,6 +66,7 @@ import Cardano.MPFS.Cage.Types (
     OnChainTokenState (..),
     UpdateRedeemer (..),
  )
+import Cardano.Tx.Ledger (ConwayTx)
 
 -- | Build an end-token (burn) transaction.
 endTokenImpl ::
@@ -74,7 +74,7 @@ endTokenImpl ::
     Provider IO ->
     TokenId ->
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 endTokenImpl cfg prov tid addr = do
     let scriptAddr =
             cageAddrFromCfg cfg (network cfg)
@@ -144,7 +144,8 @@ endTokenImpl cfg prov tid addr = do
                     ]
         integrity =
             computeScriptIntegrity pp redeemers
-    let body =
+    let body :: ConwayTxBody
+        body =
             mkBasicTxBody
                 & inputsTxBodyL
                     .~ Set.singleton stateIn

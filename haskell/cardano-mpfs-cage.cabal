@@ -46,8 +46,8 @@ library
     , cardano-strict-containers
     , cardano-ledger-core
     , cardano-ledger-mary
-    , cardano-node-clients
     , cardano-slotting
+    , cardano-tx-tools
     , containers             >=0.6  && <0.8
     , crypton
     , memory
@@ -135,9 +135,10 @@ test-suite e2e-tests
     , cardano-node-clients
     , cardano-node-clients:devnet
     , cardano-strict-containers
+    , cardano-tx-tools
     , containers
     , hspec
     , microlens
-    , ouroboros-network-api
+    , ouroboros-network
 
   ghc-options:      -threaded -with-rtsopts=-N
