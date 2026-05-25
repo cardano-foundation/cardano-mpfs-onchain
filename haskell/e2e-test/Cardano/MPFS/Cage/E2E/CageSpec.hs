@@ -30,7 +30,6 @@ import Test.Hspec (
 
 import Cardano.Ledger.Address (Addr)
 import Cardano.Ledger.Api.Tx (
-    Tx,
     bodyTxL,
     mkBasicTx,
     txIdTx,
@@ -103,10 +102,6 @@ import Cardano.MPFS.Cage.TxBuilder.Update (
     updateTokenImpl,
  )
 import Cardano.MPFS.Cage.Types (OnChainTxOutRef)
-import Cardano.Node.Client.Balance (
-    BalanceResult (balancedTx),
-    balanceTx,
- )
 import Cardano.Node.Client.E2E.Devnet (
     withCardanoNode,
  )
@@ -132,6 +127,11 @@ import Cardano.Node.Client.Submitter (
     SubmitResult (..),
     Submitter (..),
  )
+import Cardano.Tx.Balance (
+    BalanceResult (balancedTx),
+    balanceTx,
+ )
+import Cardano.Tx.Ledger (ConwayTx)
 import Ouroboros.Network.Magic (NetworkMagic (..))
 
 {- | Full cage protocol E2E test spec.
@@ -472,7 +472,7 @@ submitMalformedRequestUtxo cfg prov submit tokenId addr = do
                 mkBasicTxBody
                     & outputsTxBodyL
                         .~ StrictSeq.singleton txOut
-    case balanceTx pp [feeUtxo] addr tx of
+    case balanceTx pp [feeUtxo] [] addr tx of
         Left err ->
             error $
                 "submitMalformedRequestUtxo: "
@@ -489,8 +489,8 @@ submitMalformedRequestUtxo cfg prov submit tokenId addr = do
 
 submitWithGenesis ::
     Submitter IO ->
-    Tx ConwayEra ->
-    IO (Tx ConwayEra)
+    ConwayTx ->
+    IO ConwayTx
 submitWithGenesis submit unsignedTx = do
     let signedTx =
             addKeyWitness
@@ -638,7 +638,7 @@ assertSubmitted (Rejected reason) =
 transaction's mint field.
 -}
 extractTokenId ::
-    CageConfig -> Tx ConwayEra -> TokenId
+    CageConfig -> ConwayTx -> TokenId
 extractTokenId cfg tx =
     let MultiAsset ma =
             tx ^. bodyTxL . mintTxBodyL

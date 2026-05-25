@@ -23,7 +23,7 @@ let
   project = pkgs.haskell-nix.cabalProject' ({ lib, pkgs, ... }: {
     name = "cardano-mpfs-cage";
     src = ./..;
-    compiler-nix-name = "ghc984";
+    compiler-nix-name = "ghc9123";
     shell = shell { inherit pkgs; };
     modules = [ fix-libs ];
     inputMap = { "https://chap.intersectmbo.org/" = CHaP; };

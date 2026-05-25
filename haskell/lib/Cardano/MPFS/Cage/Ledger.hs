@@ -28,6 +28,7 @@ module Cardano.MPFS.Cage.Ledger (
     KeyRole (..),
     ExUnits (..),
     PParams,
+    ConwayTxBody,
 
     -- * Token identification
     TokenId (..),
@@ -46,6 +47,7 @@ module Cardano.MPFS.Cage.Ledger (
 import Data.ByteString (ByteString)
 
 import Cardano.Ledger.Address (Addr)
+import Cardano.Ledger.Alonzo.Core (TopTx, TxBody)
 import Cardano.Ledger.Api.Tx.Out (TxOut)
 import Cardano.Ledger.Coin (Coin (..))
 import Cardano.Ledger.Conway (ConwayEra)
@@ -60,6 +62,9 @@ import Cardano.Ledger.Mary.Value (
 import Cardano.Ledger.Plutus.ExUnits (ExUnits (..))
 import Cardano.Ledger.Slot (SlotNo (..))
 import Cardano.Ledger.TxIn (TxId, TxIn)
+
+-- | Conway-era top-level transaction body.
+type ConwayTxBody = TxBody TopTx ConwayEra
 
 {- | Unique identifier for a token managed by the
 cage. Corresponds to the on-chain asset name
@@ -100,7 +105,7 @@ data Operation
 data Request = Request
     { requestToken :: !TokenId
     -- ^ The token whose trie is being modified
-    , requestOwner :: !(KeyHash 'Payment)
+    , requestOwner :: !(KeyHash Payment)
     -- ^ The owner's payment key hash
     , requestKey :: !ByteString
     -- ^ The key to operate on
@@ -115,7 +120,7 @@ data Request = Request
 
 -- | Current on-chain state of a token.
 data TokenState = TokenState
-    { owner :: !(KeyHash 'Payment)
+    { owner :: !(KeyHash Payment)
     -- ^ Owner's payment key hash
     , root :: !Root
     -- ^ Current root hash of the token's trie

@@ -34,7 +34,6 @@ import Cardano.Ledger.Alonzo.TxBody (
     scriptIntegrityHashTxBodyL,
  )
 import Cardano.Ledger.Api.Tx (
-    Tx,
     mkBasicTx,
     witsTxL,
  )
@@ -65,7 +64,7 @@ import Cardano.MPFS.Cage.Config (
     CageConfig (..),
  )
 import Cardano.MPFS.Cage.Ledger (
-    ConwayEra,
+    ConwayTxBody,
     TokenId,
  )
 import Cardano.MPFS.Cage.Provider (Provider (..))
@@ -75,6 +74,7 @@ import Cardano.MPFS.Cage.Types (
     OnChainTokenState (..),
     UpdateRedeemer (..),
  )
+import Cardano.Tx.Ledger (ConwayTx)
 
 {- | Build a standalone sweep transaction.
 
@@ -100,7 +100,7 @@ sweepUtxoImpl ::
     and balancing come from this wallet)
     -}
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 sweepUtxoImpl cfg prov tid garbTxIn addr = do
     let reqAddr =
             requestAddrFromCfg cfg tid (network cfg)
@@ -169,6 +169,7 @@ sweepUtxoImpl cfg prov tid garbTxIn addr = do
                     )
         integrity =
             computeScriptIntegrity pp redeemers
+        body :: ConwayTxBody
         body =
             mkBasicTxBody
                 & inputsTxBodyL

@@ -28,7 +28,6 @@ import Cardano.Ledger.Alonzo.TxBody (
     scriptIntegrityHashTxBodyL,
  )
 import Cardano.Ledger.Api.Tx (
-    Tx,
     mkBasicTx,
     witsTxL,
  )
@@ -61,7 +60,7 @@ import Cardano.MPFS.Cage.Config (
     CageConfig (..),
  )
 import Cardano.MPFS.Cage.Ledger (
-    ConwayEra,
+    ConwayTxBody,
     TokenId,
  )
 import Cardano.MPFS.Cage.Provider (Provider (..))
@@ -72,6 +71,7 @@ import Cardano.MPFS.Cage.Types (
     OnChainTokenState (..),
     UpdateRedeemer (..),
  )
+import Cardano.Tx.Ledger (ConwayTx)
 import PlutusTx.Builtins.Internal (
     BuiltinByteString (..),
  )
@@ -91,7 +91,7 @@ retractRequestImpl ::
     TxIn ->
     -- | Requester's address (receives refund)
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 retractRequestImpl cfg prov tid reqTxIn addr = do
     let reqAddr =
             requestAddrFromCfg cfg tid (network cfg)
@@ -179,6 +179,7 @@ retractRequestImpl cfg prov tid reqTxIn addr = do
             ValidityInterval
                 (SJust lowerSlot)
                 (SJust upperSlot)
+        body :: ConwayTxBody
         body =
             mkBasicTxBody
                 & inputsTxBodyL

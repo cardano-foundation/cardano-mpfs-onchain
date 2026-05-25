@@ -28,7 +28,6 @@ import Lens.Micro ((&), (.~), (^.))
 
 import Cardano.Ledger.Address (Addr)
 import Cardano.Ledger.Api.Tx (
-    Tx,
     mkBasicTx,
  )
 import Cardano.Ledger.Api.Tx.Body (
@@ -59,10 +58,11 @@ import Cardano.MPFS.Cage.TxBuilder.Internal
 import Cardano.MPFS.Cage.Types (
     OnChainOperation (..),
  )
-import Cardano.Node.Client.Balance (
+import Cardano.Tx.Balance (
     BalanceResult (..),
     balanceTx,
  )
+import Cardano.Tx.Ledger (ConwayTx)
 
 -- | Build a request-insert transaction.
 requestInsertImpl ::
@@ -76,7 +76,7 @@ requestInsertImpl ::
     -- | Value to insert
     ByteString ->
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 requestInsertImpl cfg prov tip tid key value =
     requestImpl
         cfg
@@ -98,7 +98,7 @@ requestDeleteImpl ::
     -- | Old value (for on-chain proof)
     ByteString ->
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 requestDeleteImpl cfg prov tip tid key val =
     requestImpl
         cfg
@@ -122,7 +122,7 @@ requestUpdateImpl ::
     -- | New value
     ByteString ->
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 requestUpdateImpl
     cfg
     prov
@@ -149,7 +149,7 @@ requestImpl ::
     ByteString ->
     OnChainOperation ->
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 requestImpl cfg prov (Coin mf) tid key op addr = do
     pp <- queryProtocolParams prov
     utxos <- queryUTxOs prov addr
@@ -188,7 +188,7 @@ requestImpl cfg prov (Coin mf) tid key op addr = do
                 & outputsTxBodyL
                     .~ StrictSeq.singleton txOut
         tx = mkBasicTx body
-    case balanceTx pp [feeUtxo] addr tx of
+    case balanceTx pp [feeUtxo] [] addr tx of
         Left err ->
             error $
                 "requestImpl: " <> show err

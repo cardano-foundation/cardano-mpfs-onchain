@@ -27,7 +27,6 @@ import Cardano.Ledger.Alonzo.TxBody (
     scriptIntegrityHashTxBodyL,
  )
 import Cardano.Ledger.Api.Tx (
-    Tx,
     mkBasicTx,
     witsTxL,
  )
@@ -79,6 +78,7 @@ import Cardano.MPFS.Cage.Types (
     OnChainTokenState (..),
     OnChainTxOutRef,
  )
+import Cardano.Tx.Ledger (ConwayTx)
 
 -- | Locate the wallet UTxO whose on-chain reference matches @cageSeed@.
 lookupSeed ::
@@ -93,7 +93,7 @@ bootTokenImpl ::
     CageConfig ->
     Provider IO ->
     Addr ->
-    IO (Tx ConwayEra)
+    IO ConwayTx
 bootTokenImpl cfg prov addr = do
     pp <- queryProtocolParams prov
     utxos <- queryUTxOs prov addr

@@ -8,8 +8,14 @@
   };
 
   inputs = {
-    haskellNix.url =
-      "github:input-output-hk/haskell.nix/baa6a549ce876e9c44c494a12116f178f1becbe6";
+    hackageNix = {
+      url = "github:input-output-hk/hackage.nix";
+      flake = false;
+    };
+    haskellNix = {
+      url = "github:input-output-hk/haskell.nix/04f3b8ad4063be341cb773e79c3ff3d88f2cb6d7";
+      inputs.hackage.follows = "hackageNix";
+    };
     nixpkgs.follows = "haskellNix/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     iohkNix = {
@@ -19,14 +25,14 @@
     };
     CHaP = {
       url =
-        "github:intersectmbo/cardano-haskell-packages/a46182e9c039737bf43cdb5286df49bbe0edf6fb";
+        "github:intersectmbo/cardano-haskell-packages/8479db771a3186eb326e42d8480eddc20a208275";
       flake = false;
     };
     # Pinned cardano-node, used as a subprocess by the devnet E2E
     # tests. Version tracks the upstream cardano-node-clients
     # devnet Dockerfile.
     cardano-node = {
-      url = "github:IntersectMBO/cardano-node/10.5.4";
+      url = "github:IntersectMBO/cardano-node/10.7.0";
     };
   };
 

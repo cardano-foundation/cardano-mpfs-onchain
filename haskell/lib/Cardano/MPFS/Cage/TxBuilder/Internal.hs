@@ -87,6 +87,7 @@ import Cardano.Ledger.Alonzo.Scripts (
     mkPlutusScript,
  )
 import Cardano.Ledger.Alonzo.Tx (
+    ScriptIntegrity (..),
     ScriptIntegrityHash,
     hashScriptIntegrity,
  )
@@ -104,7 +105,6 @@ import Cardano.Ledger.Api.Scripts.Data (
     dataToBinaryData,
  )
 import Cardano.Ledger.Api.Tx (
-    Tx,
     bodyTxL,
     witsTxL,
  )
@@ -125,7 +125,7 @@ import Cardano.Ledger.Api.Tx.Wits (
 import Cardano.Ledger.BaseTypes (
     Inject (..),
     Network,
-    StrictMaybe,
+    StrictMaybe (..),
     TxIx (..),
  )
 import Cardano.Ledger.Core (
@@ -188,11 +188,12 @@ import Cardano.MPFS.Cage.Types (
     OnChainTokenId (..),
     OnChainTxOutRef (..),
  )
-import Cardano.Node.Client.Balance (
+import Cardano.Slotting.Slot (SlotNo)
+import Cardano.Tx.Balance (
     BalanceResult (..),
     balanceTx,
  )
-import Cardano.Slotting.Slot (SlotNo)
+import Cardano.Tx.Ledger (ConwayTx)
 
 -- | Empty MPF root (32 zero bytes).
 emptyRoot :: ByteString
@@ -215,8 +216,8 @@ evaluateAndBalance ::
     -- | Change address
     Addr ->
     -- | Unbalanced tx with placeholder ExUnits
-    Tx ConwayEra ->
-    IO (Tx ConwayEra)
+    ConwayTx ->
+    IO ConwayTx
 evaluateAndBalance prov pp inputUtxos changeAddr tx =
     do
         let existingIns =
@@ -274,6 +275,7 @@ evaluateAndBalance prov pp inputUtxos changeAddr tx =
         case balanceTx
             pp
             inputUtxos
+            []
             changeAddr
             patched' of
             Left err ->
@@ -477,12 +479,12 @@ addrFromKeyHashBytes net bs =
 payment key hash bytes.
 -}
 addrWitnessKeyHash ::
-    ByteString -> KeyHash 'Witness
+    ByteString -> KeyHash Guard
 addrWitnessKeyHash bs =
     case hashFromBytes bs of
         Just h ->
             coerce
-                (KeyHash h :: KeyHash 'Payment)
+                (KeyHash h :: KeyHash Payment)
         Nothing ->
             error
                 "addrWitnessKeyHash: \
@@ -577,8 +579,12 @@ computeScriptIntegrity pp rdmrs =
         langViews =
             Set.singleton
                 (getLanguageView pp PlutusV3)
+        emptyDats :: TxDats ConwayEra
         emptyDats = TxDats mempty
-     in hashScriptIntegrity langViews rdmrs emptyDats
+     in SJust
+            ( hashScriptIntegrity
+                (ScriptIntegrity rdmrs emptyDats langViews)
+            )
 
 -- | Get current POSIX time in milliseconds.
 currentPosixMs :: IO Integer
