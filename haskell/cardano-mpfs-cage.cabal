@@ -47,7 +47,7 @@ library
     , cardano-ledger-core
     , cardano-ledger-mary
     , cardano-slotting
-    , cardano-tx-tools
+    , cardano-tx-tools:tx-build
     , containers             >=0.6  && <0.8
     , crypton
     , memory
@@ -135,7 +135,7 @@ test-suite e2e-tests
     , cardano-node-clients
     , cardano-node-clients:devnet
     , cardano-strict-containers
-    , cardano-tx-tools
+    , cardano-tx-tools:tx-build
     , containers
     , hspec
     , microlens
