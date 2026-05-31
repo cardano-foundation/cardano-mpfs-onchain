@@ -52,8 +52,8 @@ library
     , crypton
     , memory
     , microlens
-    , mts:mpf
     , mts:mpf-test-lib
+    , mts:mpf-write
     , plutus-core
     , plutus-ledger-api
     , plutus-tx
@@ -96,7 +96,7 @@ executable cage-test-vectors
     , crypton
     , lens
     , memory
-    , mts:mpf
+    , mts:mpf-write
     , plutus-core
     , plutus-tx
     , text
