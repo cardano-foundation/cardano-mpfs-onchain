@@ -1524,6 +1524,73 @@ const refundOutput =
     reference_script: None,
   }
 
+const capturedRefundTip = 2_000_000
+
+const capturedRefundTxFee = 2_289_551
+
+const capturedStateValue = testValue |> assets.merge(from_lovelace(2_000_000))
+
+const capturedRefundState =
+  State {
+    owner: "owner",
+    root: root(mpf.empty),
+    tip: capturedRefundTip,
+    process_time: testProcessTime,
+    retract_time: testRetractTime,
+  }
+
+const capturedRefundStateDatum = Some(StateDatum(capturedRefundState))
+
+const capturedRefundStateInput =
+  Input {
+    output_reference: testStateRef,
+    output: Output {
+      address: testScriptAddress,
+      value: capturedStateValue,
+      datum: InlineDatum(StateDatum(capturedRefundState)),
+      reference_script: None,
+    },
+  }
+
+const capturedRefundStateOutput =
+  Output {
+    address: testScriptAddress,
+    value: capturedStateValue,
+    datum: InlineDatum(StateDatum(capturedRefundState)),
+    reference_script: None,
+  }
+
+const capturedRefundRequest =
+  RequestDatum(
+    Request {
+      requestToken: testToken,
+      requestKey: "42",
+      requestValue: Insert("42"),
+      requestOwner: "requester_key_aaaaaaaaaaaaaaa",
+      tip: capturedRefundTip,
+      submitted_at: 0,
+    },
+  )
+
+const capturedRefundRequestInput =
+  Input {
+    output_reference: testRequestRef,
+    output: Output {
+      address: testScriptAddress,
+      value: from_lovelace(5_020_709),
+      datum: InlineDatum(capturedRefundRequest),
+      reference_script: None,
+    },
+  }
+
+const capturedMinUtxoRefundOutput =
+  Output {
+    address: address.from_verification_key("requester_key_aaaaaaaaaaaaaaa"),
+    value: from_lovelace(849_070),
+    datum: NoDatum,
+    reference_script: None,
+  }
+
 /// Happy path: Modify with fee. Request has 2 ADA, fee is 0.5 ADA,
 /// so refund of 1.5 ADA goes to the requester's address.
 test modify_with_refund() {
@@ -1929,6 +1996,74 @@ test reject_wrong_refund() fail {
       outputs: [rejectStateOutput, bad_refund],
       extra_signatories: ["owner"],
       inputs: [feeStateInput, feeRequestInput],
+    },
+  )
+}
+
+test reject_refund_owed_above_min_utxo_passes() {
+  spend(
+    feeStateDatum,
+    Modify([Rejected]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      validity_range: phase3Range,
+      outputs: [rejectStateOutput, refundOutput],
+      extra_signatories: ["owner"],
+      inputs: [feeStateInput, feeRequestInput],
+    },
+  )
+}
+
+/// Captures the live failure shape: owed is 731_158 lovelace after fee and
+/// tip, but the ledger-valid refund output must carry 849_070 lovelace.
+test reject_refund_min_utxo_topup_passes() {
+  spend(
+    capturedRefundStateDatum,
+    Modify([Rejected]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      fee: capturedRefundTxFee,
+      validity_range: phase3Range,
+      outputs: [capturedRefundStateOutput, capturedMinUtxoRefundOutput],
+      extra_signatories: ["owner"],
+      inputs: [capturedRefundStateInput, capturedRefundRequestInput],
+    },
+  )
+}
+
+test reject_refund_under_owed_fails() fail {
+  let under_refund =
+    Output { ..capturedMinUtxoRefundOutput, value: from_lovelace(731_157) }
+  spend(
+    capturedRefundStateDatum,
+    Modify([Rejected]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      fee: capturedRefundTxFee,
+      validity_range: phase3Range,
+      outputs: [capturedRefundStateOutput, under_refund],
+      extra_signatories: ["owner"],
+      inputs: [capturedRefundStateInput, capturedRefundRequestInput],
+    },
+  )
+}
+
+test reject_refund_topup_cannot_drain_state() fail {
+  let drained_state = Output { ..capturedRefundStateOutput, value: testValue }
+  spend(
+    capturedRefundStateDatum,
+    Modify([Rejected]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      fee: capturedRefundTxFee,
+      validity_range: phase3Range,
+      outputs: [drained_state, capturedMinUtxoRefundOutput],
+      extra_signatories: ["owner"],
+      inputs: [capturedRefundStateInput, capturedRefundRequestInput],
     },
   )
 }
