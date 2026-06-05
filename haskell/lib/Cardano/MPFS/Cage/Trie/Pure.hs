@@ -31,25 +31,98 @@ import Data.IORef (
 
 import MPF.Backend.Pure (
     MPFInMemoryDB,
+    MPFPure,
     emptyMPFInMemoryDB,
     runMPFPure,
+    runMPFPureTransaction,
  )
+import MPF.Backend.Standalone (
+    MPFStandalone (..),
+    MPFStandaloneCodecs (..),
+ )
+import MPF.Deletion (deleting)
 import MPF.Hashes (
+    MPFHash,
+    isoMPFHash,
     mkMPFHash,
+    mpfHashing,
     renderMPFHash,
+    root,
  )
-import MPF.Interface (byteStringToHexKey)
-import MPF.Test.Lib (
-    deleteMPFM,
-    getRootHashM,
-    insertByteStringM,
-    proofMPFM,
+import MPF.Insertion (inserting)
+import MPF.Interface (
+    FromHexKV (..),
+    HexKey,
+    byteStringToHexKey,
+    hexKeyPrism,
+ )
+import MPF.Proof.Insertion (
+    MPFProof,
+    mkMPFInclusionProof,
  )
 
 import Cardano.MPFS.Cage.Ledger (Root (..))
 import Cardano.MPFS.Cage.Proof (toProofSteps)
 import Cardano.MPFS.Cage.Trie (Trie (..))
 import Cardano.MPFS.Cage.Types (ProofStep)
+
+mpfHashCodecs :: MPFStandaloneCodecs HexKey MPFHash MPFHash
+mpfHashCodecs =
+    MPFStandaloneCodecs
+        { mpfKeyCodec = hexKeyPrism
+        , mpfValueCodec = isoMPFHash
+        , mpfNodeCodec = isoMPFHash
+        }
+
+fromHexKVIdentity :: FromHexKV HexKey MPFHash MPFHash
+fromHexKVIdentity =
+    FromHexKV
+        { fromHexK = id
+        , fromHexV = id
+        , hexTreePrefix = const []
+        }
+
+hashKeyPath :: ByteString -> HexKey
+hashKeyPath =
+    byteStringToHexKey . renderMPFHash . mkMPFHash
+
+insertByteStringM :: ByteString -> ByteString -> MPFPure ()
+insertByteStringM k v =
+    runMPFPureTransaction mpfHashCodecs $
+        inserting
+            []
+            fromHexKVIdentity
+            mpfHashing
+            MPFStandaloneKVCol
+            MPFStandaloneMPFCol
+            (hashKeyPath k)
+            (mkMPFHash v)
+
+deleteMPFM :: HexKey -> MPFPure ()
+deleteMPFM k =
+    runMPFPureTransaction mpfHashCodecs $
+        deleting
+            []
+            fromHexKVIdentity
+            mpfHashing
+            MPFStandaloneKVCol
+            MPFStandaloneMPFCol
+            k
+
+proofMPFM :: HexKey -> MPFPure (Maybe (MPFProof MPFHash))
+proofMPFM k =
+    runMPFPureTransaction mpfHashCodecs $
+        mkMPFInclusionProof
+            []
+            fromHexKVIdentity
+            mpfHashing
+            MPFStandaloneMPFCol
+            k
+
+rootHashM :: MPFPure (Maybe ByteString)
+rootHashM =
+    runMPFPureTransaction mpfHashCodecs $
+        root MPFStandaloneMPFCol []
 
 {- | Create a new empty 'Trie IO' backed by a fresh
 'IORef' holding an empty in-memory MPF database.
@@ -126,10 +199,10 @@ pureGetRoot ref = readIORef ref >>= getRootFromDb
 -- | Get root hash from a database snapshot.
 getRootFromDb :: MPFInMemoryDB -> IO Root
 getRootFromDb db =
-    let (mHash, _) = runMPFPure db getRootHashM
+    let (mHash, _) = runMPFPure db rootHashM
      in pure $ case mHash of
             Nothing -> Root (B.replicate 32 0)
-            Just h -> Root (renderMPFHash h)
+            Just h -> Root h
 
 -- | Generate on-chain proof steps for a key.
 pureGetProofSteps ::

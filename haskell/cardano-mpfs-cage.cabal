@@ -52,7 +52,6 @@ library
     , crypton
     , memory
     , microlens
-    , mts:mpf-test-lib
     , mts:mpf-write
     , plutus-core
     , plutus-ledger-api
