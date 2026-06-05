@@ -190,6 +190,8 @@ fn validModify(
   expect (mpf.root(expectedNewRoot) == newRoot)?
   expect
     output.address.payment_credential == input.output.address.payment_credential
+  expect
+    assets.lovelace_of(output.value) >= assets.lovelace_of(input.output.value)
   expect exactQuantity(policyId, output.value, tokenId, 1)
 
   let n = list.length(owners)
@@ -199,7 +201,13 @@ fn validModify(
       expect [_, ..refundOutputs] = outputs
       let orderedOwners = list.reverse(owners)
       let totalRefunded = sumRefunds(refundOutputs, orderedOwners)
-      expect totalRefunded == totalInputLovelace - tx_fee - n * tip
+      let owed = totalInputLovelace - tx_fee - n * tip
+      let maxRefunded = totalInputLovelace - n * tip
+      // Refunds may exceed owed only to satisfy ledger min-UTxO. The state
+      // output preserves its lovelace above, so any bounded top-up comes from
+      // owner-signed funding inputs rather than from the cage.
+      expect totalRefunded >= owed
+      expect totalRefunded <= maxRefunded
       True
     }
   }
