@@ -49,3 +49,5 @@ nav:
       - Types & Encodings: architecture/types.md
       - Proof System: architecture/proofs.md
       - Security Properties: architecture/properties.md
+  - Design Proposals:
+      - Optimistic Batch Updates: design/optimistic-batch-updates.md
