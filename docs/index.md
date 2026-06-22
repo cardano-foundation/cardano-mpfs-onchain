@@ -4,6 +4,10 @@ Aiken validators and Haskell off-chain library for
 [Merkle Patricia Forestry](https://github.com/aiken-lang/merkle-patricia-forestry)
 on Cardano (Plutus V3).
 
+> **New to MPFS?** Start with the [Introduction](introduction.md) — a plain-language
+> explanation of what this system does, why it exists, and how it stays trustworthy
+> without trusting the operator. No blockchain background assumed.
+
 The on-chain component defines a **cage** pattern: a state NFT carries the
 current MPF root hash as its datum. A global state validator anchors token
 discovery, while per-cage request validators handle contributions,
