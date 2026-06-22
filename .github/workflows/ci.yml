@@ -21,7 +21,7 @@ jobs:
 
       - name: Build all checks
         run: >-
-          nix build --quiet
+          nix build --quiet --accept-flake-config
           .#checks.x86_64-linux.library
           .#checks.x86_64-linux.cage-tests
           .#checks.x86_64-linux.cage-test-vectors
@@ -31,7 +31,7 @@ jobs:
           .#checks.x86_64-linux.aiken-build
 
       - name: Stage plutus.json artifact
-        run: nix build --quiet .#checks.x86_64-linux.aiken-build
+        run: nix build --quiet --accept-flake-config .#checks.x86_64-linux.aiken-build
 
       - name: Upload plutus.json
         uses: actions/upload-artifact@v6
@@ -50,7 +50,7 @@ jobs:
           cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Run cage QuickCheck tests
-        run: nix run .#cage-tests
+        run: nix run --accept-flake-config .#cage-tests
 
   e2e:
     needs: build
@@ -63,7 +63,7 @@ jobs:
           cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Build plutus.json blueprint
-        run: nix build --quiet .#checks.x86_64-linux.aiken-build
+        run: nix build --quiet --accept-flake-config .#checks.x86_64-linux.aiken-build
 
       - name: Run cage devnet E2E tests
         env:
@@ -79,7 +79,7 @@ jobs:
           # cardano-node-clients package). Override the default
           # relative path so the test finds them regardless of CWD.
           E2E_GENESIS_DIR: ${{ github.workspace }}/haskell/e2e-test/genesis
-        run: nix run .#cage-tests-e2e
+        run: nix run --accept-flake-config .#cage-tests-e2e
 
   lint:
     needs: build
@@ -92,7 +92,7 @@ jobs:
           cachix-auth-token: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Run fourmolu + hlint
-        run: nix run .#lint
+        run: nix run --accept-flake-config .#lint
 
   lean:
     runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","cardano-mpfs-onchain"]') }}
