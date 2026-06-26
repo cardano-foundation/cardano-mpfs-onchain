@@ -71,6 +71,7 @@ data OnChainRequest = OnChainRequest
 
 data OnChainTokenState = OnChainTokenState
     { stateOwner :: !BuiltinByteString
+    , stateStakeScript :: !(Maybe BuiltinByteString)
     , stateRoot :: !OnChainRoot
     , stateTip :: !Integer
     , stateProcessTime :: !Integer
@@ -158,6 +159,22 @@ bbsToD (BuiltinByteString bs) = B bs
 bbsFromD :: Data -> Maybe BuiltinByteString
 bbsFromD (B bs) = Just (BuiltinByteString bs)
 bbsFromD _ = Nothing
+
+maybeBbsToD :: Maybe BuiltinByteString -> Data
+maybeBbsToD (Just bbs) = Constr 0 [bbsToD bbs]
+maybeBbsToD Nothing = Constr 1 []
+
+maybeBbsFromD :: Data -> Maybe (Maybe BuiltinByteString)
+maybeBbsFromD (Constr 0 [x]) = Just <$> bbsFromD x
+maybeBbsFromD (Constr 1 []) = Just Nothing
+maybeBbsFromD _ = Nothing
+
+unsafeMaybeBbsFromD :: Data -> Maybe BuiltinByteString
+unsafeMaybeBbsFromD (Constr 0 [B bs]) = Just (BuiltinByteString bs)
+unsafeMaybeBbsFromD (Constr 1 []) = Nothing
+unsafeMaybeBbsFromD _ =
+    error
+        "unsafeFromBuiltinData: Option<ScriptHash>"
 
 -- ---------------------------------------------------------
 -- ToData / FromData instances
@@ -304,6 +321,7 @@ instance ToData OnChainTokenState where
             $ Constr
                 0
                 [ bbsToD stateOwner
+                , maybeBbsToD stateStakeScript
                 , unD (toBuiltinData stateRoot)
                 , I stateTip
                 , I stateProcessTime
@@ -312,8 +330,9 @@ instance ToData OnChainTokenState where
 
 instance FromData OnChainTokenState where
     fromBuiltinData bd = case unD bd of
-        Constr 0 [own, r, I tip, I pt, I rt] -> do
+        Constr 0 [own, stake, r, I tip, I pt, I rt] -> do
             stateOwner <- bbsFromD own
+            stateStakeScript <- maybeBbsFromD stake
             stateRoot <- fromBuiltinData (mkD r)
             let stateTip = tip
                 stateProcessTime = pt
@@ -323,10 +342,12 @@ instance FromData OnChainTokenState where
 
 instance UnsafeFromData OnChainTokenState where
     unsafeFromBuiltinData bd = case unD bd of
-        Constr 0 [B own, r, I tip, I pt, I rt] ->
+        Constr 0 [B own, stake, r, I tip, I pt, I rt] ->
             OnChainTokenState
                 { stateOwner =
                     BuiltinByteString own
+                , stateStakeScript =
+                    unsafeMaybeBbsFromD stake
                 , stateRoot =
                     unsafeFromBuiltinData (mkD r)
                 , stateTip = tip

@@ -84,6 +84,8 @@ const testToken = TokenId { assetName: assetName(testSeed) }
 
 const testValue = valueFromToken("policy_id", testToken)
 
+const testStakeScript = "test_stake_script"
+
 fn spend(
   maybeDatum: Option<CageDatum>,
   redeemer: UpdateRedeemer,
@@ -132,6 +134,7 @@ fn stateSpendRedeemerData(redeemer: Data) -> Pair<ScriptPurpose, Data> {
 const state =
   State {
     owner: "owner",
+    stake_script: None,
     root: root(mpf.empty),
     tip: 0,
     process_time: testProcessTime,
@@ -190,6 +193,7 @@ const output =
       StateDatum(
         State {
           owner: "new-owner",
+          stake_script: None,
           root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
           tip: 0,
           process_time: testProcessTime,
@@ -255,6 +259,7 @@ const minted =
       StateDatum(
         State {
           owner: "owner",
+          stake_script: None,
           root: root(empty),
           tip: 0,
           process_time: testProcessTime,
@@ -370,6 +375,7 @@ test mint_nonempty_root() fail {
         StateDatum(
           State {
             owner: "owner",
+            stake_script: None,
             root: "nonempty_root",
             tip: 0,
             process_time: testProcessTime,
@@ -675,6 +681,49 @@ test modify_missing_signature() fail {
   )
 }
 
+/// A cage configured with a staking script can be modified by any submitter
+/// when the transaction withdraws through that script credential.
+test modify_with_stake_script_withdrawal() {
+  let stake_state = State { ..state, stake_script: Some(testStakeScript) }
+  let stake_input =
+    Input {
+      output_reference: testStateRef,
+      output: Output {
+        address: testScriptAddress,
+        value: testValue,
+        datum: InlineDatum(StateDatum(stake_state)),
+        reference_script: None,
+      },
+    }
+  let stake_output =
+    Output {
+      ..output,
+      datum: InlineDatum(
+        StateDatum(
+          State {
+            ..stake_state,
+            owner: "new-owner",
+            stake_script: Some(testStakeScript),
+            root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
+          },
+        ),
+      ),
+    }
+  spend(
+    Some(StateDatum(stake_state)),
+    Modify([UpdateAction([])]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      validity_range: phase1Range,
+      outputs: [stake_output],
+      extra_signatories: ["owner"],
+      withdrawals: [Pair(address.Script(testStakeScript), 1)],
+      inputs: [stake_input, request],
+    },
+  )
+}
+
 /// The output must stay at the same script address as the input.
 /// Without this check, the owner could steal the token by redirecting
 /// the output to a different script they control.
@@ -724,6 +773,7 @@ test modify_no_requests() {
         StateDatum(
           State {
             owner: "owner",
+            stake_script: None,
             root: root(empty),
             tip: 0,
             process_time: testProcessTime,
@@ -783,6 +833,7 @@ test modify_skip_other_token() {
         StateDatum(
           State {
             owner: "owner",
+            stake_script: None,
             root: root(empty),
             tip: 0,
             process_time: testProcessTime,
@@ -851,6 +902,7 @@ test modify_wrong_root() fail {
         StateDatum(
           State {
             owner: "new-owner",
+            stake_script: None,
             root: "wrong_root_hash",
             tip: 0,
             process_time: testProcessTime,
@@ -985,6 +1037,7 @@ test modify_rejects_foreign_policy_same_asset() fail {
   let fake_state =
     State {
       owner: "attacker",
+      stake_script: None,
       root: root(empty),
       tip: 0,
       process_time: testProcessTime,
@@ -1029,6 +1082,7 @@ test end_rejects_foreign_policy_same_asset() fail {
   let fake_state =
     State {
       owner: "attacker",
+      stake_script: None,
       root: root(empty),
       tip: 0,
       process_time: testProcessTime,
@@ -1197,6 +1251,7 @@ test prop_modify_requires_owner(signer via owner_fuzzer()) fail once {
   let s =
     State {
       owner: "the_real_owner_key_aaaaaaaaaa",
+      stake_script: None,
       root: root(empty),
       tip: 0,
       process_time: testProcessTime,
@@ -1210,6 +1265,7 @@ test prop_modify_requires_owner(signer via owner_fuzzer()) fail once {
         StateDatum(
           State {
             owner: "the_real_owner_key_aaaaaaaaaa",
+            stake_script: None,
             root: root(empty),
             tip: 0,
             process_time: testProcessTime,
@@ -1268,6 +1324,7 @@ test prop_mint_roundtrip(
         StateDatum(
           State {
             owner: "owner",
+            stake_script: None,
             root: root(empty),
             tip: 0,
             process_time: testProcessTime,
@@ -1327,6 +1384,7 @@ const migrate_output =
       StateDatum(
         State {
           owner: "owner",
+          stake_script: None,
           root: "nonempty_root_hash_aaaaaaaaa",
           tip: 0,
           process_time: testProcessTime,
@@ -1456,6 +1514,7 @@ const testFee = 500_000
 const feeState =
   State {
     owner: "owner",
+    stake_script: None,
     root: root(mpf.empty),
     tip: testFee,
     process_time: testProcessTime,
@@ -1506,6 +1565,7 @@ const feeStateOutput =
       StateDatum(
         State {
           owner: "new-owner",
+          stake_script: None,
           root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
           tip: testFee,
           process_time: testProcessTime,
@@ -1533,6 +1593,7 @@ const capturedStateValue = testValue |> assets.merge(from_lovelace(2_000_000))
 const capturedRefundState =
   State {
     owner: "owner",
+    stake_script: None,
     root: root(mpf.empty),
     tip: capturedRefundTip,
     process_time: testProcessTime,
@@ -1671,6 +1732,7 @@ test modify_zero_fee() {
   let zf_state =
     State {
       owner: "owner",
+      stake_script: None,
       root: root(mpf.empty),
       tip: 0,
       process_time: testProcessTime,
@@ -1715,6 +1777,7 @@ test modify_zero_fee() {
         StateDatum(
           State {
             owner: "new-owner",
+            stake_script: None,
             root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
             tip: 0,
             process_time: testProcessTime,
@@ -1836,6 +1899,7 @@ const rejectStateOutput =
       StateDatum(
         State {
           owner: "owner",
+          stake_script: None,
           root: root(mpf.empty),
           tip: testFee,
           process_time: testProcessTime,
@@ -1960,6 +2024,7 @@ test reject_root_changes() fail {
         StateDatum(
           State {
             owner: "owner",
+            stake_script: None,
             root: "different_root_aaaaaaaaaaaaa",
             tip: testFee,
             process_time: testProcessTime,
@@ -2388,6 +2453,7 @@ test modify_zero_requests_root_changes() fail {
         StateDatum(
           State {
             owner: "owner",
+            stake_script: None,
             root: "different_root_aaaaaaaaaaaaa",
             tip: 0,
             process_time: testProcessTime,
