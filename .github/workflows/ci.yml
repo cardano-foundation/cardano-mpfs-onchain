@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","cardano-mpfs-onchain"]') }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || 'nix-enabled-runners' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -41,7 +41,7 @@ jobs:
 
   tests:
     needs: build
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","cardano-mpfs-onchain"]') }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || 'nix-enabled-runners' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -54,7 +54,7 @@ jobs:
 
   e2e:
     needs: build
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","cardano-mpfs-onchain"]') }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || 'nix-enabled-runners' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -83,7 +83,7 @@ jobs:
 
   lint:
     needs: build
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","cardano-mpfs-onchain"]') }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || 'nix-enabled-runners' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -95,7 +95,7 @@ jobs:
         run: nix run .#lint
 
   lean:
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","cardano-mpfs-onchain"]') }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || 'nix-enabled-runners' }}
     defaults:
       run:
         working-directory: lean
