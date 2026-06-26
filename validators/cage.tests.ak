@@ -724,6 +724,102 @@ test modify_with_stake_script_withdrawal() {
   )
 }
 
+/// Modify must fail when stake_script is Some but no matching withdrawal is
+/// present. Signature alone is not enough when the plugin is active.
+test modify_with_stake_script_no_withdrawal() fail {
+  let stake_state = State { ..state, stake_script: Some(testStakeScript) }
+  let stake_input =
+    Input {
+      output_reference: testStateRef,
+      output: Output {
+        address: testScriptAddress,
+        value: testValue,
+        datum: InlineDatum(StateDatum(stake_state)),
+        reference_script: None,
+      },
+    }
+  let stake_output =
+    Output {
+      ..output,
+      datum: InlineDatum(
+        StateDatum(
+          State {
+            ..stake_state,
+            owner: "new-owner",
+            stake_script: Some(testStakeScript),
+            root: #"484dee386bcb51e285896271048baf6ea4396b2ee95be6fd29a92a0eeb8462ea",
+          },
+        ),
+      ),
+    }
+  spend(
+    Some(StateDatum(stake_state)),
+    Modify([UpdateAction([])]),
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      validity_range: phase1Range,
+      outputs: [stake_output],
+      extra_signatories: ["owner"],
+      inputs: [stake_input, request],
+    },
+  )
+}
+
+/// End succeeds when stake_script is Some and the transaction supplies
+/// both the owner signature and the required staking withdrawal.
+test end_with_stake_script() {
+  let stake_state = State { ..state, stake_script: Some(testStakeScript) }
+  let stake_input =
+    Input {
+      output_reference: testStateRef,
+      output: Output {
+        address: testScriptAddress,
+        value: testValue,
+        datum: InlineDatum(StateDatum(stake_state)),
+        reference_script: None,
+      },
+    }
+  spend(
+    Some(StateDatum(stake_state)),
+    End,
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      withdrawals: [Pair(address.Script(testStakeScript), 1)],
+      inputs: [stake_input],
+      mint: burn_value,
+    },
+  )
+}
+
+/// End must fail when stake_script is Some but the withdrawal is absent.
+test end_with_stake_script_no_withdrawal() fail {
+  let stake_state = State { ..state, stake_script: Some(testStakeScript) }
+  let stake_input =
+    Input {
+      output_reference: testStateRef,
+      output: Output {
+        address: testScriptAddress,
+        value: testValue,
+        datum: InlineDatum(StateDatum(stake_state)),
+        reference_script: None,
+      },
+    }
+  spend(
+    Some(StateDatum(stake_state)),
+    End,
+    testStateRef,
+    Transaction {
+      ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [stake_input],
+      mint: burn_value,
+    },
+  )
+}
+
 /// The output must stay at the same script address as the input.
 /// Without this check, the owner could steal the token by redirecting
 /// the output to a different script they control.
