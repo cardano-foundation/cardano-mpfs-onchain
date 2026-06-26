@@ -216,15 +216,25 @@ fn validModify(
 pub fn validateMint(seed: OutputReference, policyId: PolicyId, tx: Transaction) {
   let Transaction { outputs, mint, inputs, .. } = tx
   let tokenId = TokenId { assetName: assetName(seed) }
+  trace @"mint:find_input"
   expect is_some(find_input(inputs, seed))
+  trace @"mint:exact_qty_mint"
   expect exactQuantity(policyId, mint, tokenId, 1)
+  trace @"mint:head_outputs"
   expect Some(output) = head(outputs)
+  trace @"mint:payment_cred"
   expect address.Script(targetScriptHash) = output.address.payment_credential
+  trace @"mint:script_hash"
   expect targetScriptHash == policyId
+  trace @"mint:inline_datum"
   expect InlineDatum(tokenState) = output.datum
+  trace @"mint:state_datum"
   expect StateDatum(State { root: tokenRoot, .. }) = tokenState
+  trace @"mint:root_check"
   expect tokenRoot == root(empty)
+  trace @"mint:exact_qty_output"
   expect exactQuantity(policyId, output.value, tokenId, 1)
+  trace @"mint:done"
   True
 }
 

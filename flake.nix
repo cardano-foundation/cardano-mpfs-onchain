@@ -122,7 +122,7 @@
           nativeBuildInputs = [ pkgs.aiken ];
           buildPhase = ''
             ${aikenPrelude}
-            aiken build
+            aiken build --trace-level verbose
           '';
           installPhase = ''
             cp plutus.json $out
