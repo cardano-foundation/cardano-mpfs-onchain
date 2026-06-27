@@ -337,6 +337,7 @@ buildMintTx env _ownerKh ownerAddr seedUtxo tip processTime retractTime = do
                     { stateOwner =
                         BuiltinByteString
                             ownerKhBytes
+                    , stateStakeScript = Nothing
                     , stateRoot = OnChainRoot emptyRoot
                     , stateTip = tip
                     , stateProcessTime = processTime
@@ -503,6 +504,7 @@ buildModifyTx env ownerKh ownerAddr stateUtxo reqUtxos _newRoot tip processTime 
                     { stateOwner =
                         BuiltinByteString
                             ownerKhBytes
+                    , stateStakeScript = Nothing
                     , stateRoot = OnChainRoot emptyRoot
                     , stateTip = tip
                     , stateProcessTime = processTime
@@ -699,6 +701,7 @@ buildRejectTx env ownerKh ownerAddr stateUtxo reqUtxos tip processTime retractTi
                     { stateOwner =
                         BuiltinByteString
                             ownerKhBytes
+                    , stateStakeScript = Nothing
                     , stateRoot = OnChainRoot emptyRoot
                     , stateTip = tip
                     , stateProcessTime = processTime

@@ -1,4 +1,4 @@
-use aiken/crypto.{VerificationKeyHash}
+use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken/merkle_patricia_forestry.{Proof}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference}
@@ -184,9 +184,9 @@ pub type UpdateRedeemer {
 ///
 /// ## Ownership Model
 /// The `owner` field is a `VerificationKeyHash`, meaning only a single
-/// key holder controls the cage. There is no multi-sig or script-based
-/// ownership -- the owner must directly sign transactions that `Modify`
-/// or `End` the cage.
+/// key holder controls the cage by default. When `stake_script` is set,
+/// `Modify` or `End` can instead be authorized by a withdrawal under that
+/// staking script credential.
 ///
 /// ## Root Hash
 /// The `root` field is a raw `ByteArray` (32 bytes for SHA2-256) representing
@@ -206,8 +206,11 @@ pub type UpdateRedeemer {
 /// - Verify initial root is `root(empty)` after minting
 pub type State {
   /// The verification key hash of the token owner.
-  /// Only the owner can modify the MPF state or end the cage.
+  /// When `stake_script` is absent, only the owner can modify the MPF state
+  /// or end the cage.
   owner: VerificationKeyHash,
+  /// Optional staking script credential that can authorize owner operations.
+  stake_script: Option<ScriptHash>,
   /// The current Merkle Patricia Forestry root hash.
   /// This commits to all key-value pairs stored in the MPF.
   root: ByteArray,

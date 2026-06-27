@@ -32,6 +32,13 @@ genBBS32 =
     BuiltinByteString . BS.pack
         <$> vectorOf 32 arbitrary
 
+genMaybeStakeScript :: Gen (Maybe BuiltinByteString)
+genMaybeStakeScript =
+    frequency
+        [ (3, pure Nothing)
+        , (1, Just <$> genBBS28)
+        ]
+
 genBS :: Gen BS.ByteString
 genBS = BS.pack <$> listOf arbitrary
 
@@ -97,6 +104,7 @@ genTokenState :: Gen OnChainTokenState
 genTokenState =
     OnChainTokenState
         <$> genBBS28
+        <*> genMaybeStakeScript
         <*> genRoot
         <*> genNonNeg
         <*> genNonNeg
@@ -247,6 +255,59 @@ spec = do
         it "roundtrips via ToData/FromData" $
             property $
                 forAll genTokenState roundtrips
+        it "encodes Nothing stake script in Aiken field order" $ do
+            let state =
+                    OnChainTokenState
+                        { stateOwner =
+                            BuiltinByteString $
+                                BS.replicate 28 0xaa
+                        , stateStakeScript = Nothing
+                        , stateRoot =
+                            OnChainRoot $
+                                BS.replicate 32 0xbb
+                        , stateMaxFee = 2000000
+                        , stateProcessTime = 300000
+                        , stateRetractTime = 600000
+                        }
+                BuiltinData datum = toBuiltinData state
+            datum
+                `shouldBe` Constr
+                    0
+                    [ B $ BS.replicate 28 0xaa
+                    , Constr 1 []
+                    , B $ BS.replicate 32 0xbb
+                    , I 2000000
+                    , I 300000
+                    , I 600000
+                    ]
+        it "encodes Just stake script as Aiken Some" $ do
+            let stakeScript =
+                    BuiltinByteString $
+                        BS.replicate 28 0xcc
+                state =
+                    OnChainTokenState
+                        { stateOwner =
+                            BuiltinByteString $
+                                BS.replicate 28 0xaa
+                        , stateStakeScript = Just stakeScript
+                        , stateRoot =
+                            OnChainRoot $
+                                BS.replicate 32 0xbb
+                        , stateMaxFee = 2000000
+                        , stateProcessTime = 300000
+                        , stateRetractTime = 600000
+                        }
+                BuiltinData datum = toBuiltinData state
+            datum
+                `shouldBe` Constr
+                    0
+                    [ B $ BS.replicate 28 0xaa
+                    , Constr 0 [B $ BS.replicate 28 0xcc]
+                    , B $ BS.replicate 32 0xbb
+                    , I 2000000
+                    , I 300000
+                    , I 600000
+                    ]
 
     describe "CageDatum" $ do
         it "roundtrips via ToData/FromData" $
