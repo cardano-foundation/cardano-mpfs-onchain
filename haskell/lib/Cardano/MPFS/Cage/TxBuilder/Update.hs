@@ -31,8 +31,13 @@ import Data.Time.Clock.POSIX (
 import Data.Void (Void)
 import Lens.Micro ((&), (.~), (^.))
 
-import Cardano.Ledger.Address (Addr)
+import Cardano.Ledger.Address (
+    AccountAddress (..),
+    AccountId (..),
+    Addr,
+ )
 import Cardano.Ledger.Alonzo.Scripts (AsIx)
+import Cardano.Ledger.Coin (Coin (..))
 import Cardano.Ledger.Api.Tx (
     bodyTxL,
  )
@@ -53,6 +58,9 @@ import Cardano.Ledger.Conway.Scripts (
     ConwayPlutusPurpose,
  )
 import Cardano.Ledger.Core (Script)
+import Cardano.Ledger.Credential (
+    Credential (ScriptHashObj),
+ )
 import Cardano.Ledger.Keys (
     KeyHash,
     KeyRole (..),
@@ -66,7 +74,6 @@ import Cardano.MPFS.Cage.Config (
     CageConfig (..),
  )
 import Cardano.MPFS.Cage.Ledger (
-    Coin (..),
     ConwayEra,
     PParams,
     Root (..),
@@ -401,6 +408,19 @@ buildProgram
         Tx.requireSignature ownerKh
         Tx.collateral (fst feeUtxo)
         Tx.validTo upperSlot
+        case cfgStakeScript cfg of
+            Nothing -> pure ()
+            Just (stakeBytes, stakeHash) -> do
+                let stakeScript =
+                        scriptFromBytes
+                            "updateToken.stakeScript"
+                            stakeBytes
+                    rewardAcct =
+                        AccountAddress
+                            (network cfg)
+                            (AccountId (ScriptHashObj stakeHash))
+                Tx.withdrawScript rewardAcct (Coin 0) (0 :: Integer)
+                Tx.attachScript stakeScript
 
 -- | Process a single request.
 processRequest ::

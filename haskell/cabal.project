@@ -76,8 +76,8 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/lambdasistemi/cardano-tx-tools
-  tag: 631f1341fde6e4a11e94b058cf5f2925ffeb9eac
-  --sha256: 0asp3sx7hd8hip739kbz65986jlv8qx9342m9gqpqcxih6pxfgjj
+  tag: 3e0040e81b6e7babcde3e554690da593f9d63c83
+  --sha256: 0mgdp59wr1ml074cf6lz2r5wwz75hqybqdv9ysl2frmk59s60nh5
 
 source-repository-package
   type: git

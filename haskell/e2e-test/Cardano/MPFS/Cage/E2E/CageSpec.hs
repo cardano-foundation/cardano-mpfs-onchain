@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -53,6 +54,11 @@ import Cardano.Ledger.Mary.Value (
     MultiAsset (..),
  )
 import Cardano.Ledger.TxIn (TxIn (..))
+
+import Cardano.Ledger.Alonzo.Scripts (AsIx)
+import Cardano.Ledger.Conway.Scripts (ConwayPlutusPurpose)
+import Cardano.Ledger.Hashes (ScriptHash)
+import Cardano.Ledger.Plutus.ExUnits (ExUnits)
 
 import Cardano.MPFS.Cage.Blueprint (
     extractCompiledCode,
@@ -131,8 +137,12 @@ import Cardano.Tx.Balance (
     BalanceResult (balancedTx),
     balanceTx,
  )
+import Cardano.Tx.Build qualified as Tx
 import Cardano.Tx.Ledger (ConwayTx)
 import Ouroboros.Network.Magic (NetworkMagic (..))
+
+-- | Uninhabited query context for registration programs.
+data NoCtx a
 
 {- | Full cage protocol E2E test spec.
 Skips when @MPFS_BLUEPRINT@ is not set.
@@ -164,9 +174,12 @@ spec = describe "Cage E2E" $ do
                          , extractCompiledCode
                             "request.request"
                             bp
+                         , extractCompiledCode
+                            "staking.staking"
+                            bp
                          ) of
-                        (Just stateBytes, Just requestBytes) ->
-                            cageFlowSpec stateBytes requestBytes
+                        (Just stateBytes, Just requestBytes, mStakingBytes) ->
+                            cageFlowSpec stateBytes requestBytes mStakingBytes
                         _ ->
                             it "no compiled code" $
                                 expectationFailure
@@ -181,8 +194,9 @@ spec = describe "Cage E2E" $ do
 cageFlowSpec ::
     SBS.ShortByteString ->
     SBS.ShortByteString ->
+    Maybe SBS.ShortByteString ->
     Spec
-cageFlowSpec stateBytes requestBytes = do
+cageFlowSpec stateBytes requestBytes mStakingBytes = do
     it "boots state and applies a request update"
         $ withBootedCage
             id
@@ -377,6 +391,71 @@ cageFlowSpec stateBytes requestBytes = do
                 reqUtxosAfter
                 `shouldSatisfy` isNothing
 
+    case mStakingBytes of
+        Nothing ->
+            it
+                "skipped (staking.staking not \
+                \in blueprint)"
+                (pure () :: IO ())
+        Just stakingBytes ->
+            it "Modify and End succeed with staking-script withdrawal"
+                $ withE2E stateBytes requestBytes
+                $ \cfg0 prov submit tm -> do
+                    let stakeHash =
+                            computeScriptHash stakingBytes
+                        cfg =
+                            cfg0
+                                { cfgStakeScript =
+                                    Just (stakingBytes, stakeHash)
+                                }
+                    registerStakingCredential
+                        stakeHash
+                        cfg
+                        prov
+                        submit
+                    tokenId <- bootCage cfg prov submit tm
+                    _ <-
+                        submitInsertRequest
+                            cfg
+                            prov
+                            submit
+                            tokenId
+                            "stake-key"
+                            "stake-value"
+                    let reqAddr =
+                            requestAddrFromCfg cfg tokenId Testnet
+                    reqsBefore <-
+                        Cage.queryUTxOs prov reqAddr
+                    length reqsBefore `shouldSatisfy` (> 0)
+                    unsignedUpdate <-
+                        updateTokenImpl
+                            cfg
+                            prov
+                            tm
+                            tokenId
+                            genesisAddr
+                    _ <- submitWithGenesis submit unsignedUpdate
+                    reqsAfter <-
+                        Cage.queryUTxOs prov reqAddr
+                    length reqsAfter
+                        `shouldSatisfy` (< length reqsBefore)
+                    let policyId = cagePolicyIdFromCfg cfg
+                        stateAddr = cageAddrFromCfg cfg Testnet
+                    unsignedEnd <-
+                        endTokenImpl
+                            cfg
+                            prov
+                            tokenId
+                            genesisAddr
+                    _ <- submitWithGenesis submit unsignedEnd
+                    stateUtxosAfter <-
+                        Cage.queryUTxOs prov stateAddr
+                    findStateUtxo
+                        policyId
+                        tokenId
+                        stateUtxosAfter
+                        `shouldSatisfy` isNothing
+
 withBootedCage ::
     (CageConfig -> CageConfig) ->
     SBS.ShortByteString ->
@@ -512,6 +591,53 @@ largestUtxo label utxos =
             error $
                 label <> ": no UTxOs"
         u : _ -> pure u
+
+{- | Submit a @ConwayRegCert@ for a script staking
+credential. Required before the first
+withdraw-zero in an End or Modify transaction.
+-}
+registerStakingCredential ::
+    ScriptHash ->
+    CageConfig ->
+    Cage.Provider IO ->
+    Submitter IO ->
+    IO ()
+registerStakingCredential stakeHash _cfg prov submit = do
+    pp <- Cage.queryProtocolParams prov
+    walletUtxos <- Cage.queryUTxOs prov genesisAddr
+    feeUtxo <- largestUtxo "registerStakingCredential" walletUtxos
+    let evalTx :: ConwayTx -> IO (Map.Map (ConwayPlutusPurpose AsIx ConwayEra) (Either String ExUnits))
+        evalTx tx = do
+            r <- Cage.evaluateTx prov tx
+            pure $
+                Map.map
+                    ( \case
+                        Left e -> Left (show e)
+                        Right eu -> Right eu
+                    )
+                    r
+        prog :: Tx.TxBuild NoCtx String ()
+        prog = do
+            _ <- Tx.spend (fst feeUtxo)
+            _ <- Tx.registerStakeScript stakeHash
+            pure ()
+    result <-
+        Tx.build
+            (Tx.mkPParamsBound pp)
+            (Tx.InterpretIO (error "no ctx"))
+            evalTx
+            [feeUtxo]
+            []
+            genesisAddr
+            prog
+    case result of
+        Left err ->
+            error $
+                "registerStakingCredential: "
+                    <> show err
+        Right tx -> do
+            _ <- submitWithGenesis submit tx
+            pure ()
 
 fastRetractCfg :: CageConfig -> CageConfig
 fastRetractCfg cfg =
@@ -681,4 +807,5 @@ cageCfg stateBytes requestBytes seed =
         , defaultRetractTime = 30_000
         , defaultTip = Coin 1_000_000
         , network = Testnet
+        , cfgStakeScript = Nothing
         }
