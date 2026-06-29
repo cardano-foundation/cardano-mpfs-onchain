@@ -18,6 +18,8 @@ module Cardano.MPFS.Cage.TxBuilder.Internal (
     -- * Script construction
     mkCageScript,
     mkRequestScript,
+    scriptFromBytes,
+    scriptHashBytes,
     computeScriptHash,
 
     -- * Derived identity

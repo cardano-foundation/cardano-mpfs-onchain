@@ -138,7 +138,12 @@ bootTokenImpl cfg prov addr = do
                                 addr
                             )
                     , stateStakeScript =
-                        Nothing
+                        fmap
+                            ( BuiltinByteString
+                                . scriptHashBytes
+                                . snd
+                            )
+                            (cfgStakeScript cfg)
                     , stateRoot =
                         OnChainRoot emptyRoot
                     , stateMaxFee =

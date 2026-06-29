@@ -127,7 +127,9 @@ test-suite e2e-tests
     , async
     , base
     , bytestring
+    , cardano-ledger-alonzo
     , cardano-ledger-api
+    , cardano-ledger-conway
     , cardano-ledger-core
     , cardano-ledger-mary
     , cardano-mpfs-cage
