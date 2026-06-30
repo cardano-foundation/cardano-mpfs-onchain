@@ -398,63 +398,64 @@ cageFlowSpec stateBytes requestBytes mStakingBytes = do
                 \in blueprint)"
                 (pure () :: IO ())
         Just stakingBytes ->
-            it "Modify and End succeed with staking-script withdrawal"
-                $ withE2E stateBytes requestBytes
-                $ \cfg0 prov submit tm -> do
-                    let stakeHash =
-                            computeScriptHash stakingBytes
-                        cfg =
+            let stakeHash = computeScriptHash stakingBytes
+             in it "Modify and End succeed with staking-script withdrawal"
+                    $ withBootedCage
+                        ( \cfg0 ->
                             cfg0
                                 { cfgStakeScript =
                                     Just (stakingBytes, stakeHash)
                                 }
-                    registerStakingCredential
-                        stakeHash
-                        cfg
-                        prov
-                        submit
-                    tokenId <- bootCage cfg prov submit tm
-                    _ <-
-                        submitInsertRequest
+                        )
+                        stateBytes
+                        requestBytes
+                    $ \cfg prov submit tm tokenId -> do
+                        registerStakingCredential
+                            stakeHash
                             cfg
                             prov
                             submit
+                        _ <-
+                            submitInsertRequest
+                                cfg
+                                prov
+                                submit
+                                tokenId
+                                "stake-key"
+                                "stake-value"
+                        let reqAddr =
+                                requestAddrFromCfg cfg tokenId Testnet
+                        reqsBefore <-
+                            Cage.queryUTxOs prov reqAddr
+                        length reqsBefore `shouldSatisfy` (> 0)
+                        unsignedUpdate <-
+                            updateTokenImpl
+                                cfg
+                                prov
+                                tm
+                                tokenId
+                                genesisAddr
+                        _ <- submitWithGenesis submit unsignedUpdate
+                        reqsAfter <-
+                            Cage.queryUTxOs prov reqAddr
+                        length reqsAfter
+                            `shouldSatisfy` (< length reqsBefore)
+                        let policyId = cagePolicyIdFromCfg cfg
+                            stateAddr = cageAddrFromCfg cfg Testnet
+                        unsignedEnd <-
+                            endTokenImpl
+                                cfg
+                                prov
+                                tokenId
+                                genesisAddr
+                        _ <- submitWithGenesis submit unsignedEnd
+                        stateUtxosAfter <-
+                            Cage.queryUTxOs prov stateAddr
+                        findStateUtxo
+                            policyId
                             tokenId
-                            "stake-key"
-                            "stake-value"
-                    let reqAddr =
-                            requestAddrFromCfg cfg tokenId Testnet
-                    reqsBefore <-
-                        Cage.queryUTxOs prov reqAddr
-                    length reqsBefore `shouldSatisfy` (> 0)
-                    unsignedUpdate <-
-                        updateTokenImpl
-                            cfg
-                            prov
-                            tm
-                            tokenId
-                            genesisAddr
-                    _ <- submitWithGenesis submit unsignedUpdate
-                    reqsAfter <-
-                        Cage.queryUTxOs prov reqAddr
-                    length reqsAfter
-                        `shouldSatisfy` (< length reqsBefore)
-                    let policyId = cagePolicyIdFromCfg cfg
-                        stateAddr = cageAddrFromCfg cfg Testnet
-                    unsignedEnd <-
-                        endTokenImpl
-                            cfg
-                            prov
-                            tokenId
-                            genesisAddr
-                    _ <- submitWithGenesis submit unsignedEnd
-                    stateUtxosAfter <-
-                        Cage.queryUTxOs prov stateAddr
-                    findStateUtxo
-                        policyId
-                        tokenId
-                        stateUtxosAfter
-                        `shouldSatisfy` isNothing
+                            stateUtxosAfter
+                            `shouldSatisfy` isNothing
 
 withBootedCage ::
     (CageConfig -> CageConfig) ->

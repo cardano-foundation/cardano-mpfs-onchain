@@ -59,8 +59,9 @@ data CageConfig = CageConfig
     , network :: !Network
     -- ^ Target network (Mainnet or Testnet)
     , cfgStakeScript :: !(Maybe (ShortByteString, ScriptHash))
-    -- ^ Optional staking script: bytes + hash.
-    -- When set, boot stores the hash in
-    -- @stake_script@ and Modify\/End include a
-    -- withdraw-zero from the staking credential.
+    {- ^ Optional staking script: bytes + hash.
+    When set, boot stores the hash in
+    @stake_script@ and Modify\/End include a
+    withdraw-zero from the staking credential.
+    -}
     }
