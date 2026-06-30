@@ -37,7 +37,6 @@ import Cardano.Ledger.Address (
     Addr,
  )
 import Cardano.Ledger.Alonzo.Scripts (AsIx)
-import Cardano.Ledger.Coin (Coin (..))
 import Cardano.Ledger.Api.Tx (
     bodyTxL,
  )
@@ -54,6 +53,7 @@ import Cardano.Ledger.Api.Tx.Out (
 import Cardano.Ledger.BaseTypes (
     Inject (..),
  )
+import Cardano.Ledger.Coin (Coin (..))
 import Cardano.Ledger.Conway.Scripts (
     ConwayPlutusPurpose,
  )
