@@ -7,3 +7,8 @@ e2e/dist/
 haskell/dist-newstyle/
 .claude/
 result-*
+WIP.md
+STATUS.md
+.worker-brief-*.md
+.llm/
+gate.sh
