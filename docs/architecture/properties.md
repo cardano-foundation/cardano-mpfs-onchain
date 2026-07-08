@@ -38,11 +38,16 @@ Run `aiken check` (or `just test`) for validator tests. Run `lake build` in
 
 ## 1. Token Uniqueness
 
-**Invariant:** a cage token asset name is derived from a consumed
-`OutputReference`.
+**Invariant:** a cage token asset name under the state policy is creatable
+only via seed derivation (`Minting`) or via authenticated provenance from an
+allowlisted predecessor (`Migrating`, see §13); no path accepts an arbitrary
+asset name or an arbitrary predecessor policy.
 
-The asset name is `SHA2-256(tx_id ++ output_index)`. Since the seed UTxO can
-be consumed only once, the ledger gives uniqueness.
+The seed-derived asset name is `SHA2-256(tx_id ++ output_index)`. Since the
+seed UTxO can be consumed only once, the ledger gives uniqueness for
+`Minting`. `Migrating` carries the asset name forward from an already-unique,
+audited predecessor rather than deriving a fresh one — see §13 for how its
+provenance is authenticated.
 
 Representative tests: `assetName_deterministic`,
 `assetName_different_txid`, `assetName_different_index`,
@@ -55,8 +60,11 @@ moves exactly one asset under that policy.
 
 `Minting(seed)` requires exactly `+1` of `assetName(seed)`.
 `Migrating` requires exactly `-1` under the old policy and `+1` under the
-state policy. `Burning(tokenId)` requires exactly `-1` of that token. Extra
-assets under the state policy are rejected.
+state policy, *and* additionally requires the old policy to be an allowlisted
+predecessor whose UTxO is actually spent (§13) — mint/burn quantities alone
+are not sufficient proof of a legitimate migration. `Burning(tokenId)`
+requires exactly `-1` of that token. Extra assets under the state policy are
+rejected.
 
 Representative tests: `canMint`, `mint_missing_input`,
 `mint_quantity_two`, `mint_extra_state_policy_asset`, `canMigrate`,
@@ -214,3 +222,36 @@ Representative tests: `tokenFromValue_single_nft`, `tokenFromValue_ada_only`,
 
 Lean theorems: `valueFromToken_roundtrip`, `tokenFromValue_ada_only`,
 `tokenFromValue_multi_policy`, `tokenFromValue_multi_asset`.
+
+## 13. Migration Provenance
+
+**Invariant:** `Migrating` proves that the migrated state token descends from
+an audited predecessor, not from an attacker-chosen policy.
+
+The `state` validator is parameterized by an immutable
+`previousPolicies: List<PolicyId>` allowlist. `validateMigration` enforces,
+in order:
+
+1. **Allowlist** — `oldPolicy` must be a member of `previousPolicies`. A
+   genesis cage is deployed with `previousPolicies = []`, so migration into
+   it is impossible; its tokens exist only via seed `Minting` (§1).
+2. **Provenance by spend** — a transaction input must actually carry
+   `(oldPolicy, tokenId)`; the migrated `State` is read from that input's
+   datum (`predState`), not from the redeemer.
+3. **Owner authorization** — `predState`'s owner must authorize the
+   migration via the existing ownership rule (§5).
+4. **Full field preservation** — the migrated output `State` must equal
+   `predState` in every field. Migration is a pure re-policy operation; it
+   cannot introduce an owner or parameter change (that remains `Modify`'s
+   job, §6).
+
+Without the allowlist, provenance-by-spend + owner-sig + field-preservation
+are all trivially satisfiable by an attacker who authors the fake
+predecessor datum himself, since he controls an always-true `oldPolicy`.
+Requiring `oldPolicy ∈ previousPolicies` forces the burned token to be a
+genuine audited predecessor whose asset name the attacker does not control.
+
+Representative tests: `canMigrate`, `migrate_old_policy_not_allowlisted`,
+`migrate_no_predecessor_input`, `migrate_missing_owner_signature`,
+`migrate_changes_owner`, `migrate_changes_tip`,
+`migrate_forged_token_cannot_sweep`.

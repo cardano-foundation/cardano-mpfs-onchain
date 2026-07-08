@@ -1,4 +1,4 @@
-use aiken/collection/list.{find, foldl, head}
+use aiken/collection/list.{find, foldl, has, head}
 use aiken/crypto.{VerificationKeyHash}
 use aiken/merkle_patricia_forestry.{MerklePatriciaForestry, empty, root}
 use aiken/merkle_patricia_forestry as mpf
@@ -9,18 +9,19 @@ use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction, find_input,
 }
 use lib.{TokenId, assetName, exactQuantity, tokenFromPolicy}
-use shared.{in_phase1, is_rejectable, validateOwnership}
+use shared.{in_phase1, is_rejectable, readState, validateOwnership}
 use types.{
   Burning, CageDatum, Delete, End, Insert, Migrating, Migration, MintRedeemer,
   Minting, Modify, Rejected, Request, RequestAction, RequestDatum, State,
   StateDatum, Update, UpdateAction, UpdateRedeemer,
 }
 
-validator state {
+validator state(previousPolicies: List<PolicyId>) {
   mint(redeemer: MintRedeemer, policyId: PolicyId, tx: Transaction) {
     when redeemer is {
       Minting(seed) -> validateMint(seed, policyId, tx)
-      Migrating(migration) -> validateMigration(migration, policyId, tx)
+      Migrating(migration) ->
+        validateMigration(previousPolicies, migration, policyId, tx)
       Burning(tokenId) -> validateBurn(tokenId, policyId, tx)
     }
   }
@@ -229,19 +230,33 @@ pub fn validateMint(seed: OutputReference, policyId: PolicyId, tx: Transaction) 
 }
 
 pub fn validateMigration(
+  previousPolicies: List<PolicyId>,
   migration: Migration,
   policyId: PolicyId,
   tx: Transaction,
 ) {
   let Migration { oldPolicy, tokenId } = migration
-  let Transaction { outputs, mint, .. } = tx
+  let Transaction { outputs, mint, inputs, .. } = tx
+  // FR1: oldPolicy must be an audited, allowlisted predecessor.
+  expect has(previousPolicies, oldPolicy)
+  // FR5: mint integrity — burn the old token, mint exactly one new one.
   expect exactQuantity(oldPolicy, mint, tokenId, -1)
   expect exactQuantity(policyId, mint, tokenId, 1)
+  // FR2: the predecessor state UTxO carrying (oldPolicy, tokenId) must
+  // actually be spent; the migrated State is read from it.
+  expect Some(predIn) =
+    find(inputs, fn(i) { exactQuantity(oldPolicy, i.output.value, tokenId, 1) })
+  let predState = readState(predIn)
+  // FR3: the predecessor owner authorizes the migration.
+  expect validateOwnership(predState, tx)
+  // FR5: output[0] goes to the new state script and holds the new token.
   expect Some(output) = head(outputs)
   expect address.Script(targetScriptHash) = output.address.payment_credential
   expect targetScriptHash == policyId
-  expect InlineDatum(tokenState) = output.datum
-  expect StateDatum(State { .. }) = tokenState
   expect exactQuantity(policyId, output.value, tokenId, 1)
+  expect InlineDatum(tokenState) = output.datum
+  expect StateDatum(outState) = tokenState
+  // FR4: migration is a pure re-policy operation — every field is preserved.
+  expect outState == predState
   True
 }
