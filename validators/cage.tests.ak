@@ -102,12 +102,12 @@ fn spend(
         self,
         tx,
       )
-    _ -> state.state.spend(maybeDatum, redeemer, self, tx)
+    _ -> state.state.spend([], maybeDatum, redeemer, self, tx)
   }
 }
 
 fn mint(redeemer: MintRedeemer, policyId: PolicyId, tx: Transaction) -> Bool {
-  state.state.mint(redeemer, policyId, tx)
+  state.state.mint(previousPolicies, redeemer, policyId, tx)
 }
 
 fn endRedeemerData() -> Data {
@@ -1463,6 +1463,12 @@ const old_policy = "old_policy_id"
 
 const new_policy = "new_policy_id"
 
+// The `mint` test wrapper applies this fixed allowlist to every mint-path
+// call. `old_policy` is the only audited predecessor; migrations must spend
+// a genuine predecessor UTxO under it, so plain `Minting` tests (which never
+// reach `validateMigration`) are unaffected by its presence.
+const previousPolicies = [old_policy]
+
 const migrate_token = TokenId { assetName: assetName(testSeed) }
 
 const migrate_redeemer =
@@ -1472,34 +1478,52 @@ const migrate_mint =
   from_asset(old_policy, migrate_token.assetName, -1)
     |> assets.merge(from_asset(new_policy, migrate_token.assetName, 1))
 
+// The predecessor `State`: migration must spend the UTxO carrying this
+// state exactly as-is (field preservation), authorized by its own owner.
+const migrate_predecessor_state =
+  State {
+    owner: "owner",
+    stake_script: None,
+    root: "nonempty_root_hash_aaaaaaaaa",
+    tip: 0,
+    process_time: testProcessTime,
+    retract_time: testRetractTime,
+  }
+
+const migrate_predecessor_ref =
+  OutputReference { transaction_id: "migrate_predecessor_tx_id", output_index: 0 }
+
+const migrate_predecessor_input =
+  Input {
+    output_reference: migrate_predecessor_ref,
+    output: Output {
+      address: address.from_script(old_policy),
+      value: from_asset(old_policy, migrate_token.assetName, 1),
+      datum: InlineDatum(StateDatum(migrate_predecessor_state)),
+      reference_script: None,
+    },
+  }
+
 const migrate_output =
   Output {
     address: address.from_script(new_policy),
     value: from_asset(new_policy, migrate_token.assetName, 1),
-    datum: InlineDatum(
-      StateDatum(
-        State {
-          owner: "owner",
-          stake_script: None,
-          root: "nonempty_root_hash_aaaaaaaaa",
-          tip: 0,
-          process_time: testProcessTime,
-          retract_time: testRetractTime,
-        },
-      ),
-    ),
+    datum: InlineDatum(StateDatum(migrate_predecessor_state)),
     reference_script: None,
   }
 
 /// Happy path: migrate a cage from old_policy to new_policy.
-/// Burns old token (-1) and mints new token (+1) atomically.
-/// The MPF root is non-empty (carried over from the old cage).
+/// Burns old token (-1) and mints new token (+1) atomically, spending the
+/// allowlisted predecessor state input (owner-signed) and preserving every
+/// field of its `State` in the migrated output.
 test canMigrate() {
   mint(
     Migrating(migrate_redeemer),
     new_policy,
     Transaction {
       ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [migrate_predecessor_input],
       outputs: [migrate_output],
       mint: migrate_mint,
     },
@@ -1515,6 +1539,8 @@ test migrate_no_burn() fail {
     new_policy,
     Transaction {
       ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [migrate_predecessor_input],
       outputs: [migrate_output],
       mint: mint_no_burn,
     },
@@ -1534,6 +1560,8 @@ test migrate_to_wallet() fail {
     new_policy,
     Transaction {
       ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [migrate_predecessor_input],
       outputs: [wallet_output],
       mint: migrate_mint,
     },
@@ -1551,6 +1579,8 @@ test migrate_wrong_old_policy() fail {
     new_policy,
     Transaction {
       ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [migrate_predecessor_input],
       outputs: [migrate_output],
       mint: wrong_mint,
     },
@@ -1568,6 +1598,8 @@ test migrate_extra_state_policy_asset() fail {
     new_policy,
     Transaction {
       ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [migrate_predecessor_input],
       outputs: [migrate_output],
       mint: wrong_mint,
     },
@@ -1591,8 +1623,145 @@ test migrate_output_must_hold_token() fail {
     new_policy,
     Transaction {
       ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [migrate_predecessor_input],
       outputs: [tokenless_state_output, wallet_token_output],
       mint: migrate_mint,
+    },
+  )
+}
+
+// ============================================================================
+// Migration provenance tests (#76): allowlist + predecessor spend + owner
+// authorization + full field preservation.
+// ============================================================================
+
+/// FR1: an `oldPolicy` absent from the validator's `previousPolicies`
+/// allowlist is rejected outright, before any predecessor/ownership check.
+test migrate_old_policy_not_allowlisted() fail {
+  let unlisted_policy = "unlisted_policy_id"
+  let redeemer =
+    Migration { oldPolicy: unlisted_policy, tokenId: migrate_token }
+  let mint_val =
+    from_asset(unlisted_policy, migrate_token.assetName, -1)
+      |> assets.merge(from_asset(new_policy, migrate_token.assetName, 1))
+  mint(
+    Migrating(redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      outputs: [migrate_output],
+      mint: mint_val,
+    },
+  )
+}
+
+/// FR2: burning the right quantity under the allowlisted policy is not
+/// enough — migration must actually spend a UTxO carrying that token.
+test migrate_no_predecessor_input() fail {
+  mint(
+    Migrating(migrate_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [],
+      outputs: [migrate_output],
+      mint: migrate_mint,
+    },
+  )
+}
+
+/// FR3: the predecessor `State`'s owner must sign; an unsigned migration of
+/// an otherwise-genuine predecessor is rejected.
+test migrate_missing_owner_signature() fail {
+  mint(
+    Migrating(migrate_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      inputs: [migrate_predecessor_input],
+      outputs: [migrate_output],
+      mint: migrate_mint,
+    },
+  )
+}
+
+/// FR4: the migrated output must preserve every field of the predecessor
+/// `State`. Changing `owner` is exactly the exploit's forged-ownership move.
+test migrate_changes_owner() fail {
+  let bad_output =
+    Output {
+      ..migrate_output,
+      datum: InlineDatum(
+        StateDatum(State { ..migrate_predecessor_state, owner: "attacker" }),
+      ),
+    }
+  mint(
+    Migrating(migrate_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [migrate_predecessor_input],
+      outputs: [bad_output],
+      mint: migrate_mint,
+    },
+  )
+}
+
+/// FR4: changing `tip` at migration time is also rejected — parameter
+/// changes belong to `Modify`, not `Migrating`.
+test migrate_changes_tip() fail {
+  let bad_output =
+    Output {
+      ..migrate_output,
+      datum: InlineDatum(
+        StateDatum(State { ..migrate_predecessor_state, tip: 1 }),
+      ),
+    }
+  mint(
+    Migrating(migrate_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      extra_signatories: ["owner"],
+      inputs: [migrate_predecessor_input],
+      outputs: [bad_output],
+      mint: migrate_mint,
+    },
+  )
+}
+
+/// Regression for the issue's exploit chain: an attacker-controlled
+/// `oldPolicy` (not an audited predecessor) can never mint a genuine
+/// state-policy token for a victim's asset name, since the allowlist check
+/// rejects it outright. Because the forged `(statePolicyId, N)` token is
+/// never produced, `Sweep` never becomes reachable against the victim cage —
+/// asserting mint failure here is sufficient to close the exploit without
+/// separately constructing the downstream Sweep transaction.
+test migrate_forged_token_cannot_sweep() fail {
+  let attacker_policy = "attacker_always_true_policy"
+  let forged_redeemer =
+    Migration { oldPolicy: attacker_policy, tokenId: migrate_token }
+  let forged_mint =
+    from_asset(attacker_policy, migrate_token.assetName, -1)
+      |> assets.merge(from_asset(new_policy, migrate_token.assetName, 1))
+  let forged_output =
+    Output {
+      ..migrate_output,
+      datum: InlineDatum(
+        StateDatum(State { ..migrate_predecessor_state, owner: "attacker" }),
+      ),
+    }
+  mint(
+    Migrating(forged_redeemer),
+    new_policy,
+    Transaction {
+      ..transaction.placeholder,
+      outputs: [forged_output],
+      mint: forged_mint,
     },
   )
 }
@@ -2402,6 +2571,7 @@ test sweep_fake_state_ref() fail {
 /// ignored by policy-id discovery instead of reclaimed by the protocol.
 test state_sweep_rejected() fail {
   state.state.spend(
+    [],
     Some(rawStateDatum),
     Sweep(testStateRef),
     testStateRef,

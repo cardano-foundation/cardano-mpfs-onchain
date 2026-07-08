@@ -376,15 +376,45 @@ structure FeeEnforced (state : State) (reqInput : TxInput)
 -- 16. Migration
 -- ============================================================================
 
-/-- A Migration transaction is valid iff the old token is burned and a new
-    token is minted, output goes to the new script, and carries a StateDatum. -/
-structure ValidMigration (oldPolicy newPolicy : PolicyId)
-    (tokenId : TokenId) (tx : Transaction) : Prop where
+/-- A Migration transaction is valid iff `oldPolicy` is an allowlisted
+    predecessor, the predecessor state UTxO carrying `(oldPolicy, tokenId)`
+    is actually spent and its owner authorizes the migration, the mint field
+    burns/mints exactly one token under each policy, and the migrated
+    output goes to the new script preserving every field of the
+    predecessor `State` (#76: migration must prove provenance, not merely
+    balance a burn/mint pair). -/
+structure ValidMigration (previousPolicies : List PolicyId)
+    (oldPolicy newPolicy : PolicyId) (tokenId : TokenId)
+    (tx : Transaction) : Prop where
+  /-- FR1: `oldPolicy` must be an audited, allowlisted predecessor. A
+      genesis cage is deployed with `previousPolicies = []`, so migration
+      into it is impossible — its tokens exist only via seed `Minting`. -/
+  allowlisted : oldPolicy ∈ previousPolicies
+  /-- FR5: mint integrity — burn the old token, mint exactly one new one. -/
   oldBurned : tx.mint oldPolicy tokenId = -1
   newMinted : tx.mint newPolicy tokenId = 1
-  toScript  : ∃ o ∈ tx.outputs, tx.outputs.head? = some o ∧ o.address = newPolicy
-  hasDatum  : ∃ o ∈ tx.outputs, tx.outputs.head? = some o ∧
-              ∃ s, o.datum = some (CageDatum.StateDatum s)
+  /-- FR2: the predecessor state input actually carrying `(oldPolicy,
+      tokenId)` — not merely referenced by the burn quantity. -/
+  predInput : TxInput
+  predIsSpent : predInput ∈ tx.inputs
+  predCarriesToken :
+    predInput.address = oldPolicy ∧ predInput.token = some tokenId
+  /-- The predecessor `State`, read from `predInput`'s datum (not from the
+      attacker-chosen redeemer). -/
+  predState : State
+  predDatum : predInput.datum = some (CageDatum.StateDatum predState)
+  /-- FR3: the predecessor owner authorizes the migration. -/
+  ownerAuth : oracleAuthorized predState tx
+  /-- FR5: output[0] goes to the new script. -/
+  toScript :
+    ∃ o ∈ tx.outputs, tx.outputs.head? = some o ∧ o.address = newPolicy
+  /-- FR4: full field preservation — the migrated output `State` equals
+      `predState` exactly. Migration is a pure re-policy operation; it
+      cannot introduce an owner/parameter change (that remains `Modify`'s
+      job). -/
+  fieldsPreserved :
+    ∃ o ∈ tx.outputs, tx.outputs.head? = some o ∧
+      o.datum = some (CageDatum.StateDatum predState)
 
 -- ============================================================================
 -- Composite validator property
