@@ -15,9 +15,11 @@ The blueprint also carries optional @compiledCode@
 fields (hex-encoded double-CBOR PlutusV3 scripts).
 'extractCompiledCode' decodes these into
 'ShortByteString' suitable for 'PlutusBinary'.
-The state script is unparameterized; the request
-script is parameterized by @(statePolicyId,
-cageToken)@ via 'applyRequestParams'.
+The state script is parameterized by
+@previousPolicies@ (a predecessor-policy allowlist)
+via 'applyPreviousPolicies'; the request script is
+parameterized by @(statePolicyId, cageToken)@ via
+'applyRequestParams'.
 -}
 module Cardano.MPFS.Cage.Blueprint (
     -- * Schema types
@@ -42,6 +44,7 @@ module Cardano.MPFS.Cage.Blueprint (
     applyDataParam,
     applyBytesParam,
     applyOutputRef,
+    applyPreviousPolicies,
     applyRequestParams,
 ) where
 
@@ -432,6 +435,22 @@ applyOutputRef ::
 applyOutputRef ref sbs =
     let BuiltinData d = toBuiltinData ref
      in applyDataParam d sbs
+
+{- | Apply the state validator's @previousPolicies@
+allowlist parameter. The on-chain parameter type is
+@List\<PolicyId\>@, encoded as
+@List [B pid0, B pid1, …]@ (an empty @List []@ for a
+genesis cage, which makes migration into it
+impossible).
+-}
+applyPreviousPolicies ::
+    -- | Predecessor policy-id bytes (28 bytes each); @[]@ for genesis
+    [BS.ByteString] ->
+    -- | Flat-encoded raw state UPLC program
+    SBS.ShortByteString ->
+    SBS.ShortByteString
+applyPreviousPolicies pids =
+    applyDataParam (List (map B pids))
 
 {- | Apply request-validator parameters in source
 order: @statePolicyId@ first, then @cageTokenName@.
