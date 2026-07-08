@@ -19,12 +19,12 @@ Two slices, one bisect-safe commit each. `T76-S1` = slice 1 tasks, etc.
 
 ## Slice 2 — Haskell off-chain applies the new state parameter
 
-- [ ] T76-S2 Add + export `applyPreviousPolicies :: [ByteString] -> ShortByteString -> ShortByteString` in `Blueprint.hs` (builds `List [B pid, …]`, calls `applyDataParam`).
-- [ ] T76-S2 Apply the (empty) allowlist to state bytes at config construction so `cageScriptBytes` / `cfgScriptHash` reflect the parameterized script; optionally record `cfgPreviousPolicies` in `Config.hs`.
-- [ ] T76-S2 Update `CageSpec.hs` (`cageCfg` / `withE2E`) to apply `applyPreviousPolicies []` before hashing/storing state bytes.
-- [ ] T76-S2 Grep and fix any other `computeScriptHash`/`cageScriptBytes`/`extractCompiledCode "state"` site with the same pattern (lib/app).
-- [ ] T76-S2 Gate green: `library`, `cage-tests`, `lint`, `nix run .#cage-tests`, and `nix run .#cage-tests-e2e` (devnet boot/modify/end still valid with the applied state hash).
-- [ ] T76-S2 One commit `fix(76): apply predecessor-allowlist parameter to state script off-chain` with `Tasks: T76-S2`.
+- [X] T76-S2 Add + export `applyPreviousPolicies :: [ByteString] -> ShortByteString -> ShortByteString` in `Blueprint.hs` (builds `List [B pid, …]`, calls `applyDataParam`).
+- [X] T76-S2 Apply the (empty) allowlist to state bytes at config construction so `cageScriptBytes` / `cfgScriptHash` reflect the parameterized script; optionally record `cfgPreviousPolicies` in `Config.hs`.
+- [X] T76-S2 Update `CageSpec.hs` (`cageCfg` / `withE2E`) to apply `applyPreviousPolicies []` before hashing/storing state bytes.
+- [X] T76-S2 Grep and fix any other `computeScriptHash`/`cageScriptBytes`/`extractCompiledCode "state"` site with the same pattern (lib/app).
+- [X] T76-S2 Gate green: `library`, `cage-tests`, `lint`, `nix run .#cage-tests`, and `nix run .#cage-tests-e2e` (devnet boot/modify/end still valid with the applied state hash).
+- [X] T76-S2 One commit `fix(76): apply predecessor-allowlist parameter to state script off-chain` with `Tasks: T76-S2`.
 
 ## Finalization
 

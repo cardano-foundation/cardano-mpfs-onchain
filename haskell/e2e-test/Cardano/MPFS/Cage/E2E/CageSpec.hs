@@ -61,6 +61,7 @@ import Cardano.Ledger.Hashes (ScriptHash)
 import Cardano.Ledger.Plutus.ExUnits (ExUnits)
 
 import Cardano.MPFS.Cage.Blueprint (
+    applyPreviousPolicies,
     extractCompiledCode,
     loadBlueprint,
  )
@@ -791,6 +792,10 @@ awaitTx = threadDelay 5_000_000
 
 {- | Build a 'CageConfig' from state and request
 script bytes plus the boot seed @OutputReference@.
+The raw state bytes are applied to the empty
+(genesis) @previousPolicies@ allowlist before
+hashing, matching the parameterized on-chain state
+script.
 -}
 cageCfg ::
     SBS.ShortByteString ->
@@ -798,11 +803,12 @@ cageCfg ::
     OnChainTxOutRef ->
     CageConfig
 cageCfg stateBytes requestBytes seed =
-    CageConfig
-        { cageScriptBytes = stateBytes
+    let appliedStateBytes = applyPreviousPolicies [] stateBytes
+     in CageConfig
+        { cageScriptBytes = appliedStateBytes
         , requestScriptBytes = requestBytes
         , cfgScriptHash =
-            computeScriptHash stateBytes
+            computeScriptHash appliedStateBytes
         , cageSeed = seed
         , defaultProcessTime = 30_000
         , defaultRetractTime = 30_000
