@@ -50,3 +50,5 @@ nav:
       - Types & Encodings: architecture/types.md
       - Proof System: architecture/proofs.md
       - Security Properties: architecture/properties.md
+  - Roadmap:
+      - Permissionless Registries: roadmap/permissionless-registries.md
