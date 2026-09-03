@@ -60,6 +60,16 @@ Build the formal proofs (phase exclusivity, token handling):
 cd lean && lake build
 ```
 
+## Documentation
+
+The site is built with MkDocs from `docs/` plus `mkdocs.yml`:
+
+```sh
+nix develop github:paolino/dev-assets?dir=mkdocs -c mkdocs build --strict
+```
+
+CI deploys it with `mkdocs-deploy --force` from the same shell.
+
 ## Nix checks and apps
 
 The flake exposes checks (sandboxed derivations) and apps (runnable wrappers):
@@ -69,18 +79,29 @@ The flake exposes checks (sandboxed derivations) and apps (runnable wrappers):
 | `library` | Haskell cage library compiles |
 | `cage-tests` | QuickCheck property tests pass |
 | `cage-test-vectors` | Test vector generator builds |
+| `cage-tests-e2e` | Devnet E2E suite (spawns a pinned `cardano-node`) |
 | `lint` | fourmolu + hlint pass |
 | `vectors-freshness` | Committed `cage_vectors.ak` matches generated output |
+| `aiken-check` | `aiken check` (Aiken unit and property tests) passes |
+| `aiken-build` | `plutus.json` blueprint builds |
+
+Four of these are also exposed as runnable apps: `cage-tests`,
+`cage-tests-e2e`, `cage-test-vectors`, and `lint`.
 
 ```sh
 # Build all checks
 nix build .#checks.x86_64-linux.library
 nix build .#checks.x86_64-linux.cage-tests
+nix build .#checks.x86_64-linux.aiken-check
 
 # Run tests with stdout visible
 nix run .#cage-tests
+nix run .#cage-tests-e2e
 nix run .#lint
 ```
+
+CI builds every check, then runs `cage-tests`, `cage-tests-e2e` and `lint` as
+apps, and builds the Lean proofs in a separate job.
 
 ## Test vectors
 
@@ -129,5 +150,5 @@ sandbox.
 
 The Haskell cage library is built via
 [haskell.nix](https://github.com/input-output-hk/haskell.nix)
-with GHC 9.8.4 and dependencies from
+with GHC 9.12.3 (`compiler-nix-name = "ghc9123"`) and dependencies from
 [CHaP](https://github.com/intersectmbo/cardano-haskell-packages).

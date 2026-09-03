@@ -35,9 +35,9 @@ So: the database's root hash lives on the blockchain. To make clear *which* data
 From this setup, the **core promise** of the system follows directly — and here is exactly how it follows:
 
 - **Anyone can verify the whole thing.** Get a copy of the full database, run the hashing yourself, and check that your computed root hash matches the one sitting on the token on the blockchain. If they match, then — because matching fingerprints mean matching data — you know you're looking at the real, complete, unaltered database. The oracle cannot secretly change an entry or hide one, because doing so would change the fingerprint, and your recomputed fingerprint would no longer match the token. (One caveat in today's base system: you depend on the oracle to hand you that full copy. The upgrade in Section 5 closes this gap by putting the data permanently on-chain where the oracle can't withhold it.)
-- **And bad updates can be proven, not just suspected.** If the oracle ever moves the fingerprint from one value to another in a way that breaks the rules, *any* user can demonstrate that on the blockchain — file what the system calls a **challenge** — and the oracle is punished. Because the database is knowable to everyone, anyone can check the oracle's work and challenge a bad update.
+- **And bad updates cannot get in at all.** Today the blockchain itself checks every single change as it is made (Section 4), so a fingerprint that does not follow from the rules is simply rejected — there is nothing to catch after the fact. The upgrade in Section 5 trades that immediate check for an after-the-fact one, and it is there that the words **challenge** and **bond** acquire meaning; neither exists in the system as it stands today.
 
-That last point is the heart of it. We're not asking you to trust the oracle. We're giving everyone the tools and the information to catch the oracle.
+Both points are the heart of it. We're not asking you to trust the oracle to be honest: today the rules are checked before a change is accepted, and under the Section 5 upgrade everyone has the evidence and the standing to prove a bad one after the fact.
 
 ## 4. How it works today — safe, but expensive
 
@@ -117,11 +117,30 @@ A fair explanation names the costs, not just the benefits.
 - **Someone else's fraud can undo your honest change.** Here is what "stacked on top" means concretely. The changes in a batch are applied in order, each one to the database that the previous change left behind — so change 5 is computed from the result of change 4, change 4 from change 3, and so on. They form a chain, not an independent pile. If an early change in that chain is proven fraudulent and undone, every change computed *after* it was built on a starting point that has now vanished, so those later changes have to be unwound too — *even if yours was perfectly legitimate*. The system refunds you, but you have to resubmit. Your money is safe; your change just may not stick on the first try.
 - **No more instant cancellation.** Because requests now flow through batches rather than as immediate individual transactions, you can't cancel a request the very instant you change your mind; there's a short delay.
 - **Censorship pushes you back to the expensive path.** If the oracle refuses to include your off-chain signed request, your remedy is the on-chain escape hatch — which costs what the old method cost. You only pay that price when you're actually being censored, but the option being there is what keeps the oracle honest about including requests.
-- **It isn't built yet.** This is a design proposal. The base MPFS system — fingerprint on a token, a publicly verifiable database, real-time on-chain checking, challengeable bad updates — is the part that exists today. The optimistic batch upgrade described here is the proposed evolution, not a shipped feature — its design and implementation plan are tracked in [epic #64](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/64).
+- **It isn't built yet.** This is a design proposal. The base MPFS system — fingerprint on a token, a publicly verifiable database, real-time on-chain checking of every change — is the part that exists today. Challenges, bonds and the challenge window do not exist yet; they arrive with this upgrade. The optimistic batch upgrade described here is the proposed evolution, not a shipped feature — its design and implementation plan are tracked in [epic #64](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/64).
 
 The thread running through every trade-off is the same bargain: by relaxing *when* and *how often* the expensive checking happens — doing it only on complaint, against permanently public evidence — the system becomes far cheaper to run and to use, while preserving the one property that matters most. No one has to trust the operator. Anyone can catch a cheat.
 
-## 8. A short glossary
+## 8. A separate gap: the oracle can simply stop
+
+Everything above is about the oracle being *dishonest*. There is a second
+problem, unrelated to the batching upgrade, and it is about the oracle being
+*absent*.
+
+Only the oracle can apply a request or formally discard an expired one. A user
+has exactly one window in which to walk away on their own — the retraction
+window. Once it closes, the request sits on the ledger and nobody but the
+oracle can move it. An oracle that stops answering therefore leaves those
+deposits stuck, and it costs the oracle nothing to let that happen. It is also
+why a cage cannot yet be a genuinely public registry: someone always holds the
+key.
+
+The planned fix lets anyone clear expired requests, and lets a validator — a
+rule, not a person — decide what a batch may do. See
+[Permissionless Registries](roadmap/permissionless-registries.md). Like the
+batching upgrade, none of it has shipped.
+
+## 9. A short glossary
 
 - **Key/value database:** a list where each key (a label you look up) maps to a value (the fact you get back), like a dictionary.
 - **Blockchain (also "the ledger," "on-chain"):** a public, shared, append-only record book that anyone can read, no one controls, and no one can secretly rewrite. **Cardano** is the specific one used here.
@@ -136,4 +155,4 @@ The thread running through every trade-off is the same bargain: by relaxing *whe
 - **Digital signature:** an unforgeable mathematical seal you place on a message, proving it came from you and wasn't altered — cheap, like signing an email.
 - **Batch:** a group of changes (and the requests authorizing them) handled together as one unit instead of one at a time.
 - **Optimistic:** the approach of accepting changes without immediate checking, relying on public evidence and after-the-fact challenges to catch any wrongdoing.
-- **Challenge / challenge window:** the period (about 36 hours) during which anyone can prove a published change broke the rules; a successful challenge punishes the oracle and undoes the bad change.
+- **Challenge / challenge window:** the period (about 36 hours) during which anyone can prove a published change broke the rules; a successful challenge punishes the oracle and undoes the bad change. Part of the Section 5 proposal, not of the system as it stands.

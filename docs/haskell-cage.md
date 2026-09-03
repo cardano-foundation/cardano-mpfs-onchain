@@ -19,6 +19,8 @@ imports them as re-exports.
   and all on-chain domain types
 - `Cardano.MPFS.Cage.AssetName` — deterministic asset-name
   derivation matching Aiken's `lib.assetName`
+- `Cardano.MPFS.Cage.Ledger` — the Conway-era ledger type vocabulary the
+  builders share, plus the domain types bridging it to the Aiken layout
 
 ### MPF proof serialization
 
@@ -45,6 +47,15 @@ for convergent fee balancing:
 | `TxBuilder.Reject` | Modify with `Rejected` actions | Discard expired or dishonest requests |
 | `TxBuilder.Retract` | Retract | Cancel a request in Phase 2 |
 | `TxBuilder.End` | Burn | Destroy the cage token |
+| `TxBuilder.Sweep` | Sweep | Reclaim a non-legitimate UTxO at the request address |
+
+### Configuration and chain access
+
+- `Cardano.MPFS.Cage.Config` — `CageConfig`: state script bytes, unapplied
+  request validator bytes, state script hash, boot seed, default token
+  parameters, optional staking hook, network
+- `Cardano.MPFS.Cage.Provider` — record-of-functions query interface;
+  node-to-client `LocalStateQuery` in production, in-memory stubs in tests
 
 ### In-memory MPF trie
 
