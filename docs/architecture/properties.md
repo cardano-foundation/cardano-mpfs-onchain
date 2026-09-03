@@ -23,7 +23,7 @@ Run `aiken check` (or `just test`) for validator tests. Run `lake build` in
 | Token identity is unique | State mint policy consumes the seed UTxO |
 | State policy moves exactly one state-policy asset | `exactQuantity` |
 | State UTxO references are authentic | `(statePolicyId, cageToken)` check |
-| Only the oracle updates or ends state | `State.owner` signature |
+| Only the oracle updates or ends state | `State.owner` signature, plus a `stake_script` withdrawal when one is set |
 | Only the requester retracts a request | `Request.requestOwner` signature |
 | Request updates carry valid MPF proofs | On-chain MPF proof verification |
 | Output root matches proof computation | State `Modify` fold |
@@ -33,8 +33,15 @@ Run `aiken check` (or `just test`) for validator tests. Run `lake build` in
 | Processable requests cannot be swept | `processableRequest` guard |
 | Phase windows are exclusive | Validity-range checks and Lean proofs |
 | Oracle honestly chooses which valid requests to process | Off-chain behavior |
+| Requests can always exit after Phase 3 | Off-chain behavior — no permissionless path exists |
 | Proofs are generated against the intended trie state | Off-chain behavior |
 | History is reconstructable | Ledger property |
+
+The two off-chain behavior rows about the oracle are the liveness hole: an
+oracle that stops acting strands funds at the request address, and nothing
+on-chain forces it to act. The
+[permissionless registries roadmap](../roadmap/permissionless-registries.md)
+is the plan to close the exit half of it.
 
 ## 1. Token Uniqueness
 
@@ -109,15 +116,28 @@ Lean theorems: `contribute_rejects_reference_only_state`,
 
 | Operation | Required signer |
 |---|---|
-| State `Modify` | `State.owner` |
-| State `End` | `State.owner` |
-| Request `Sweep` | current `State.owner` |
+| State `Modify` | `State.owner`, plus a `stake_script` withdrawal when set |
+| State `End` | `State.owner`, plus a `stake_script` withdrawal when set |
+| Mint `Migrating` | the predecessor `State.owner`, under the same rule |
+| Request `Sweep` | current `State.owner`, key signature only |
 | Request `Retract` | `Request.requestOwner` |
 | Request `Contribute` | permissionless, but authenticated against state |
 
+The `stake_script` hook is conjunctive (`shared.validateOwnership`): it adds a
+withdrawal requirement, it never replaces the owner signature. The shipped
+`staking.ak` stub returns `True` for every withdrawal, so a cage booted with
+it gains no guarantee — both points are
+[#79](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/79),
+and the delegated authorization a permissionless registry needs is roadmap
+work, not shipped behaviour
+([roadmap](../roadmap/permissionless-registries.md)).
+
 Representative tests: `modify_missing_signature`, `end_missing_signature`,
-`sweep_missing_signature`, `retract_wrong_signer`,
-`prop_retract_requires_owner`, `prop_modify_requires_owner`.
+`sweep_wrong_signer`, `retract_wrong_signer`,
+`prop_retract_requires_owner`, `prop_modify_requires_owner`,
+`modify_with_stake_script_withdrawal`,
+`modify_with_stake_script_no_withdrawal`, `end_with_stake_script`,
+`end_with_stake_script_no_withdrawal`, `migrate_missing_owner_signature`.
 
 ## 6. State Confinement and Immutability
 
@@ -125,12 +145,20 @@ Representative tests: `modify_missing_signature`, `end_missing_signature`,
 carries the same cage token, and preserves `tip`, `process_time`, and
 `retract_time`.
 
-The owner field is intentionally mutable, allowing oracle rotation through a
-normal `Modify`.
+The state output must also hold at least as much lovelace as the state input.
+
+`owner` and `stake_script` are intentionally mutable, allowing oracle rotation
+through a normal `Modify`. That is safe only because `Modify` is owner-gated;
+pinning both is a prerequisite of every permissionless path
+([#98](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/98),
+[#100](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/100)).
 
 Representative tests: `modify_wrong_address`, `modify_owner_transfer`,
-`modify_wrong_token_in_output`, `modify_tip_changes`,
-`modify_process_time_changes`, `modify_retract_time_changes`.
+`modify_output_must_hold_token`, `migrate_changes_tip`, `migrate_changes_owner`.
+
+Coverage gap: the `tip`, `process_time`, and `retract_time` equalities are
+enforced at `validators/state.ak` on the `Modify` path, but no Aiken test
+mutates them there — the negatives above cover the `Migrating` path only.
 
 ## 7. MPF Root Integrity
 
@@ -146,14 +174,27 @@ Representative tests: `canCage`, `modify_wrong_root`,
 
 ## 8. Refund and Tip Accounting
 
-**Invariant:** processed request owners are refunded according to the state
-validator's equation:
+**Invariant:** the total paid back to processed request owners lies between
+what they are owed and what the oracle may keep:
 
 ```text
-total request input lovelace - transaction fee - number_of_requests * state.tip
+owed        = total request input lovelace - tx_fee - n * state.tip
+maxRefunded = total request input lovelace - n * state.tip
+
+owed <= totalRefunded <= maxRefunded
 ```
 
+It is a range, not an equality: a refund may exceed `owed` so an output can
+reach the ledger min-UTxO floor. The state output's lovelace is pinned
+non-decreasing, so that top-up comes from funding inputs rather than the cage.
+
 The request tip must match `state.tip` for processable requests.
+
+Two limits are open and both block any permissionless builder: `tx_fee` enters
+`owed` unbounded
+([#97](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/97)),
+and the bounds are aggregate with no per-owner floor
+([#77](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/77)).
 
 Representative tests: `modify_with_refund`, `modify_missing_refund`,
 `modify_insufficient_refund`, `modify_wrong_refund_address`,
@@ -185,11 +226,13 @@ submitted_at          + process_time       + process_time + retract_time
 
 Representative tests: `retract_in_phase1`, `retract_happy`,
 `retract_in_phase3`, `contribute_in_phase2`, `contribute_in_phase3`,
-`modify_in_phase2`.
+`modify_in_phase2`, `reject_happy`, `reject_in_phase1`, `reject_in_phase2`,
+`reject_future_submitted_at`, `prop_phase1_phase2_exclusive`,
+`prop_phase_coverage_point`.
 
-Lean theorems: `phase1_phase2_exclusive`,
-`phase1_honest_not_rejectable`, `phase2_honest_not_rejectable`,
-`phase_coverage_point`.
+Lean theorems: `phase1_phase2_exclusive`, `phase1_phase3_exclusive`,
+`phase2_phase3_exclusive`, `phase1_honest_not_rejectable`,
+`phase2_honest_not_rejectable`, `phase_coverage_point`.
 
 ## 11. Request Sweep
 
@@ -202,7 +245,7 @@ matching-token UTxOs are sweepable.
 
 Representative tests: `sweep_no_datum`, `sweep_wrong_token_request`,
 `sweep_mismatched_tip_request`, `sweep_underfunded_matching_request`,
-`sweep_legitimate_request_rejected`.
+`sweep_legitimate_request`, `sweep_fake_state_ref`, `sweep_alongside_modify`.
 
 Lean theorems: `sweep_mismatched_tip_request_allowed`,
 `sweep_underfunded_matching_request_allowed`,

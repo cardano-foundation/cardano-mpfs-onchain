@@ -19,7 +19,8 @@ context:
 - request validators receive `statePolicyId` as a parameter.
 
 The asset name is `SHA2-256(tx_id ++ output_index)` of the seed
-`OutputReference` carried by `Minting(seed)`.
+`OutputReference` carried by `Minting(seed)`, where `output_index` is encoded
+as two big-endian bytes (`lib.assetName`).
 
 ## Datum
 
@@ -37,6 +38,7 @@ Attached to the UTxO that holds the cage token.
 ```aiken
 type State {
   owner: VerificationKeyHash
+  stake_script: Option<ScriptHash>
   root: ByteArray
   tip: Int
   process_time: Int
@@ -46,7 +48,8 @@ type State {
 
 | Field | Encoding | Description |
 |---|---|---|
-| `owner` | 28 bytes | Verification key hash that controls state `Modify` and `End` |
+| `owner` | 28 bytes | Verification key hash that must sign state `Modify` and `End` |
+| `stake_script` | `Option<ScriptHash>` (`Constr 0 [Bytes]` / `Constr 1 []`) | When `Some`, `Modify` and `End` additionally require a withdrawal under that staking script credential |
 | `root` | bytes | Current MPF root; boot starts at `root(empty)` |
 | `tip` | integer | Oracle tip per processed request |
 | `process_time` | integer | Phase 1 duration; immutable across `Modify` |
@@ -171,6 +174,7 @@ Example `StateDatum`:
 Constr(1,
   [ Constr(0,
       [ Bytes(owner_pkh)
+      , Constr(1, [])          -- stake_script = None
       , Bytes(root_hash)
       , Int(tip)
       , Int(process_time)
@@ -178,6 +182,10 @@ Constr(1,
       ])
   ])
 ```
+
+With a staking hook set, the second field is `Constr(0, [Bytes(script_hash)])`
+instead. A datum built without this field is undecodable by both the Aiken
+validator and the Haskell `FromData` instance.
 
 Example `RequestDatum` with `Insert`:
 

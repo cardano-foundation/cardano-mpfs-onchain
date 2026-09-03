@@ -11,16 +11,27 @@ Shared predicates live in
 [`shared.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/shared.ak),
 and token helpers live in
 [`lib.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/lib.ak).
+[`staking.ak`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/validators/staking.ak)
+is the withdrawal stub used by the optional staking-script ownership hook
+(see [Ownership](#ownership)).
 
 ## Validator Parameters
 
-The state validator is unparameterized:
+The state validator carries one immutable parameter:
 
 ```aiken
-validator state {
+validator state(previousPolicies: List<PolicyId>) {
 ```
 
-Its policy ID is the global discovery anchor for all cages of this
+| Parameter | Type | Description |
+|---|---|---|
+| `previousPolicies` | `List<PolicyId>` | Allowlist of audited predecessor policies a `Migrating` mint may descend from |
+
+A genesis deployment sets `previousPolicies = []`, which makes migration into
+it impossible; its tokens exist only through seed `Minting`. The parameter is
+part of the script, so each allowlist value produces a distinct policy ID.
+
+That policy ID is the global discovery anchor for all cages of this
 validator version. A specific cage is identified by the pair
 `(statePolicyId, cageToken)`, where `cageToken` is the asset name minted
 under the state policy.
@@ -70,16 +81,29 @@ graph LR
 
 ### Migration (`Migrating(migration)`)
 
-Carries a cage token identity forward from an old policy to the new global
-state policy.
+Carries a cage token identity forward from an audited predecessor policy to
+the new global state policy.
 
 Validation rules:
 
-1. Exactly one old token `(oldPolicy, tokenId)` is burned.
-2. Exactly one new token `(statePolicyId, tokenId)` is minted.
-3. No unrelated state-policy asset is moved.
-4. The first output is locked at the new state script address.
-5. The output carries `StateDatum`; the root may be non-empty.
+1. `oldPolicy` is a member of the `previousPolicies` parameter.
+2. Exactly one old token `(oldPolicy, tokenId)` is burned.
+3. Exactly one new token `(statePolicyId, tokenId)` is minted.
+4. No unrelated state-policy asset is moved.
+5. A transaction input actually carries `(oldPolicy, tokenId)`; the migrated
+   `State` is read from that input's inline datum, not from the redeemer.
+6. The predecessor `State` authorizes the migration under the ownership rule
+   below.
+7. The first output is locked at the new state script address and carries
+   exactly one `(statePolicyId, tokenId)` token.
+8. The output `StateDatum` equals the predecessor `State` in every field.
+   Migration is a pure re-policy operation; it cannot change the owner, the
+   staking hook, the root, or the phase parameters.
+
+Dropping any one of rules 1 and 5-8 makes the path forgeable: without the
+allowlist an attacker supplies an `oldPolicy` he controls and authors the
+predecessor datum himself. See
+[Security Properties §13](properties.md#13-migration-provenance).
 
 ### Burn (`Burning(tokenId)`)
 
@@ -90,9 +114,30 @@ Validation rules:
 1. The mint field contains exactly `-1` of `(statePolicyId, tokenId)`.
 2. No unrelated asset under the state policy is moved.
 
+## Ownership
+
+Every privileged state operation — `Modify`, `End`, and the predecessor side
+of `Migrating` — goes through `shared.validateOwnership`:
+
+| `State.stake_script` | Required authorization |
+|---|---|
+| `None` | `State.owner` is in `tx.extra_signatories` |
+| `Some(script)` | `State.owner` is in `tx.extra_signatories` **and** the transaction carries a withdrawal under `Script(script)` |
+
+The hook is conjunctive: a staking script can only add a condition, never
+replace the owner signature. It covers the state-side operations only; the
+request validator's `Sweep` reads `State.owner` and checks that signature
+directly. `staking.ak`, the stub shipped in the blueprint,
+returns `True` unconditionally for any `withdraw`, so a cage booted against it
+gains no extra guarantee. Both facts are tracked as
+[#79](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/79),
+and replacing the conjunction with a real delegated path is the subject of the
+[permissionless registries roadmap](../roadmap/permissionless-registries.md).
+
 ## State Spending Validator
 
-`state.spend` accepts only `StateDatum` inputs. The state owner must sign,
+`state.spend` accepts only `StateDatum` inputs. Authorization follows
+[Ownership](#ownership),
 the spent input must be locked at the state validator's script credential,
 and the input value must carry exactly one cage token under the state policy.
 
@@ -113,20 +158,23 @@ request validator's `Contribute(stateRef)` redeemer.
 
 Validation rules:
 
-1. The owner signs the transaction.
+1. The transaction is authorized under [Ownership](#ownership).
 2. The first output remains at the state script credential.
 3. The first output carries exactly one same cage token.
-4. `tip`, `process_time`, and `retract_time` are immutable.
-5. Matching request inputs are those with `RequestDatum.requestToken` equal
-   to the cage token.
-6. Each matching request consumes one `RequestAction` in input order.
-7. `UpdateAction(proof)` is allowed only in Phase 1 and folds the MPF proof
+4. The first output holds at least as much lovelace as the state input.
+5. `tip`, `process_time`, and `retract_time` are immutable. `owner` and
+   `stake_script` are not: an owner may hand the cage over in a normal
+   `Modify`.
+6. Matching request inputs are those with `RequestDatum.requestToken` equal
+   to the cage token. Each must record `tip` equal to `state.tip`.
+7. Each matching request consumes one `RequestAction` in input order.
+8. `UpdateAction(proof)` is allowed only in Phase 1 and folds the MPF proof
    into the root.
-8. `Rejected` is allowed only for rejectable requests: Phase 3 or dishonest
+9. `Rejected` is allowed only for rejectable requests: Phase 3 or dishonest
    future `submitted_at`.
-9. The output root equals the folded root.
-10. Refund outputs pay request owners `total input lovelace - tx fee -
-    n * state.tip`.
+10. The output root equals the folded root.
+11. Refund outputs follow the state input positionally, one per processed
+    request owner, and their total lies within bounds (see below).
 
 ```mermaid
 graph TD
@@ -144,13 +192,41 @@ graph TD
     FOLD --> REFUNDS
 ```
 
+#### Refund bounds
+
+With `n` processed requests contributing `totalInputLovelace`, the validator
+enforces a range rather than an equality:
+
+```text
+owed        = totalInputLovelace - tx_fee - n * state.tip
+maxRefunded = totalInputLovelace - n * state.tip
+
+owed <= totalRefunded <= maxRefunded
+```
+
+The upper bound is what the oracle may keep; the lower bound is what the
+requesters are owed. Refunds are allowed to exceed `owed` so an output can
+reach the ledger min-UTxO floor — the state output's own lovelace is pinned
+non-decreasing, so the top-up comes from the funding inputs, not from the
+cage.
+
+Two limits of this rule are open issues, and both matter before anyone but
+the oracle can build a `Modify`:
+
+- `tx_fee` enters `owed` unbounded, so whoever builds the transaction can
+  charge unrelated business to the requesters
+  ([#97](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/97));
+- the bounds are aggregate, with no per-owner floor, so the builder chooses
+  the distribution across requesters
+  ([#77](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/77)).
+
 ### End
 
 Destroys the cage token instance.
 
 Validation rules:
 
-1. The owner signs the transaction.
+1. The transaction is authorized under [Ownership](#ownership).
 2. The mint field burns exactly the cage token from the spent state input.
 3. No unrelated asset under the state policy is moved.
 
@@ -210,7 +286,9 @@ Validation rules:
 1. `stateRef` may be in regular inputs or reference inputs.
 2. The referenced state UTxO must carry exactly one
    `(statePolicyId, cageTokenName)` token.
-3. The current state owner signs the transaction.
+3. The `State.owner` read from the referenced state signs the transaction.
+   `Sweep` checks that key directly and does **not** consult `stake_script`,
+   unlike the state-side operations.
 4. The spent UTxO is not a processable request for the referenced state.
 
 A request is protected from sweep only when all of these hold:
@@ -231,6 +309,7 @@ requests are not sweepable.
 | `exactQuantity` | Requires exactly one asset under a policy with the expected quantity |
 | `tokenFromPolicy` | Extracts the sole asset name under a specific policy |
 | `carriesStateToken` | Authenticates a state UTxO by `(statePolicyId, cageToken)` |
+| `validateOwnership` | Owner signature, plus a `stake_script` withdrawal when one is set |
 | `in_phase1` | Checks the oracle processing window |
 | `in_phase2` | Checks the requester retract window |
 | `is_rejectable` | Checks Phase 3 or dishonest future `submitted_at` |

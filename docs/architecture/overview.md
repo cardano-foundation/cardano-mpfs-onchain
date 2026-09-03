@@ -10,9 +10,15 @@ MPF-backed cage tokens on Cardano.
 
 Issue #49 splits the cage into:
 
-- a global **state validator** whose policy ID is the discovery anchor; and
+- a global **state validator**, parameterized by an allowlist of audited
+  predecessor policies, whose policy ID is the discovery anchor; and
 - a parameterized **request validator** applied per cage with
   `(statePolicyId, cageToken)`.
+
+A third module, `staking.ak`, is the withdrawal stub behind the optional
+`stake_script` ownership hook. As shipped the hook only adds a condition to
+the owner signature, and the stub accepts every withdrawal — see
+[Ownership](validators.md#ownership).
 
 ```mermaid
 graph TD
@@ -41,6 +47,10 @@ graph TD
 The **oracle** controls the state UTxO through `State.owner`. Requesters
 submit modification requests to the per-cage request address and can retract
 them during Phase 2. Observers reconstruct state from chain history.
+
+Every path out of a request other than Phase 2 retraction runs through the
+oracle. Removing that dependency is roadmap work, not shipped behaviour: see
+[Permissionless Registries](../roadmap/permissionless-registries.md).
 
 ## Transaction Lifecycle
 
@@ -159,6 +169,9 @@ The validators enforce these core invariants:
 8. Request phase windows are exclusive.
 9. Malformed request-address spam can be swept by the state owner.
 10. Processable legitimate requests are protected from sweep.
+11. `Migrating` accepts only an allowlisted predecessor policy whose state
+    UTxO is spent and whose owner authorizes the migration, and preserves
+    every `State` field.
 
 The corresponding Lean model lives in
 [`lean/MpfsCage/SplitValidators.lean`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/lean/MpfsCage/SplitValidators.lean),
