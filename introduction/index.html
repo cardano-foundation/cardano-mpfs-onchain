@@ -1,0 +1,1006 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://cardano-foundation.github.io/cardano-mpfs-onchain/introduction/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../development/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Introduction - Cardano MPFS Onchain</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mpfs-a-trustworthy-public-database-that-no-one-has-to-take-on-faith" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Cardano MPFS Onchain" class="md-header__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Cardano MPFS Onchain
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Introduction
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Cardano MPFS Onchain" class="md-nav__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Cardano MPFS Onchain
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-human-problem-in-plain-words" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The human problem, in plain words
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-cast-of-characters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The cast of characters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-core-promise-a-fingerprint-nobody-can-fake" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The core promise: a fingerprint nobody can fake
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-how-it-works-today-safe-but-expensive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. How it works today — safe, but expensive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-the-clever-idea-act-first-check-only-if-challenged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. The clever idea: act first, check only if challenged
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. The clever idea: act first, check only if challenged">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#part-1-cheaper-for-the-oracle-publish-now-verify-only-if-someone-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 1 — Cheaper for the oracle: publish now, verify only if someone objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#part-2-cheaper-for-users-sign-a-request-like-signing-an-email" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 2 — Cheaper for users: sign a request like signing an email
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-what-a-regular-user-actually-experiences-step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. What a regular user actually experiences, step by step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-the-honest-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. The honest trade-offs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-a-separate-gap-the-oracle-can-simply-stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. A separate gap: the oracle can simply stop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-a-short-glossary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. A short glossary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../haskell-cage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Haskell Cage Library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types & Encodings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/proofs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proof System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/properties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Properties
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/permissionless-registries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Permissionless Registries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="mpfs-a-trustworthy-public-database-that-no-one-has-to-take-on-faith">MPFS: A Trustworthy Public Database That No One Has to Take on Faith</h1>
+<h2 id="1-the-human-problem-in-plain-words">1. The human problem, in plain words</h2>
+<p>Imagine a shared list that lots of people care about. It could be a registry of who owns which web domain, a list of approved suppliers, a record of which software versions are certified safe — anything where the entries are "a name points to a fact." In computing we call this kind of list a <strong>key/value database</strong>: a key is the thing you look up (like a name in a phone book), and the value is what you get back (the phone number). It works like a dictionary — you look up a word and find its definition.</p>
+<p>Almost every such list in the world today is kept by some organization on its own servers. You have to trust that organization. You trust that when they say "Company X is certified," they really were; that they didn't quietly delete an entry someone paid to make disappear; that they didn't slip in a fake one. Usually that trust is fine. Sometimes it is badly misplaced — records get altered, history gets rewritten, and you have no way to prove it, because you only ever saw what the keeper chose to show you.</p>
+<p>The system described here, called <strong>MPFS</strong>, is an attempt to run exactly this kind of shared list <em>without</em> anyone having to trust the keeper. The keeper still does the day-to-day work of updating the list. But the design makes it impossible for the keeper to cheat without being caught and publicly proven wrong by anybody who bothers to look. That is the whole point: a public list you don't have to take on faith.</p>
+<h2 id="2-the-cast-of-characters">2. The cast of characters</h2>
+<p>There are only a few players, and it helps to meet them up front.</p>
+<p><strong>The blockchain (specifically, Cardano).</strong> A blockchain is a shared record book that the whole world can read, that anyone can write to under fixed rules, and that no single company or person controls. Two properties make it special. First, it is <em>append-only</em>: you can add new pages, but rewriting an old one would be visible to everyone and rejected by the network. Second, it is <em>tamper-evident</em>: if anyone managed to alter a past page, everyone would be able to tell. Think of it as a giant public notarized logbook kept simultaneously by thousands of independent record-keepers around the world, who constantly check each other's copies. Cardano is one particular blockchain; the details of which one don't matter much for this explanation. Throughout this document, "the ledger," "on-chain," and "on the blockchain" all mean the same thing: written into that public logbook. Anything "off-chain" simply means handed around privately, not written into the logbook.</p>
+<p><strong>The database itself</strong> — the key/value list we described, the thing everyone cares about.</p>
+<p><strong>The operator</strong>, which this system calls the <strong>oracle</strong>. This is the party that actually does the work of applying changes to the database — adding entries, removing them, editing them. Crucially, you do <em>not</em> have to trust the oracle to be honest. The system is built so that a dishonest oracle gets caught.</p>
+<p><strong>The users</strong> (sometimes called requesters). These are the people who want changes made — "please add this entry," "please update that value" — and who, along with everyone else, can watch the oracle's work and raise the alarm if something is wrong.</p>
+<h2 id="3-the-core-promise-a-fingerprint-nobody-can-fake">3. The core promise: a fingerprint nobody can fake</h2>
+<p>Here is the central idea, and if you understand only one thing, understand this.</p>
+<p>You could imagine putting the entire database onto the public logbook so everyone can see it. But databases can be huge, and blockchains are expensive places to store data. So instead, MPFS stores just a <strong>fingerprint</strong> of the database on the blockchain — a short string of characters that acts like a unique summary of the <em>entire</em> contents.</p>
+<p>This fingerprint is produced by a process called <strong>hashing</strong>. A hash is a mathematical blender: you pour in data of any size, and out comes a short fixed-length code. Two things make it useful. Change even a single character anywhere in the data, and the resulting code changes completely and unpredictably. And no one can feasibly run the blender backwards, <em>nor</em> feasibly hand-craft two different inputs that come out as the same code — and that second part is the one the blender image doesn't show you, so just take it as a known property of good hashing: matching codes mean matching data, full stop. So the fingerprint is, in effect, unforgeable. If two people both have the full database and both compute the fingerprint, they will agree — and if even one entry differs between their copies, their fingerprints will visibly disagree.</p>
+<p>The specific kind of fingerprint MPFS uses comes from a structure called a <strong>Merkle tree</strong>. You don't need the mechanics, just the payoff. A Merkle tree is a way of hashing a large dataset in stages — hashing small pieces, then hashing the hashes, and so on up to a single code at the top called the <strong>root hash</strong>. The root hash is the fingerprint of the whole database. The Merkle tree gives you a second gift on top of the unforgeable summary: it lets someone prove a narrow fact — "the entry for key X has value Y" — with a small, checkable proof, instead of having to hand over the entire database. We'll lean on that gift later, and it turns out to be the secret behind the whole system's safety.</p>
+<p>So: the database's root hash lives on the blockchain. To make clear <em>which</em> database that fingerprint belongs to, MPFS attaches it to a unique <strong>token</strong> on the blockchain. Think of the token as a labeled envelope and the root hash as the note inside it: the token is the holder, the root hash is the fingerprint it carries. A token here is like a numbered seal or a serial-numbered certificate that exists on the ledger and can't be duplicated. One token stands for one particular database, and at any moment it carries that database's current fingerprint. When the database changes, the oracle updates the root hash recorded on that token — it slips a new note into the same envelope.</p>
+<p>From this setup, the <strong>core promise</strong> of the system follows directly — and here is exactly how it follows:</p>
+<ul>
+<li><strong>Anyone can verify the whole thing.</strong> Get a copy of the full database, run the hashing yourself, and check that your computed root hash matches the one sitting on the token on the blockchain. If they match, then — because matching fingerprints mean matching data — you know you're looking at the real, complete, unaltered database. The oracle cannot secretly change an entry or hide one, because doing so would change the fingerprint, and your recomputed fingerprint would no longer match the token. (One caveat in today's base system: you depend on the oracle to hand you that full copy. The upgrade in Section 5 closes this gap by putting the data permanently on-chain where the oracle can't withhold it.)</li>
+<li><strong>And bad updates cannot get in at all.</strong> Today the blockchain itself checks every single change as it is made (Section 4), so a fingerprint that does not follow from the rules is simply rejected — there is nothing to catch after the fact. The upgrade in Section 5 trades that immediate check for an after-the-fact one, and it is there that the words <strong>challenge</strong> and <strong>bond</strong> acquire meaning; neither exists in the system as it stands today.</li>
+</ul>
+<p>Both points are the heart of it. We're not asking you to trust the oracle to be honest: today the rules are checked before a change is accepted, and under the Section 5 upgrade everyone has the evidence and the standing to prove a bad one after the fact.</p>
+<h2 id="4-how-it-works-today-safe-but-expensive">4. How it works today — safe, but expensive</h2>
+<p>In the current version of MPFS, the blockchain itself is the referee for <em>every single change</em>, in real time.</p>
+<p>When the oracle wants to apply a change, it submits two things to the blockchain together: the change itself, and a small proof. Here is what that proof does, and why it's possible even though you can't run hashing backwards. Remember the Merkle tree's gift: you can prove a narrow fact cheaply. The proof hands over just the few small pieces of the database that the change actually touches — not the whole thing — along with the steps that hash those pieces up to the root. With those pieces in hand, the blockchain can hash <em>forward</em> (the direction that always works): it confirms the pieces match the <em>old</em> fingerprint, applies the change to just those pieces, and re-hashes forward to check that the result is exactly the <em>new</em> fingerprint the oracle claims. So nobody runs the blender backwards; the proof simply supplies the small amount of original data needed to run it forward and confirm both endpoints. The blockchain only accepts the new fingerprint if that check passes.</p>
+<p>This is wonderfully safe — a wrong update simply can't get in, because it would be rejected immediately. But it is expensive, and in <em>two</em> separate ways. The first is computation. A blockchain doesn't only charge to <em>store</em> data; it also charges to <em>run</em> calculations, because every one of those thousands of independent record-keepers has to repeat the same work to check it. Making the blockchain re-do the hashing math on every change means each change is slow and costly, and only a small number of changes can be grouped together before the cost gets too high.</p>
+<p>There's a second cost, this one borne by users. Today, just to <em>ask</em> for a change, a user has to post their own transaction on the blockchain. A <strong>transaction</strong> is a single recorded action on the ledger — and posting one always costs a fee, plus a refundable <strong>deposit</strong> (money you put down that you get back later if all goes well). So every request a user makes costs them real money and effort, even before the oracle does anything.</p>
+<p>In short: the present design is trustworthy but pricey, on both sides.</p>
+<h2 id="5-the-clever-idea-act-first-check-only-if-challenged">5. The clever idea: act first, check only if challenged</h2>
+<p>The proposed upgrade is called <strong>optimistic batch updates</strong> — where a <strong>batch</strong> simply means a group of changes handled together, rather than one at a time. (This upgrade is a design proposal, tracked in <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/64">epic #64</a>; everything in Sections 1–4 above already exists.) The word "optimistic" is the key, so let's build the right mental picture before any mechanism.</p>
+<p>Picture a sports referee with an unusual rule. Imagine an idealized stadium where every play is recorded on video and <em>every spectator has the full replay in their hands</em> — not how real stadiums work, but go with it, because that total public visibility is the whole trick. Now the referee doesn't scrutinize every play as it happens. The referee lets the game run and <em>only steps in when a spectator files a formal complaint</em> — and because everyone holds the complete video, a complaint can point to the exact frame and prove the foul beyond dispute. The referee doesn't need to watch anything in real time, because the crowd can, and the evidence is undeniable. That is "optimistic": assume things are fine, but keep complete public evidence so that any wrongdoing can be proven after the fact.</p>
+<p>Now apply that to the database. The upgrade has two halves: one that makes things cheaper for the oracle, and one that makes things cheaper for users.</p>
+<h3 id="part-1-cheaper-for-the-oracle-publish-now-verify-only-if-someone-objects">Part 1 — Cheaper for the oracle: publish now, verify only if someone objects</h3>
+<p>Today the blockchain re-checks every change the moment it's made. The upgrade removes that immediate re-checking. Instead, the oracle does this:</p>
+<ol>
+<li>It takes a whole batch of changes and <strong>publishes the full list of them onto the blockchain</strong> — not a summary, but the actual change data, written permanently into the public logbook. This matters enormously: because the real data is on the ledger, it is permanently public and <em>nobody can hide it</em>. This is the "video every spectator holds" — it's what makes everything else possible, and it's exactly the thing the base system couldn't fully guarantee.</li>
+<li>It posts the new fingerprint (the new root hash) claimed to result from those changes.</li>
+<li>The blockchain does <strong>not</strong> re-do the math right away. It simply accepts the claim for now. That's the optimism.</li>
+</ol>
+<p>Then comes the safety net: a waiting period called the <strong>challenge window</strong> — on the order of a day and a half (roughly 36 hours). During this window, <em>anyone at all</em> can take the published list of changes, re-do the math themselves on their own computer, and look for a mistake. They don't have to prove the whole batch is wrong. They only need to find <strong>one single step</strong> that doesn't follow the rules.</p>
+<p>If someone finds such a step, they submit a tiny proof of <em>just that one wrong step</em> to the blockchain. The blockchain checks that one small thing — which is cheap — and if the challenger is right, three things happen: the oracle is <strong>caught</strong>, the oracle <strong>loses a security deposit</strong> (a sum of money it had to lock up in advance, called a <strong>bond</strong>, precisely so it has something to lose), and the <strong>bad change is undone</strong> (and, as we'll see in Section 7, any later changes that were stacked on top of it are undone with it).</p>
+<p>If the challenge window passes and nobody has found a problem, the change becomes <strong>final</strong> and permanent.</p>
+<p>Now, <em>why</em> is this safe, even though the blockchain stops checking up front? This is the single most important claim in the whole document, so here it is in plain words rather than as "trust the math."</p>
+<p>A batch isn't one big indivisible leap from the old fingerprint to the new one. It's a chain of small steps: apply change 1 to get an in-between fingerprint, apply change 2 to that, and so on, each step moving from one fingerprint to the next. The oracle has to publish every change in the batch, so the entire chain of steps is laid out in public. Now suppose the oracle wants the chain to <em>end</em> on a fingerprint it isn't entitled to — say, one representing a database where it secretly handed itself a domain it doesn't own. The chain still has to <em>start</em> from the agreed-upon old fingerprint (that one is already nailed down on the token from before). So somewhere between the honest start and the dishonest end, at least one step must not actually follow from the step before it — because if <em>every</em> step followed correctly from the previous one, the chain would have landed on the honest result, not the oracle's desired one. The lie can't be smeared evenly across the batch to hide it: hashing has no "almost correct." Each individual step either follows the rules exactly or it doesn't, and a false ending forces at least one step to visibly not follow. And here's where Section 3's Merkle gift returns: that one broken step can be isolated and disproven with a single small, cheap proof — the same "prove one narrow fact cheaply" tool, now used to prove one narrow <em>lie</em>. So a cheating oracle cannot avoid leaving at least one provably broken step sitting in plain view in the public logbook. Its only safe move is to be honest.</p>
+<p>The win is cost. The expensive full re-verification now happens only in the rare case of an actual challenge, instead of on every change. So the oracle can process far more changes far more cheaply.</p>
+<h3 id="part-2-cheaper-for-users-sign-a-request-like-signing-an-email">Part 2 — Cheaper for users: sign a request like signing an email</h3>
+<p>The second half tackles the cost users bear. Recall that today, to ask for a change, you must post your own blockchain transaction and pay for it every single time.</p>
+<p>The upgrade lets you skip that. Instead of posting a transaction, you simply <strong>sign your change request as a message and hand it to the oracle</strong> — no transaction, no per-request fee. This is what "off-chain" means in practice: the request travels privately from you to the oracle without being written into the public logbook (at least not yet).</p>
+<p>The contrast worth holding onto is <em>signing an email versus mailing a certified letter</em>. A <strong>digital signature</strong> is a mathematical seal you can put on any message using a private secret only you hold; anyone can later verify the seal genuinely came from you and that the message wasn't altered, but no one can forge it. Signing a message is essentially free and instant — like signing an email. Posting a transaction is like mailing a certified letter: it costs money and takes a trip to the post office every time. The upgrade moves users from certified letters to signed emails.</p>
+<p>The oracle gathers up many of these signed requests and bundles them into one batch — and, just as with the changes themselves, the signed requests get <strong>published in the batch on the blockchain too</strong>. So anyone can verify that the oracle applied <em>exactly</em> what users actually authorized, no more and no less.</p>
+<p>To handle the small per-change fee without a transaction each time, a user <strong>pre-loads a small balance once</strong> — a one-time deposit — and each change simply draws a tiny fee from it (the system calls this fee a <strong>tip</strong>). The net effect on a user's costs is dramatic: instead of paying for a full transaction on every request, you pay one upfront deposit, then just a tiny tip per change.</p>
+<p>This raises an obvious worry: if you're just handing signed notes to the oracle off to the side, can the oracle abuse that? The design closes the gaps:</p>
+<ul>
+<li>The oracle <strong>cannot invent or alter a request</strong>, because any request it applies must carry your valid signature, which it can't forge.</li>
+<li>The oracle <strong>cannot quietly double-charge you</strong>: because every request it processes is published in the batch for all to see, any attempt to charge you twice for the same change is right there in the public record and can be challenged like any other bad step.</li>
+<li>And if the oracle simply <strong>ignores you</strong> — refuses to include your request — you have an <strong>escape hatch</strong>: you can fall back to the old-fashioned on-chain request (the certified letter), which the oracle cannot quietly suppress. You'd only need this in the specific case where you're actually being censored.</li>
+</ul>
+<h2 id="6-what-a-regular-user-actually-experiences-step-by-step">6. What a regular user actually experiences, step by step</h2>
+<p>Putting the two halves together, here's the lived experience under the upgrade.</p>
+<ol>
+<li><strong>One-time setup.</strong> You deposit a small balance with the system. This is a single up-front cost, not something you repeat.</li>
+<li><strong>Making a request.</strong> When you want a change, you write it down and sign it — like signing an email — and send it to the oracle. No transaction, no fee at this moment; later a tiny tip is drawn from your pre-loaded balance.</li>
+<li><strong>The oracle batches.</strong> The oracle collects your request along with many others, applies them all to the database, and publishes onto the blockchain: the full list of changes, the signed requests authorizing them, and the new fingerprint. It does <em>not</em> wait for the blockchain to re-verify.</li>
+<li><strong>The challenge window opens.</strong> For roughly a day and a half, the new fingerprint is provisional. Anyone in the world can audit the published batch and challenge a bad step. You don't have to do this yourself; it's enough that anyone <em>can</em>, and that cheating is guaranteed to be catchable.</li>
+<li><strong>Finalization.</strong> If no valid challenge arrives, the change becomes permanent at the end of the window. If someone does prove a bad step, the oracle is punished and the offending changes are rolled back.</li>
+</ol>
+<p>Most of the time, from your seat, it feels like: deposit once, fire off cheap signed requests, wait out a settling period, done.</p>
+<h2 id="7-the-honest-trade-offs">7. The honest trade-offs</h2>
+<p>A fair explanation names the costs, not just the benefits.</p>
+<ul>
+<li><strong>Finality takes longer.</strong> Under the old design a change was final as soon as the blockchain confirmed it. Under the upgrade you must wait out the challenge window — roughly 36 hours — before a change is truly permanent. You've traded quick certainty for much lower cost.</li>
+<li><strong>Someone else's fraud can undo your honest change.</strong> Here is what "stacked on top" means concretely. The changes in a batch are applied in order, each one to the database that the previous change left behind — so change 5 is computed from the result of change 4, change 4 from change 3, and so on. They form a chain, not an independent pile. If an early change in that chain is proven fraudulent and undone, every change computed <em>after</em> it was built on a starting point that has now vanished, so those later changes have to be unwound too — <em>even if yours was perfectly legitimate</em>. The system refunds you, but you have to resubmit. Your money is safe; your change just may not stick on the first try.</li>
+<li><strong>No more instant cancellation.</strong> Because requests now flow through batches rather than as immediate individual transactions, you can't cancel a request the very instant you change your mind; there's a short delay.</li>
+<li><strong>Censorship pushes you back to the expensive path.</strong> If the oracle refuses to include your off-chain signed request, your remedy is the on-chain escape hatch — which costs what the old method cost. You only pay that price when you're actually being censored, but the option being there is what keeps the oracle honest about including requests.</li>
+<li><strong>It isn't built yet.</strong> This is a design proposal. The base MPFS system — fingerprint on a token, a publicly verifiable database, real-time on-chain checking of every change — is the part that exists today. Challenges, bonds and the challenge window do not exist yet; they arrive with this upgrade. The optimistic batch upgrade described here is the proposed evolution, not a shipped feature — its design and implementation plan are tracked in <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/64">epic #64</a>.</li>
+</ul>
+<p>The thread running through every trade-off is the same bargain: by relaxing <em>when</em> and <em>how often</em> the expensive checking happens — doing it only on complaint, against permanently public evidence — the system becomes far cheaper to run and to use, while preserving the one property that matters most. No one has to trust the operator. Anyone can catch a cheat.</p>
+<h2 id="8-a-separate-gap-the-oracle-can-simply-stop">8. A separate gap: the oracle can simply stop</h2>
+<p>Everything above is about the oracle being <em>dishonest</em>. There is a second
+problem, unrelated to the batching upgrade, and it is about the oracle being
+<em>absent</em>.</p>
+<p>Only the oracle can apply a request or formally discard an expired one. A user
+has exactly one window in which to walk away on their own — the retraction
+window. Once it closes, the request sits on the ledger and nobody but the
+oracle can move it. An oracle that stops answering therefore leaves those
+deposits stuck, and it costs the oracle nothing to let that happen. It is also
+why a cage cannot yet be a genuinely public registry: someone always holds the
+key.</p>
+<p>The planned fix lets anyone clear expired requests, and lets a validator — a
+rule, not a person — decide what a batch may do. See
+<a href="../roadmap/permissionless-registries/">Permissionless Registries</a>. Like the
+batching upgrade, none of it has shipped.</p>
+<h2 id="9-a-short-glossary">9. A short glossary</h2>
+<ul>
+<li><strong>Key/value database:</strong> a list where each key (a label you look up) maps to a value (the fact you get back), like a dictionary.</li>
+<li><strong>Blockchain (also "the ledger," "on-chain"):</strong> a public, shared, append-only record book that anyone can read, no one controls, and no one can secretly rewrite. <strong>Cardano</strong> is the specific one used here.</li>
+<li><strong>Off-chain:</strong> handed around privately between parties, not written into the blockchain.</li>
+<li><strong>Hash / fingerprint:</strong> a short code computed from data; any change to the data changes the code completely, and the code can't feasibly be forged or reversed. Matching codes mean matching data.</li>
+<li><strong>Merkle tree / root hash:</strong> a staged way of hashing a large dataset down to one top-level fingerprint (the root hash), which also lets you prove a single entry's value with a small proof instead of the whole dataset.</li>
+<li><strong>Token:</strong> a unique, non-duplicable serial-numbered seal on the blockchain. Here, one token represents one database and carries its current fingerprint — the envelope that holds the note.</li>
+<li><strong>Operator / oracle:</strong> the party that applies changes to the database. Not trusted to be honest — the design makes cheating provable.</li>
+<li><strong>Transaction:</strong> a single recorded action on the blockchain; posting one costs a fee.</li>
+<li><strong>Deposit / bond:</strong> money locked up in advance. Users deposit a small balance to pre-pay fees; the oracle posts a bond it forfeits if caught cheating.</li>
+<li><strong>Tip:</strong> the small per-change fee, drawn from a user's pre-loaded deposit.</li>
+<li><strong>Digital signature:</strong> an unforgeable mathematical seal you place on a message, proving it came from you and wasn't altered — cheap, like signing an email.</li>
+<li><strong>Batch:</strong> a group of changes (and the requests authorizing them) handled together as one unit instead of one at a time.</li>
+<li><strong>Optimistic:</strong> the approach of accepting changes without immediate checking, relying on public evidence and after-the-fact challenges to catch any wrongdoing.</li>
+<li><strong>Challenge / challenge window:</strong> the period (about 36 hours) during which anyone can prove a published change broke the rules; a successful challenge punishes the oracle and undoes the bad change. Part of the Section 5 proposal, not of the system as it stands.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.indexes", "navigation.sections", "navigation.path", "toc.integrate", "content.code.copy"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
