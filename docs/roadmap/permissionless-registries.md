@@ -125,7 +125,7 @@ boundary.
 The registry state machine can be replayed scenario by scenario in the
 simulator:
 
-<https://preview.dev.plutimus.com/lambdasistemi/cardano-keri/pr-317/simulator/registry/>
+<https://lambdasistemi.github.io/cardano-keri/simulator/registry/>
 
 M1 ships against the permissioned cage — the registry's own operator holds the
 key. The work on this page is what removes that operator from the trust
