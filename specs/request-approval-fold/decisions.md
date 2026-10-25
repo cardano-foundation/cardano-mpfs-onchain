@@ -1,120 +1,181 @@
-# Requests, oracle approvals and permissionless folds: decisions
+# Requests, oracle judgments and permissionless folds: decisions
 
-As a cage operator, I want requests to reach my cage without a request script
-applied to my cage, so that creating a cage publishes no per-cage script and
-anyone can fold what I have approved.
+As anyone, I want to create a registry by naming the oracles that judge it and
+the protocol they judge, so that a registry needs no script, no owner and no
+folding infrastructure of its own, and anyone can fold what its oracles have
+approved.
 
-This records the design decisions taken on 24 October 2026, after the Singular
-investigation in which the request lifecycle belongs to the application
-(lambdasistemi/singular#731, #741). The Lean statements in
-`lean/MpfsCage/RequestApprovalFold.lean` state this design. Each decision says
-what was decided and why.
+This records the design decisions taken on 24 and 25 October 2026, after the
+Singular investigation in which the request lifecycle belongs to the
+application (lambdasistemi/singular#731, #741). Each decision says what was
+decided and why. The Lean statements in `lean/MpfsCage/RequestApprovalFold.lean`
+state the earlier single-oracle version of this design and are to be rewritten
+against this record.
 
 ## Roles
 
 - **Three parties check three things.** The requester states the write and the
-  conditions on the tree under which it may apply. The oracle states that the
-  requester may ask for it: an authorization judged off-chain (for Moog: GitHub
-  keys, repository roles, signatures), independent of the tree. The folder,
-  anyone, shows that it applies to the tree now.
-- **The oracle is the application.** In Singular's terms the MPFS oracle plays
-  the application: it decides admission, not tree validity.
+  conditions on the tree under which it may apply. Each oracle judges, off
+  chain, the aspect of the request it is responsible for (for Moog: GitHub
+  keys, repository roles, signatures), independently of the tree. The folder,
+  anyone, shows that the write applies to the tree now.
+- **The oracles are the application.** In Singular's terms the oracles play the
+  application: they decide admission, not tree validity. Different oracles
+  check different things, so an application is composed from oracles, which
+  may be shared between applications.
 - **Folding is permissionless.** Whether a fold is accepted does not depend on
   who submits it. The folder chooses which approved requests to include and
   their order; it cannot apply an unapproved request, change a write, or
   consume a request without applying it.
-- **No rejection.** The tree moves only by folded writes. A request that is
-  not approved is simply never folded.
 - **No externalized state.** Unlike Singular, the fold mints and burns no
   per-key token; everything stays in the tree. Generalizing to both designs is
   out of scope.
 
+## Registries
+
+- **Anyone can create a registry.** Creating one mints the cage state with an
+  empty root, the set of oracles and the protocol. No script is applied to a
+  registry.
+- **Everything is declared at creation and never changes.** A permissionless
+  registry cannot have changeable parts, because whoever may change them would
+  hold power over everyone who trusted the contract.
+- **The oracle set and the protocol are the registry's identity.** Every entry
+  of the tree means "judged by these oracles under this protocol". Changing the
+  oracles would leave part of the tree judged one way and part another, and no
+  migration repairs that: a migrated tree carries the mix along. New judges
+  mean a new, empty registry.
+- **A registry has no owner and no end.** The oracles are the only judges and
+  they only judge requests; a centralized power to end or freeze the registry
+  above distributed judgment of requests makes no sense. A registry whose
+  oracles stop answering simply stops moving. Trust is placed in the oracles
+  when they are enumerated; nothing in the protocol can rescue a registry from
+  a bad one.
+- **Oracles need not consent to being listed.** Listing is an offer of
+  business; an oracle that does not serve a registry never answers its
+  requests.
+- **The protocol is named by hash.** The registry carries the hash of a
+  document describing, in CDDL, its keys, values and evidence, and optionally
+  which key prefix each oracle judges. Oracles publish off chain which
+  protocols they serve. An oracle that does not understand a request does not
+  answer it, so the protocol affects progress, never safety.
+
 ## Requests
 
-- **One request script per release** serves every cage. It is the spending
-  validator of the request address and the minting policy of the tags and
-  approvals. No script is applied to a cage.
-- **A request names its cage by data** (state policy and state asset name).
-- **A request carries one write**: `set key value` or `unset key`.
+- **One request script per release** serves every registry. It is the spending
+  validator of the request address and the minting policy of the tags,
+  approvals and refusals.
+- **A request names its registry by data.**
+- **A request carries one write**: `set key value` or `unset key`. The write is
+  on chain in the request datum, paid for by the requester, so readers rebuild
+  the tree by replaying folds at no cost. A protocol may store a hash as the
+  value, in which case serving the preimage is the key holder's
+  responsibility.
 - **A request carries conditions**: `key absent` or `key equals value`, on any
   key, checked at the fold against the tree reached when the request is
   applied. Compare-and-swap is a write with a condition on its own key; a
-  blind write has no conditions and applies to any tree. Fold-time conditions
-  are required because a generic system cannot foresee every state-based
-  consideration of its applications.
-- **The oracle checks that the conditions are sufficient** for its own rules
-  before approving. The fold checks that they hold.
+  blind write has no conditions. Fold-time conditions are required because a
+  generic system cannot foresee every state-based consideration of its
+  applications. The oracles check that the conditions suffice for their rules;
+  the fold checks that they hold.
+- **A request carries evidence**, an opaque field the chain never reads. The
+  registry's protocol decides whether it holds the evidence itself or its
+  hash, with the content delivered to the oracles off chain. Both have valid
+  uses: on chain lets anyone audit the oracles' reasons; off chain is cheaper.
 - **A request carries a seed**, an output reference spent by the transaction
-  that creates it, so that no two requests in history are equal. An approval,
-  or an application signature covering the seed, cannot be replayed onto a
-  copied request.
-- **The owner may withdraw at any time.** There is no clock on a request.
-  Withdrawing burns its tag and its approval, so the approval dies with it.
+  that creates it, so that no two requests in history are equal and no
+  judgment can be replayed onto a copied request.
+- **A request carries a deadline and a window.** Folds and judgments happen
+  before the deadline. The owner cannot withdraw before the deadline plus the
+  window, which protects oracles that have judged from losing their fee.
+
+## Judgments
+
+- **Every oracle of the registry must approve** a request before it can fold.
+- **An oracle approves or refuses by minting a token** under the request
+  script's policy, with the request output as a reference input. The token can
+  sit in any output, typically the oracle's own wallet. Nothing is spent, so
+  oracles never contend for the request output.
+- **A judgment's name** hashes the registry, the request (including its seed),
+  the oracle and the verdict. Judgments do not expire: the request's deadline
+  bounds them, and an oracle that finds a deadline too far for its judgment to
+  stay valid does not answer.
+- **A fold signed by an oracle counts as that oracle's approval** of every
+  request in it, so a single oracle that folds itself needs no separate
+  approval transaction.
+- **Dead judgments are harmless.** Once the request is gone its seed can never
+  recur; the holder burns the token whenever it likes.
 
 ## Discovery
 
-- **The requester mints a tag** named after the cage, under the request
-  script's policy, into the request output. The oracle finds its pending
-  requests with one asset query.
-- **Minting a tag** requires the seed to be spent in the same transaction and
-  the cage state to be present as a reference input, proving that the cage
-  exists. Exactly one tag goes into exactly one request output.
-- **Every path that consumes a request burns its tag**, so a tag never leaves
-  a request output and the asset query returns only live requests.
+- **The requester mints a tag** under the request script's policy into the
+  request output. Minting requires the seed spent in the same transaction and
+  the cage state as a reference input, proving that the registry exists.
+- **Every path that consumes a request burns its tag**, so an asset query
+  returns only live requests.
 - **Folders find work through approval tokens.**
 - The address staking-part alternative was declined.
 
-## Approvals
-
-- **The oracle approves by minting an approval token into the request
-  output**, recreating the output with the same request and tags.
-- **The approval's name** hashes the cage, the request (including its seed)
-  and the expiry.
-- **The approval expires**, at a time the oracle chooses: an off-chain
-  judgment does not stay valid forever. A fold needs a live approval. An
-  expired approval can be replaced by a fresh one.
-- **Only the cage's oracle can approve**, checked against the oracle recorded
-  in the cage state, read as a reference input.
-
 ## Money
 
-- **The request pays for being judged.** It declares an approval fee; the
-  oracle takes at most that fee at the first approval. Re-approval takes
-  nothing, so an oracle cannot drain a request by approving it repeatedly.
-  This protects the oracle from being starved by requests withdrawn after
-  approval.
-- **A paid approval must be foldable.** The request declares a minimum
-  approval window; an approval must stay live at least that long after the
-  approving transaction.
-- **Paid refusal is opt-in.** A request may declare a refusal fee. If it is
-  positive, the oracle may refuse the request before any approval: it burns
-  the tag, takes at most the refusal fee and returns the rest to the request's
-  refund address in an output whose datum records the refused request and the
-  oracle's reason. The record is what the requester pays for. With a zero
-  refusal fee the oracle cannot refuse for a fee, so it cannot target a
-  requester by refusing.
-- **The fold checks no money.** A request's remaining value is the folder's
-  bid; any minimum is the oracle's policy at approval.
+- **The request pays for judgment, not for outcome.** It declares a fee per
+  oracle, held in the request's value. Approving and refusing pay the same
+  fee, so an oracle gains nothing by choosing either verdict and judges
+  honestly. A refusal is worth paying for: it is what lets the requester exit
+  early.
+- **The fold pays every oracle its fee.** What remains in the request after
+  the fees is the folder's bid; the fold writes no refund outputs, so batches
+  are larger.
+- **A complete account settles a request at any time.** Anyone may consume the
+  request by showing, for every oracle of the registry, its approval or its
+  refusal. Each oracle is paid its fee and the rest returns to the owner. The
+  owner cannot hide an approval, because it cannot produce a refusal from an
+  oracle that approved.
+- **No exit inside the window without all the judgments.** Until the deadline
+  plus the window has passed, a request ends only by a fold or a complete
+  account.
+- **After the window the owner takes everything.** The chain cannot tell a
+  silent oracle from a hidden approval, so the owner decides whether to pay the
+  oracles that answered. A silent oracle loses its fee; good oracles carry a
+  small risk while they decide whether to keep serving a registry with a
+  silent member.
+
+## The old design as a special case
+
+The current MPFS cage is a registry with one oracle that also folds: its
+`Insert`, `Delete` and `Update` are writes with the matching condition on their
+own key, its tip is the oracle fee, and its processing and retract windows are
+the deadline and the window. The old cage owner's powers to transfer and end a
+cage have no counterpart.
 
 ## Not decided
 
+- One tag per request, named after the registry, or one tag per oracle, named
+  after the oracle, so that each oracle finds all its pending requests across
+  every registry with one asset query.
+- Ordering as an auction: conflicting approved requests are ordered by the
+  folder, and bids decide which wins.
+- Hold-up by complementary oracles: each oracle can block a request, so the
+  total price of judgment tends to exceed that of one integrated oracle.
 - Encodings of the hashed names (the Singular line uses CBOR specified in
   CDDL), the datum layout and the migration of existing cages.
-- Fold cost: the cost per condition proof is to be measured on a devnet.
+- Fold cost: the cost per condition proof and per judgment reference input is
+  to be measured on a devnet.
 
 ```mermaid
 sequenceDiagram
   participant R as Requester
-  participant O as Oracle
+  participant O as Oracles
   participant F as Folder
   participant C as Cage state
-  R->>R: create request, spend seed, mint cage tag
-  O->>O: judge off-chain
-  alt approve
-    O->>R: mint approval, take at most the approval fee
-    F->>C: fold: check approval and conditions, apply write, burn tag and approval
-  else paid refusal
-    O->>R: burn tag, take at most the refusal fee, refund with the record
+  R->>R: create request, spend seed, mint tag, escrow fees
+  O->>O: judge off chain
+  alt every oracle approves
+    O->>O: mint approvals by reference to the request
+    F->>C: fold: check approvals and conditions, apply write, pay oracles, burn tag
+  else every oracle answered, some refused
+    O->>O: mint approvals and refusals by reference
+    R->>R: complete account: pay every oracle, refund the rest, burn tag
+  else some oracle silent
+    R->>R: after deadline and window, take everything, burn tag
   end
-  R-->>R: withdraw at any time, burning tag and approval
 ```
