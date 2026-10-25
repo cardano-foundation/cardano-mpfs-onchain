@@ -125,11 +125,23 @@ against this record.
 - **The fold pays every oracle its fee.** What remains in the request after
   the fees is the folder's bid; the fold writes no refund outputs, so batches
   are larger.
-- **A complete account settles a request at any time.** Anyone may consume the
-  request by showing, for every oracle of the registry, its approval or its
-  refusal. Each oracle is paid its fee and the rest returns to the owner. The
-  owner cannot hide an approval, because it cannot produce a refusal from an
-  oracle that approved.
+- **A complete account settles a request.** Anyone may consume the request by
+  showing, for every oracle of the registry, its approval or its refusal. Each
+  oracle is paid its fee and the rest returns to the owner.
+- **Before the deadline a complete account needs at least one refusal.** A
+  request every oracle approved must fold; its owner cannot cancel it by
+  settling. From the deadline on, approvals alone suffice, which settles an
+  approved request nobody folded (for example because its conditions became
+  false).
+- **Equivocation is accepted, not prevented.** The chain cannot stop an oracle
+  from minting both an approval and a refusal for the same request; preventing
+  it would need a ballot per oracle burned at judgment. A minted approval
+  stands and a later refusal does not revoke it: a folder may fold with the
+  approval. Before the deadline the refusal also lets the request be settled
+  instead, so an equivocating oracle hands the owner a cancel option that
+  races the folders. No oracle's payment changes either way, and both
+  verdicts stay on chain under the oracle's signature, so the equivocation is
+  public and provable; its cost is the oracle's reputation.
 - **No exit inside the window without all the judgments.** Until the deadline
   plus the window has passed, a request ends only by a fold or a complete
   account.
@@ -172,7 +184,7 @@ sequenceDiagram
   alt every oracle approves
     O->>O: mint approvals by reference to the request
     F->>C: fold: check approvals and conditions, apply write, pay oracles, burn tag
-  else every oracle answered, some refused
+  else every oracle answered, some refused (or deadline passed)
     O->>O: mint approvals and refusals by reference
     R->>R: complete account: pay every oracle, refund the rest, burn tag
   else some oracle silent
