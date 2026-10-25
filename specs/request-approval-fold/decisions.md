@@ -120,31 +120,38 @@ against this record.
 - **The request pays for judgment, not for outcome.** It declares a fee per
   oracle, held in the request's value. Approving and refusing pay the same
   fee, so an oracle gains nothing by choosing either verdict and judges
-  honestly. A refusal is worth paying for: it is what lets the requester exit
-  early.
+  honestly. A refusal is worth paying for: it is the signed record of why, and
+  the evidence a settlement needs.
+- **Each window has exactly one exit, so exits never race.** Several folders
+  may compete for the same cage state and several parties may submit the same
+  settlement, but which exit ends a request never depends on who submits first.
+
+  | Window | The only exit |
+  |---|---|
+  | Before the deadline | The fold, with an approval from every oracle. |
+  | From the deadline to the deadline plus the window | The complete account. |
+  | After the window | The owner's withdrawal. |
+
 - **The fold pays every oracle its fee.** What remains in the request after
   the fees is the folder's bid; the fold writes no refund outputs, so batches
   are larger.
-- **A complete account settles a request.** Anyone may consume the request by
-  showing, for every oracle of the registry, its approval or its refusal. Each
-  oracle is paid its fee and the rest returns to the owner.
-- **Before the deadline a complete account needs at least one refusal.** A
-  request every oracle approved must fold; its owner cannot cancel it by
-  settling. From the deadline on, approvals alone suffice, which settles an
-  approved request nobody folded (for example because its conditions became
-  false).
+- **The complete account settles a request after its deadline.** Anyone may
+  consume the request by showing, for every oracle of the registry, its
+  approval or its refusal, in any mix. Each oracle is paid its fee and the rest
+  returns to the owner. The outcome does not depend on which verdicts are
+  shown, so the owner cannot hide an approval to save a fee. A refused request
+  therefore waits for its deadline; the requester, who sets the deadline,
+  bounds that wait.
+- **A refusal is no early exit.** Letting the owner leave before the deadline
+  on one refusal would let it hide the approvals of the other oracles, or would
+  pay oracles that never judged.
 - **Equivocation is accepted, not prevented.** The chain cannot stop an oracle
   from minting both an approval and a refusal for the same request; preventing
-  it would need a ballot per oracle burned at judgment. A minted approval
-  stands and a later refusal does not revoke it: a folder may fold with the
-  approval. Before the deadline the refusal also lets the request be settled
-  instead, so an equivocating oracle hands the owner a cancel option that
-  races the folders. No oracle's payment changes either way, and both
-  verdicts stay on chain under the oracle's signature, so the equivocation is
-  public and provable; its cost is the oracle's reputation.
-- **No exit inside the window without all the judgments.** Until the deadline
-  plus the window has passed, a request ends only by a fold or a complete
-  account.
+  it would need a ballot per oracle burned at judgment. Under the windows above
+  it changes nothing: before the deadline only approvals are usable, and after
+  it every verdict pays the same. Both verdicts stay on chain under the
+  oracle's signature, so the equivocation is public and provable; its cost is
+  the oracle's reputation.
 - **After the window the owner takes everything.** The chain cannot tell a
   silent oracle from a hidden approval, so the owner decides whether to pay the
   oracles that answered. A silent oracle loses its fee; good oracles carry a
@@ -184,9 +191,9 @@ sequenceDiagram
   alt every oracle approves
     O->>O: mint approvals by reference to the request
     F->>C: fold: check approvals and conditions, apply write, pay oracles, burn tag
-  else every oracle answered, some refused (or deadline passed)
+  else not folded by the deadline, every oracle answered
     O->>O: mint approvals and refusals by reference
-    R->>R: complete account: pay every oracle, refund the rest, burn tag
+    R->>R: in the window, complete account: pay every oracle, refund the rest, burn tag
   else some oracle silent
     R->>R: after deadline and window, take everything, burn tag
   end
