@@ -33,7 +33,7 @@ def s4 := afterFold s3 fold
 
 def account (bobVerdict : Bool) : AccountTx :=
   ⟨cage, output, [approved "alice", judgmentName cage.id request "bob" bobVerdict],
-    1, "anybody", tokensOf output, allocation cage output "owner"⟩
+    10, "anybody", tokensOf output, allocation cage output "owner"⟩
 def withdraw : WithdrawTx := ⟨output, 16, ["owner"], tokensOf output, "owner", 10⟩
 
 def registry_ok : registryCreated cage [] := by
@@ -42,7 +42,7 @@ def create_ok : createAllowed create output := by
   concrete
 
 def reachable0 : Reachable s0 := Reachable.registry cage [] registry_ok
-def step_create : Step s0 s1 := by
+def step_create : Step s0 (.create create output) s1 := by
   apply Step.create s0 create output rfl create_ok
   simp [s0, initial]
 def reachable1 : Reachable s1 := .next reachable0 step_create
@@ -50,14 +50,14 @@ def reachable1 : Reachable s1 := .next reachable0 step_create
 def judge_ok (oracle : Signer) (verdict : Bool) (h : oracle ∈ cage.oracles) :
     judgmentAllowed (judge oracle verdict) := by
   exact ⟨rfl, h, List.mem_cons_self, by change 2 < 10; concrete, rfl, rfl⟩
-def step_alice : Step s1 s2 :=
+def step_alice : Step s1 (.judge (judge "alice" true)) s2 :=
   Step.judge s1 (judge "alice" true) rfl (by concrete) (judge_ok _ _ (by concrete))
 def reachable2 : Reachable s2 := .next reachable1 step_alice
-def step_bob : Step s2 s3 :=
+def step_bob : Step s2 (.judge (judge "bob" true)) s3 :=
   Step.judge s2 (judge "bob" true) rfl (by concrete) (judge_ok _ _ (by concrete))
 def reachable3 : Reachable s3 := .next reachable2 step_bob
 
-def step_mixed : Step s2 mixed :=
+def step_mixed : Step s2 (.judge (judge "bob" false)) mixed :=
   Step.judge s2 (judge "bob" false) rfl (by concrete) (judge_ok _ _ (by concrete))
 def reachableMixed : Reachable mixed := .next reachable2 step_mixed
 
@@ -75,13 +75,13 @@ def run_ok : FoldRun cage 3 fold.refs [] cage.trie [output] fold.cageOut.trie :=
   .cons _ _ _ _ valid_step (.nil _)
 def fold_ok : foldAccepted fold :=
   ⟨rfl, rfl, rfl, by concrete, rfl, rfl, run_ok⟩
-def step_fold : Step s3 s4 := by
+def step_fold : Step s3 (.fold fold) s4 := by
   apply Step.fold s3 fold rfl (by concrete) (by concrete) fold_ok
 
 def reachable4 : Reachable s4 := .next reachable3 step_fold
 
 def account_ok (verdict : Bool) : accountAllowed (account verdict) := by
-  refine ⟨?_, ?_, rfl, rfl⟩
+  refine ⟨?_, ?_, rfl, rfl, by change 10 ≤ 10; decide, by change 10 ≤ 15; decide⟩
   · change wellFormed cage output; concrete
   intro oracle h
   change oracle ∈ cage.oracles at h
@@ -91,9 +91,9 @@ def account_ok (verdict : Bool) : accountAllowed (account verdict) := by
   · exact ⟨verdict, by simp [account, output]⟩
 def withdraw_ok : withdrawAllowed withdraw := by concrete
 
-def step_account : Step mixed (afterExit mixed output) :=
+def step_account : Step mixed (.account (account false)) (afterExit mixed output) :=
   Step.account mixed (account false) rfl (by concrete) (by concrete) (account_ok false)
-def step_withdraw : Step s1 (afterExit s1 output) :=
+def step_withdraw : Step s1 (.withdraw withdraw) (afterExit s1 output) :=
   Step.withdraw s1 withdraw (by concrete) withdraw_ok
 
 def history04 : History s0 s4 :=
@@ -123,7 +123,7 @@ example : Reachable s0 ∧ createAllowed create output := ⟨reachable0, create_
 -- A second distinct seed is live alongside the first.
 def output1 : RequestOutput := { output with request := { request with seed := "seed1" } }
 def create1 : CreateTx := ⟨["seed1"], cage, [tagName cage.id], [output1]⟩
-def step_create1 : Step s1 (afterCreate s1 create1 output1) :=
+def step_create1 : Step s1 (.create create1 output1) (afterCreate s1 create1 output1) :=
   Step.create s1 create1 output1 rfl (by concrete) (by concrete)
 def spent_once : SpentOnce [create, create1] := by
   intro a b seed ha hb hsa hsb
@@ -139,8 +139,9 @@ def spent_once : SpentOnce [create, create1] := by
   · rfl
 -- W08
 example : Reachable (afterCreate s1 create1 output1) ∧ SpentOnce [create, create1] ∧
-    createAllowed create output ∧ createAllowed create1 output1 ∧ create ≠ create1 := by
-  refine ⟨.next reachable1 step_create1, spent_once, create_ok, by concrete, ?_⟩
+    createAllowed create output ∧ createAllowed create1 output1 ∧
+    create ∈ [create, create1] ∧ create1 ∈ [create, create1] ∧ create ≠ create1 := by
+  refine ⟨.next reachable1 step_create1, spent_once, create_ok, by concrete, by simp, by simp, ?_⟩
   intro h
   have hspent := congrArg CreateTx.spent h
   contradiction
@@ -156,11 +157,11 @@ example : Reachable s2 ∧ tagName cage.id ∈ output.tags ∧ approved "alice" 
 -- W12
 example : Reachable s3 ∧ foldAccepted fold := ⟨reachable3, fold_ok⟩
 -- W13
-example : Reachable s3 ∧ Step s3 s4 := ⟨reachable3, step_fold⟩
+example : Reachable s3 ∧ Step s3 (.fold fold) s4 := ⟨reachable3, step_fold⟩
 -- W14
 example : Reachable s0 ∧ History s0 s4 := ⟨reachable0, history04⟩
 -- W15
-example : Reachable s3 ∧ Step s3 s4 ∧ s4.cage.trie ≠ s3.cage.trie := by
+example : Reachable s3 ∧ Step s3 (.fold fold) s4 ∧ s4.cage.trie ≠ s3.cage.trie := by
   refine ⟨reachable3, step_fold, ?_⟩
   intro h
   have hx := congrFun h "x"
@@ -205,10 +206,12 @@ example : Reachable s3 ∧ foldAccepted fold ∧ fold.submitter ≠ "new-submitt
 example : Reachable s4 ∧ s4.cage.trie "x" = some "v" ∧
     ¬ (Condition.absent "x").holds s4.cage.trie := ⟨reachable4, rfl, by concrete⟩
 -- W25
-example : Reachable mixed ∧ accountAllowed (account false) ∧ Step mixed (afterExit mixed output) :=
+example : Reachable mixed ∧ accountAllowed (account false) ∧ Step mixed (.account (account false)) (afterExit mixed output) :=
   ⟨reachableMixed, account_ok false, step_account⟩
 -- W26
-example : Reachable mixed ∧ accountAllowed (account false) := ⟨reachableMixed, account_ok false⟩
+example : Reachable mixed ∧ accountAllowed (account false) ∧
+    output.request.deadline ≤ 12 ∧ 12 ≤ output.request.deadline + output.request.window :=
+  ⟨reachableMixed, account_ok false, by concrete, by concrete⟩
 -- W27: both approval and refusal paths are reachable, with the same money.
 example : Reachable s3 ∧ Reachable mixed ∧
     accountAllowed (account true) ∧ accountAllowed (account false) ∧
@@ -242,28 +245,21 @@ example : Reachable mixed ∧ requestSpendAllowed output (.accounted (account fa
     RequestSpend.cage (.accounted (account false)) = some cage :=
   ⟨reachableMixed, ⟨account_ok false, rfl⟩, by concrete, rfl⟩
 
-def mixed_nonEquivocating : NonEquivocating mixed.issued := by
-  intro c r oracle ha hf
-  simp [mixed, s2, s1, s0, initial, afterJudgment, afterCreate, judge,
-    judgmentName] at ha hf
-  have he := ha.2.2.symm.trans hf.2.2
-  contradiction
 -- W34
-example : Reachable mixed ∧ accountAllowed (account false) ∧ NonEquivocating mixed.issued ∧
-    (∀ name ∈ (account false).refs, name ∈ mixed.issued) ∧
-    "alice" ∈ cage.oracles ∧ approved "alice" ∈ mixed.issued :=
-  ⟨reachableMixed, account_ok false, mixed_nonEquivocating, by concrete, by concrete, by concrete⟩
+example : Reachable s3 ∧ requestSpendAllowed output (.folded fold) ∧
+    fold.now < output.request.deadline :=
+  ⟨reachable3, ⟨fold_ok, by concrete⟩, by concrete⟩
 -- W35
 example : Reachable s4 ∧ approved "alice" ∈ s4.judgments ∧
     (∀ o ∈ s4.live, o.request ≠ request) := ⟨reachable4, by concrete, by concrete⟩
 -- W36
-example : Reachable s1 ∧ Step s1 s2 := ⟨reachable1, step_alice⟩
+example : Reachable s1 ∧ Step s1 (.judge (judge "alice" true)) s2 := ⟨reachable1, step_alice⟩
 -- W37
 example : Reachable (afterExit s1 output) := .next reachable1 step_withdraw
 -- W38
 example : Reachable s4 ∧ output ∈ fold.requests := ⟨reachable4, by concrete⟩
 -- W39
-example : Reachable s1 ∧ Step s1 s2 ∧ request.seed ∈ s1.usedSeeds :=
+example : Reachable s1 ∧ Step s1 (.judge (judge "alice" true)) s2 ∧ request.seed ∈ s1.usedSeeds :=
   ⟨reachable1, step_alice, by concrete⟩
 -- W40
 example : Reachable s1 ∧ output ∈ s1.live := ⟨reachable1, by concrete⟩
@@ -271,14 +267,16 @@ example : Reachable s1 ∧ output ∈ s1.live := ⟨reachable1, by concrete⟩
 example : Reachable s4 ∧ request.seed ∈ s4.usedSeeds ∧ createAllowed create output :=
   ⟨reachable4, by concrete, create_ok⟩
 -- W42: burning dead evidence is a nontrivial post-exit history.
-def deadBurn : Step s4 (afterBurn s4 (approved "alice")) := Step.burn s4 _ (by concrete)
+def deadBurn : Step s4 (.burn (approved "alice")) (afterBurn s4 (approved "alice")) := Step.burn s4 _ (by concrete)
 example : Reachable s4 ∧ History s4 (afterBurn s4 (approved "alice")) ∧
     request.seed ∈ s4.usedSeeds ∧ output ∉ s4.live :=
   ⟨reachable4, .next deadBurn (.refl _), by concrete, by concrete⟩
 -- W43
-example : registryCreated { cage with oracles := ["alice"] } [] ∧
+example : Reachable (initial { cage with oracles := ["alice"] }) ∧
+    registryCreated { cage with oracles := ["alice"] } [] ∧
     ({ cage with oracles := ["alice"] } : CageState).oracles = ["alice"] := by
-  exact ⟨by simp [registryCreated, RegistryValid, cage], rfl⟩
+  exact ⟨Reachable.registry _ [] (by simp [registryCreated, RegistryValid, cage]),
+    by simp [registryCreated, RegistryValid, cage], rfl⟩
 -- W44
 example : Reachable s0 ∧ Reachable s4 ∧
     (OldOperation.insert "x" "v").condition.holds s0.cage.trie ∧
@@ -287,10 +285,10 @@ example : Reachable s0 ∧ Reachable s4 ∧
   ⟨reachable0, reachable4, rfl, rfl, rfl⟩
 
 -- W45
-example : Reachable s3 ∧ Step s3 s4 ∧ output ∈ s3.live ∧ output ∉ s4.live :=
+example : Reachable s3 ∧ Step s3 (.fold fold) s4 ∧ output ∈ s3.live ∧ output ∉ s4.live :=
   ⟨reachable3, step_fold, by concrete, by concrete⟩
 -- W46
-example : Reachable s1 ∧ Step s1 s2 ∧ approved "alice" ∈ s2.issued ∧
+example : Reachable s1 ∧ Step s1 (.judge (judge "alice" true)) s2 ∧ approved "alice" ∈ s2.issued ∧
     approved "alice" ∉ s1.issued := ⟨reachable1, step_alice, by concrete, by concrete⟩
 
 -- W24b: all antecedents of the exclusivity theorem hold on this reachable
@@ -332,5 +330,10 @@ example : Reachable withAgain ∧
     output.request.write = .set "x" "v" ∧
     Condition.absent "x" ∈ againOutput.request.conditions :=
   ⟨reachableBatch, tripleRun, rfl, by concrete⟩
+
+def equivocal := afterJudgment s3 (judge "bob" false)
+def step_equivocal : Step s3 (.judge (judge "bob" false)) equivocal :=
+  Step.judge s3 (judge "bob" false) rfl (by concrete) (judge_ok _ _ (by concrete))
+def reachableEquivocal : Reachable equivocal := .next reachable3 step_equivocal
 
 end RequestApprovalFold.Witnesses
