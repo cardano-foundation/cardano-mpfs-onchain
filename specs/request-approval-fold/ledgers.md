@@ -24,57 +24,60 @@ uses the explicit ledger-wide SpentOnce premise, not a global chain simulator.
 
 ## Theorems
 
-All names are in RequestApprovalFold. Phase-1 outcomes are OPEN, intentional
-sorry statements. The final proof phase updates outcome cells only.
+All names are in RequestApprovalFold. All 46 frozen statements are PROVED.
+Phase 1 retained intentional sorry statements; phase 2 changed only proof
+bodies in Lean. The clean-build and axiom receipts are in the creator handoff.
+One proposed mutant description was corrected during author review: applying
+a head twice still satisfies append composition; discarding the tail does not.
 
 | Row | Theorem | Decision / semantic obligation | Reachable antecedent | Single-edit production mutant (expected falsifier) | Outcome |
 |---|---|---|---|---|---|
-| T01 | applyAll_append | Fold composition | W01 | applyAll cons: apply the head write twice | OPEN |
-| T02 | foldRun_step_valid | Fold guards | W02 | FoldRun.cons: remove stepValid premise | OPEN |
-| T03 | foldRun_result | Fold ordered effects | W03 | FoldRun.cons: recurse on t instead of write.apply t | OPEN |
-| T04 | foldRun_conditions | Conditions at intermediate tree | W04 | FoldRun.cons: check stepValid against emptyTrie | OPEN |
-| T05 | applyAll_keeps_present | Present-key preservation | W05 | Write.apply set: store none instead of some value | OPEN |
-| T06 | registry_creation | Registry creation | W06 | registryCreated: remove RegistryValid guard | OPEN |
-| T07 | create_tags_existing_cage | Request creation and tag minting | W07 | createAllowed: drop seed-spent guard | OPEN |
-| T08 | requests_unique_in_history | Historical request uniqueness | W08 | createAllowed: drop seed-spent guard | OPEN |
-| T09 | judgment_authorized_and_bound | Judgment authorization, time, binding | W09 | judgmentAllowed: drop oracle-membership guard | OPEN |
-| T10 | judgment_not_replayable | Judgment replay protection | W10 | judgmentName: replace request seed with a constant | OPEN |
-| T11 | token_roles_separated | Tag/judgment domain separation | W11 | tagName: emit a judgment-role name for a fixed request/oracle | OPEN |
-| T12 | fold_preserves_registry | Immutable registry identity | W12 | foldAccepted: drop protocol-preservation guard | OPEN |
-| T13 | step_preserves_registry | Immutable registry on every step | W13 | afterJudgment: replace cage.protocol with a constant | OPEN |
-| T14 | history_preserves_registry | Immutable registry across composition | W14 | afterJudgment: replace cage.oracles with [] | OPEN |
-| T15 | only_fold_changes_tree | Only fold changes cage | W15 | afterJudgment: replace cage.trie with emptyTrie | OPEN |
-| T16 | fold_only_approved_before_deadline | All oracles approve before deadline | W16 | stepValid: drop hasApproval guard | OPEN |
-| T17 | fold_conditions_hold_when_applied | Intermediate-tree conditions | W17 | stepValid: test conditions on emptyTrie instead of t | OPEN |
-| T18 | fold_root_is_folded_writes | Exact writes in exact order | W18 | FoldRun.cons: recurse on t without applying write | OPEN |
-| T19 | fold_burns_tags | Burn tags on fold | W19 | foldAccepted: permit burned=[] | OPEN |
-| T20 | fold_pays_and_keeps_rest | All fees paid and folder remainder | W20 | foldAccepted: permit allocations=[] | OPEN |
-| T21 | allocation_conserves_value | Money conservation | W21 | allocation: replace remainder with o.value | OPEN |
-| T22 | blind_write_folds_on_any_tree | Blind-write availability | W22 | stepValid: require nonempty conditions | OPEN |
-| T23 | fold_permissionless | Permissionless submission | W23 | foldAccepted: require submitter=folder | OPEN |
-| T24 | absent_inserts_exclusive | Absent-insert exclusivity | W24 + W24b | stepValid: omit condition check | OPEN |
-| T25 | account_complete_and_pays | Complete account, fees, owner rest | W25 | accountAllowed: omit hasAccount guard | OPEN |
-| T26 | account_anyone_anytime | Anyone may account at any time | W26 | accountAllowed: require now<deadline | OPEN |
-| T27 | account_fee_neutral | Approval/refusal fee neutrality | W27 | accountAllowed: increase remainder by one when a refusal is shown | OPEN |
-| T28 | withdraw_only_owner_after_window | Owner-only timed withdrawal | W28 | withdrawAllowed: omit owner-signature guard | OPEN |
-| T29 | owner_can_withdraw_everything | Withdrawal availability after window | W29 | withdrawAllowed: require paid=0 | OPEN |
-| T30 | request_spent_only_by_lifecycle | No other legal request exit | W30 | requestSpendAllowed accounted: accept True | OPEN |
-| T31 | every_exit_burns_tag | Every exit burns tags | W31 | withdrawAllowed: omit burned guard | OPEN |
-| T32 | early_exit_requires_all_judgments | Early exits show every judgment | W32 | withdrawAllowed: omit after-window guard | OPEN |
-| T33 | early_exit_pays_every_oracle | Early exits pay every oracle | W33 | accountAllowed: permit empty oracle payments | OPEN |
-| T34 | owner_cannot_hide_approval | An approval cannot be hidden | W34 | hasAccount: require evidence from only the first oracle | OPEN |
-| T35 | dead_judgment_can_burn | Dead judgments always burn | W35 | Step.burn: add a live-request premise | OPEN |
-| T36 | judgments_do_not_consume | Judgment minting consumes no request | W36 | afterJudgment: replace live with [] | OPEN |
-| T37 | exits_remove_consumed | Exit terminality | W37 | afterExit: preserve live unchanged | OPEN |
-| T38 | fold_removes_consumed | Fold terminality | W38 | afterFold: preserve live unchanged | OPEN |
-| T39 | used_seeds_monotone | Spent-once composition | W39 | afterExit: clear usedSeeds | OPEN |
-| T40 | reachable_requests_have_spent_seeds | Live requests have spent seeds | W40 | afterCreate: preserve usedSeeds unchanged | OPEN |
-| T41 | spent_seed_cannot_create_again | Seed cannot recur | W41 | createAllowed: omit seed-spent guard | OPEN |
-| T42 | request_never_reappears | Consumed requests never reappear | W42 | afterJudgment: prepend requestRef to live | OPEN |
-| T43 | one_oracle_signature_suffices | Single-oracle old-design signature shortcut | W43 | hasApproval: remove signature alternative | OPEN |
-| T44 | old_operations_correspond | Old Insert/Delete/Update correspondence | W44 | OldOperation.write delete: use set instead of unset | OPEN |
-| T45 | live_removal_is_legal_exit | Authoritative machine exit inversion | W45 | afterBurn: clear live | OPEN |
-| T46 | new_judgment_is_authorized | Authoritative machine judgment provenance | W46 | afterBurn: prepend a tag name to issued | OPEN |
+| T01 | applyAll_append | Fold composition | W01 | applyAll cons: return w.apply t and discard the tail | PROVED |
+| T02 | foldRun_step_valid | Fold guards | W02 | FoldRun.cons: remove stepValid premise | PROVED |
+| T03 | foldRun_result | Fold ordered effects | W03 | FoldRun.cons: recurse on t instead of write.apply t | PROVED |
+| T04 | foldRun_conditions | Conditions at intermediate tree | W04 | FoldRun.cons: check stepValid against emptyTrie | PROVED |
+| T05 | applyAll_keeps_present | Present-key preservation | W05 | Write.apply set: store none instead of some value | PROVED |
+| T06 | registry_creation | Registry creation | W06 | registryCreated: remove RegistryValid guard | PROVED |
+| T07 | create_tags_existing_cage | Request creation and tag minting | W07 | createAllowed: drop seed-spent guard | PROVED |
+| T08 | requests_unique_in_history | Historical request uniqueness | W08 | createAllowed: drop seed-spent guard | PROVED |
+| T09 | judgment_authorized_and_bound | Judgment authorization, time, binding | W09 | judgmentAllowed: drop oracle-membership guard | PROVED |
+| T10 | judgment_not_replayable | Judgment replay protection | W10 | judgmentName: replace request seed with a constant | PROVED |
+| T11 | token_roles_separated | Tag/judgment domain separation | W11 | tagName: emit a judgment-role name for a fixed request/oracle | PROVED |
+| T12 | fold_preserves_registry | Immutable registry identity | W12 | foldAccepted: drop protocol-preservation guard | PROVED |
+| T13 | step_preserves_registry | Immutable registry on every step | W13 | afterJudgment: replace cage.protocol with a constant | PROVED |
+| T14 | history_preserves_registry | Immutable registry across composition | W14 | afterJudgment: replace cage.oracles with [] | PROVED |
+| T15 | only_fold_changes_tree | Only fold changes cage | W15 | afterJudgment: replace cage.trie with emptyTrie | PROVED |
+| T16 | fold_only_approved_before_deadline | All oracles approve before deadline | W16 | stepValid: drop hasApproval guard | PROVED |
+| T17 | fold_conditions_hold_when_applied | Intermediate-tree conditions | W17 | stepValid: test conditions on emptyTrie instead of t | PROVED |
+| T18 | fold_root_is_folded_writes | Exact writes in exact order | W18 | FoldRun.cons: recurse on t without applying write | PROVED |
+| T19 | fold_burns_tags | Burn tags on fold | W19 | foldAccepted: permit burned=[] | PROVED |
+| T20 | fold_pays_and_keeps_rest | All fees paid and folder remainder | W20 | foldAccepted: permit allocations=[] | PROVED |
+| T21 | allocation_conserves_value | Money conservation | W21 | allocation: replace remainder with o.value | PROVED |
+| T22 | blind_write_folds_on_any_tree | Blind-write availability | W22 | stepValid: require nonempty conditions | PROVED |
+| T23 | fold_permissionless | Permissionless submission | W23 | foldAccepted: require submitter=folder | PROVED |
+| T24 | absent_inserts_exclusive | Absent-insert exclusivity | W24 + W24b | stepValid: omit condition check | PROVED |
+| T25 | account_complete_and_pays | Complete account, fees, owner rest | W25 | accountAllowed: omit hasAccount guard | PROVED |
+| T26 | account_anyone_anytime | Anyone may account at any time | W26 | accountAllowed: require now<deadline | PROVED |
+| T27 | account_fee_neutral | Approval/refusal fee neutrality | W27 | accountAllowed: increase remainder by one when a refusal is shown | PROVED |
+| T28 | withdraw_only_owner_after_window | Owner-only timed withdrawal | W28 | withdrawAllowed: omit owner-signature guard | PROVED |
+| T29 | owner_can_withdraw_everything | Withdrawal availability after window | W29 | withdrawAllowed: require paid=0 | PROVED |
+| T30 | request_spent_only_by_lifecycle | No other legal request exit | W30 | requestSpendAllowed accounted: accept True | PROVED |
+| T31 | every_exit_burns_tag | Every exit burns tags | W31 | withdrawAllowed: omit burned guard | PROVED |
+| T32 | early_exit_requires_all_judgments | Early exits show every judgment | W32 | withdrawAllowed: omit after-window guard | PROVED |
+| T33 | early_exit_pays_every_oracle | Early exits pay every oracle | W33 | accountAllowed: permit empty oracle payments | PROVED |
+| T34 | owner_cannot_hide_approval | An approval cannot be hidden | W34 | hasAccount: require evidence from only the first oracle | PROVED |
+| T35 | dead_judgment_can_burn | Dead judgments always burn | W35 | Step.burn: add a live-request premise | PROVED |
+| T36 | judgments_do_not_consume | Judgment minting consumes no request | W36 | afterJudgment: replace live with [] | PROVED |
+| T37 | exits_remove_consumed | Exit terminality | W37 | afterExit: preserve live unchanged | PROVED |
+| T38 | fold_removes_consumed | Fold terminality | W38 | afterFold: preserve live unchanged | PROVED |
+| T39 | used_seeds_monotone | Spent-once composition | W39 | afterExit: clear usedSeeds | PROVED |
+| T40 | reachable_requests_have_spent_seeds | Live requests have spent seeds | W40 | afterCreate: preserve usedSeeds unchanged | PROVED |
+| T41 | spent_seed_cannot_create_again | Seed cannot recur | W41 | createAllowed: omit seed-spent guard | PROVED |
+| T42 | request_never_reappears | Consumed requests never reappear | W42 | afterJudgment: prepend requestRef to live | PROVED |
+| T43 | one_oracle_signature_suffices | Single-oracle old-design signature shortcut | W43 | hasApproval: remove signature alternative | PROVED |
+| T44 | old_operations_correspond | Old Insert/Delete/Update correspondence | W44 | OldOperation.write delete: use set instead of unset | PROVED |
+| T45 | live_removal_is_legal_exit | Authoritative machine exit inversion | W45 | afterBurn: clear live | PROVED |
+| T46 | new_judgment_is_authorized | Authoritative machine judgment provenance | W46 | afterBurn: prepend a tag name to issued | PROVED |
 
 ## Semantic atoms
 
