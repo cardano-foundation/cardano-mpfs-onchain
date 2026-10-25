@@ -127,7 +127,15 @@ theorem fold_preserves_registry (tx : FoldTx) :
 theorem step_preserves_registry {s s' : State} {action : Action} (h : Step s action s') :
     s'.cage.id = s.cage.id ∧ s'.cage.oracles = s.cage.oracles ∧
       s'.cage.protocol = s.cage.protocol := by
-  sorry
+
+  cases h with
+  | create => exact ⟨rfl, rfl, rfl⟩
+  | judge => exact ⟨rfl, rfl, rfl⟩
+  | account => exact ⟨rfl, rfl, rfl⟩
+  | withdraw => exact ⟨rfl, rfl, rfl⟩
+  | burn => exact ⟨rfl, rfl, rfl⟩
+  | fold tx hc _ _ hf => simpa [afterFold, hc] using fold_preserves_registry tx hf
+
 
 theorem history_preserves_registry {s s' : State} (h : History s s') :
     s'.cage.id = s.cage.id ∧ s'.cage.oracles = s.cage.oracles ∧
@@ -141,7 +149,16 @@ theorem history_preserves_registry {s s' : State} (h : History s s') :
 theorem only_fold_changes_tree {s s' : State} {action : Action} (h : Step s action s') :
     s'.cage.trie ≠ s.cage.trie →
       ∃ tx, foldAccepted tx ∧ tx.cageIn = s.cage ∧ s' = afterFold s tx := by
-  sorry
+
+  intro hne
+  cases h with
+  | fold tx hc _ _ hf => exact ⟨tx, hf, hc, rfl⟩
+  | create => exact False.elim (hne rfl)
+  | judge => exact False.elim (hne rfl)
+  | account => exact False.elim (hne rfl)
+  | withdraw => exact False.elim (hne rfl)
+  | burn => exact False.elim (hne rfl)
+
 
 theorem fold_only_approved_before_deadline (tx : FoldTx) :
     foldAccepted tx → ∀ o ∈ tx.requests,
@@ -255,18 +272,24 @@ theorem account_complete_and_pays (tx : AccountTx) :
     accountAllowed tx → hasAccount tx.cageRef tx.input.request tx.refs ∧
       tx.burned = tokensOf tx.input ∧
       tx.paid = allocation tx.cageRef tx.input tx.input.request.owner := by
-  sorry
+  intro ⟨_, ha, hb, hp, _⟩
+  exact ⟨ha, hb, hp⟩
+
 
 theorem account_anyone_in_window (tx : AccountTx) (now : Time) (other : Signer) :
     accountAllowed tx → tx.input.request.deadline ≤ now →
     now ≤ tx.input.request.deadline + tx.input.request.window →
     accountAllowed { tx with now := now, submitter := other } := by
-  sorry
+  intro ⟨hw, ha, hb, hp, _⟩ hlo hhi
+  exact ⟨hw, ha, hb, hp, hlo, hhi⟩
+
 
 theorem account_fee_neutral (a b : AccountTx) :
     accountAllowed a → accountAllowed b →
     a.cageRef = b.cageRef → a.input = b.input → a.paid = b.paid := by
-  sorry
+  intro ha hb hc hi
+  rw [ha.2.2.2.1, hb.2.2.2.1, hc, hi]
+
 
 theorem withdraw_only_owner_after_window (tx : WithdrawTx) :
     withdrawAllowed tx → tx.input.request.owner ∈ tx.signers ∧
@@ -295,13 +318,41 @@ theorem request_spent_only_by_lifecycle (o : RequestOutput) (spend : RequestSpen
 
 theorem every_exit_burns_tag (o : RequestOutput) (spend : RequestSpend) :
     requestSpendAllowed o spend → ∀ tag ∈ tokensOf o, tag ∈ spend.burned := by
-  sorry
+
+  intro h tag ht
+  cases spend with
+  | folded tx =>
+    change tag ∈ tx.burned
+    rw [fold_burns_tags tx h.1]
+    exact List.mem_flatMap.mpr ⟨o, h.2, ht⟩
+  | accounted tx =>
+    change tag ∈ tx.burned
+    rw [h.1.2.2.1, h.2]
+    exact ht
+  | withdrawn tx =>
+    change tag ∈ tx.burned
+    rw [h.1.2.2.1, h.2]
+    exact ht
+
 
 theorem early_exit_requires_all_judgments (o : RequestOutput) (spend : RequestSpend) :
     requestSpendAllowed o spend → spend.now ≤ o.request.deadline + o.request.window →
     ∃ c, spend.cage = some c ∧
       ∀ oracle ∈ c.oracles, spend.evidence o.request oracle := by
-  sorry
+
+  intro h ht
+  cases spend with
+  | folded tx =>
+    exact ⟨tx.cageIn, rfl, (fold_only_approved_before_deadline tx h.1 o h.2).2.2⟩
+  | accounted tx =>
+    refine ⟨tx.cageRef, rfl, ?_⟩
+    simpa only [RequestSpend.evidence, h.2] using h.1.2.1
+  | withdrawn tx =>
+    have hlate := h.1.1
+    rw [h.2] at hlate
+    change tx.now ≤ o.request.deadline + o.request.window at ht
+    exact False.elim (Nat.not_lt_of_ge ht hlate)
+
 
 /-- Stronger than the approved-oracle guarantee: every oracle is paid on
     every early exit, even without non-equivocation. -/
@@ -309,7 +360,26 @@ theorem early_exit_pays_every_oracle (o : RequestOutput) (spend : RequestSpend) 
     requestSpendAllowed o spend → spend.now ≤ o.request.deadline + o.request.window →
     ∃ c, spend.cage = some c ∧
       ∀ oracle ∈ c.oracles, spend.pays c o oracle := by
-  sorry
+
+  intro h ht
+  cases spend with
+  | folded tx =>
+    refine ⟨tx.cageIn, rfl, ?_⟩
+    intro oracle hm
+    obtain ⟨ha, hp⟩ := fold_pays_and_keeps_rest tx h.1 o h.2
+    exact ⟨rfl, allocation tx.cageIn o tx.folder, ha, rfl, hp oracle hm⟩
+  | accounted tx =>
+    refine ⟨tx.cageRef, rfl, ?_⟩
+    intro oracle hm
+    change tx.cageRef.id = tx.cageRef.id ∧ tx.paid.input = o ∧ _
+    rw [h.1.2.2.2.1, h.2]
+    exact ⟨rfl, rfl, List.mem_map.mpr ⟨oracle, hm, rfl⟩⟩
+  | withdrawn tx =>
+    have hlate := h.1.1
+    rw [h.2] at hlate
+    change tx.now ≤ o.request.deadline + o.request.window at ht
+    exact False.elim (Nat.not_lt_of_ge ht hlate)
+
 
 /-- Before the deadline a permitted exit is a fold, using only approvals or signatures. -/
 theorem before_deadline_only_approvals (o : RequestOutput) (spend : RequestSpend) :
@@ -317,7 +387,20 @@ theorem before_deadline_only_approvals (o : RequestOutput) (spend : RequestSpend
     ∃ tx, spend = .folded tx ∧ o ∈ tx.requests ∧
       ∀ oracle ∈ tx.cageIn.oracles,
         judgmentName tx.cageIn.id o.request oracle true ∈ tx.refs ∨ oracle ∈ tx.signers := by
-  sorry
+  intro h ht
+  cases spend with
+  | folded tx => exact ⟨tx, rfl, h.2, (fold_only_approved_before_deadline tx h.1 o h.2).2.2⟩
+  | accounted tx =>
+    have hlo := h.1.2.2.2.2.1
+    rw [h.2] at hlo
+    exact False.elim (Nat.not_lt_of_ge hlo ht)
+  | withdrawn tx =>
+    have hlate := h.1.1
+    rw [h.2] at hlate
+    change tx.now < o.request.deadline at ht
+    simp only [Time] at *
+    omega
+
 
 theorem dead_judgment_can_burn (s : State) (c : CageId) (r : Request)
     (oracle : Signer) (verdict : Bool) :
@@ -326,7 +409,10 @@ theorem dead_judgment_can_burn (s : State) (c : CageId) (r : Request)
     Step s (.burn (judgmentName c r oracle verdict)) (afterBurn s (judgmentName c r oracle verdict)) ∧
       (afterBurn s (judgmentName c r oracle verdict)).live = s.live ∧
       (afterBurn s (judgmentName c r oracle verdict)).cage = s.cage := by
-  sorry
+
+  intro hm _
+  exact ⟨Step.burn s _ hm, rfl, rfl⟩
+
 
 theorem judgments_do_not_consume (s : State) (tx : JudgmentTx) :
     (afterJudgment s tx).live = s.live ∧ (afterJudgment s tx).cage = s.cage := by
@@ -343,11 +429,41 @@ theorem fold_removes_consumed (s : State) (tx : FoldTx) (o : RequestOutput) :
 
 theorem used_seeds_monotone {s s' : State} {action : Action} (h : Step s action s') :
     ∀ seed ∈ s.usedSeeds, seed ∈ s'.usedSeeds := by
-  sorry
+
+  intro seed hm
+  cases h with
+  | create => exact List.mem_append_right _ hm
+  | judge => exact hm
+  | fold => exact hm
+  | account => exact hm
+  | withdraw => exact hm
+  | burn => exact hm
+
 
 theorem reachable_requests_have_spent_seeds (s : State) :
     Reachable s → ∀ o ∈ s.live, o.request.seed ∈ s.usedSeeds := by
-  sorry
+
+  intro hr
+  induction hr with
+  | registry => intro o ho; cases ho
+  | @next s s' action hr hs ih =>
+    intro o ho
+    cases hs with
+    | create tx created hc hcreate hfresh =>
+      change o ∈ created :: _ at ho
+      rcases List.mem_cons.mp ho with he | hm
+      · subst o
+        exact List.mem_append_left _ hcreate.1
+      · exact List.mem_append_right _ (ih o hm)
+    | judge => exact ih o ho
+    | burn => exact ih o ho
+    | fold =>
+      exact ih o (List.mem_filter.mp ho).1
+    | account =>
+      exact ih o (List.mem_filter.mp ho).1
+    | withdraw =>
+      exact ih o (List.mem_filter.mp ho).1
+
 
 theorem spent_seed_cannot_create_again (s : State) (tx : CreateTx) (o : RequestOutput) :
     o.request.seed ∈ s.usedSeeds → createAllowed tx o →
@@ -358,7 +474,27 @@ theorem spent_seed_cannot_create_again (s : State) (tx : CreateTx) (o : RequestO
 /-- A consumed live request is never live again along a subsequent history. -/
 theorem request_never_reappears (s s' : State) (o : RequestOutput) :
     History s s' → o.request.seed ∈ s.usedSeeds → o ∉ s.live → o ∉ s'.live := by
-  sorry
+
+  intro hh
+  induction hh with
+  | refl => intro _ hn; exact hn
+  | @next s t u action hs hh ih =>
+    intro hseed hgone
+    apply ih (used_seeds_monotone hs _ hseed)
+    intro hm
+    cases hs with
+    | create tx created hc hcreate hfresh =>
+      change o ∈ created :: _ at hm
+      rcases List.mem_cons.mp hm with he | hm
+      · subst o
+        exact hfresh _ hcreate.1 hseed
+      · exact hgone hm
+    | judge => exact hgone hm
+    | burn => exact hgone hm
+    | fold => exact hgone (List.mem_filter.mp hm).1
+    | account => exact hgone (List.mem_filter.mp hm).1
+    | withdraw => exact hgone (List.mem_filter.mp hm).1
+
 
 theorem one_oracle_signature_suffices (c : CageState) (r : Request) (oracle : Signer) :
     c.oracles = [oracle] → hasApproval c r [] [oracle] := by
@@ -385,12 +521,42 @@ theorem live_removal_is_legal_exit {s s' : State} {action : Action} (h : Step s 
        | .accounted tx => s' = afterExit s tx.input ∧ tx.cageRef = s.cage ∧
            (∀ name ∈ tx.refs, name ∈ s.judgments)
        | .withdrawn tx => s' = afterExit s tx.input) := by
-  sorry
+  intro hm hgone
+  cases h with
+  | create => exact False.elim (hgone (List.mem_cons_of_mem _ hm))
+  | judge => exact False.elim (hgone hm)
+  | burn => exact False.elim (hgone hm)
+  | fold tx hc hl hj hf =>
+    refine ⟨.folded tx, rfl, ⟨hf, ?_⟩, rfl, hc, hj⟩
+    by_cases ho : o ∈ tx.requests
+    · exact ho
+    · exact False.elim (hgone (List.mem_filter.mpr ⟨hm, by simpa using ho⟩))
+  | account tx hc hl hj ha =>
+    by_cases he : tx.input = o
+    · exact ⟨.accounted tx, rfl, ⟨ha, he⟩, rfl, hc, hj⟩
+    · exact False.elim (hgone (List.mem_filter.mpr ⟨hm, by simp only [decide_eq_true_eq, List.mem_singleton]; exact Ne.symm he⟩))
+  | withdraw tx hl hw =>
+    by_cases he : tx.input = o
+    · exact ⟨.withdrawn tx, rfl, ⟨hw, he⟩, rfl⟩
+    · exact False.elim (hgone (List.mem_filter.mpr ⟨hm, by simp only [decide_eq_true_eq, List.mem_singleton]; exact Ne.symm he⟩))
+
 
 theorem new_judgment_is_authorized {s s' : State} {action : Action} (h : Step s action s') (name : TokenName) :
     name ∈ s'.issued → name ∉ s.issued →
     ∃ tx, judgmentAllowed tx ∧ tx.cageRef = s.cage ∧
       tx.requestRef ∈ s.live ∧ name ∈ tx.minted := by
-  sorry
+
+  intro hm hn
+  cases h with
+  | judge tx hc hl hj =>
+    rcases List.mem_append.mp hm with hnew | hold
+    · exact ⟨tx, hj, hc, hl, hnew⟩
+    · exact False.elim (hn hold)
+  | create => exact False.elim (hn hm)
+  | fold => exact False.elim (hn hm)
+  | account => exact False.elim (hn hm)
+  | withdraw => exact False.elim (hn hm)
+  | burn => exact False.elim (hn hm)
+
 
 end RequestApprovalFold
