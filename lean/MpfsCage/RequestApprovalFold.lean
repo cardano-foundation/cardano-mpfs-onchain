@@ -320,6 +320,87 @@ def requestSpendAllowed (o : RequestOutput) : RequestSpend → Prop
   | .refused tx => refuseAllowed tx ∧ tx.input = o
   | .withdrawn signers burned => withdrawAllowed o signers burned
 
+/-! ## Helper lemmas -/
+
+theorem applyAll_append (t : Trie) (xs ys : List Write) :
+    applyAll t (xs ++ ys) = applyAll (applyAll t xs) ys := by
+  induction xs generalizing t with
+  | nil => rfl
+  | cons w ws ih => exact ih (w.apply t)
+
+theorem foldRun_step_valid {cage : CageState} {v : Time} {t t' : Trie}
+    {os : List RequestOutput} (h : FoldRun cage v t os t') :
+    ∀ o ∈ os, ∃ t0, stepValid cage v t0 o := by
+  induction h with
+  | nil => intro o ho; cases ho
+  | cons t o' os t' hv _ ih =>
+    intro o ho
+    cases ho with
+    | head => exact ⟨t, hv⟩
+    | tail _ hm => exact ih o hm
+
+theorem foldRun_result {cage : CageState} {v : Time} {t t' : Trie}
+    {os : List RequestOutput} (h : FoldRun cage v t os t') :
+    t' = applyAll t (os.map (·.request.write)) := by
+  induction h with
+  | nil => rfl
+  | cons t o os t' _ _ ih => exact ih
+
+theorem foldRun_conditions {cage : CageState} {v : Time} {t t' : Trie}
+    {os : List RequestOutput} (h : FoldRun cage v t os t') :
+    ∀ (n : Nat) (o : RequestOutput), os[n]? = some o →
+      ∀ c ∈ o.request.conditions,
+        c.holds (applyAll t ((os.take n).map (·.request.write))) := by
+  induction h with
+  | nil => intro n o ho; simp at ho
+  | cons t o' os t' hv _ ih =>
+    intro n o ho
+    cases n with
+    | zero =>
+      simp at ho
+      subst ho
+      exact hv.2.2
+    | succ n =>
+      simp only [List.getElem?_cons_succ] at ho
+      simpa [List.take_succ_cons, applyAll] using ih n o ho
+
+/-- Without an `unset k`, a present key stays present. -/
+theorem applyAll_keeps_present (k : Key) :
+    ∀ (ws : List Write) (t : Trie), (∀ w ∈ ws, w ≠ .unset k) →
+      (t k).isSome → (applyAll t ws k).isSome := by
+  intro ws
+  induction ws with
+  | nil => intro t _ h; exact h
+  | cons w ws ih =>
+    intro t hw h
+    apply ih (w.apply t) (fun w' hm => hw w' (List.mem_cons_of_mem _ hm))
+    have hne := hw w List.mem_cons_self
+    cases w with
+    | set k' v =>
+      simp only [Write.apply]
+      split <;> simp_all
+    | unset k' =>
+      simp only [Write.apply]
+      split
+      · rename_i heq; subst heq; exact absurd rfl hne
+      · exact h
+
+/-- Re-approvals never take value. -/
+theorem approvalChain_reapproval_keeps (o o' : RequestOutput)
+    (h : ApprovalChain o o') : o.approval.isSome → o.lovelace ≤ o'.lovelace := by
+  induction h with
+  | refl => intro _; exact Int.le_refl _
+  | step tx o hA _ ih =>
+    intro hs
+    obtain ⟨-, -, -, -, -, -, h7, -, h9, -⟩ := hA
+    have hsome : tx.output.approval.isSome := by rw [h7]; rfl
+    have hle := ih hsome
+    cases hin : tx.input.approval with
+    | none => rw [hin] at hs; cases hs
+    | some p =>
+      rw [hin] at h9
+      exact Int.le_trans h9 hle
+
 /-! ## Theorems: creation and replay -/
 
 /-- A new request names an existing cage, holds exactly that cage's tag and
@@ -330,7 +411,8 @@ theorem create_tags_existing_cage (tx : CreateTx) :
     tx.output.tags = [tagName tx.output.request.cage] ∧
     tx.output.approval = none ∧
     tx.output.request.seed ∈ tx.spent := by
-  sorry
+  intro ⟨h1, h2, _, h4, h5⟩
+  exact ⟨h2, h4, h5, h1⟩
 
 /-- Two distinct creations in one ledger history create distinct requests. -/
 theorem requests_unique_in_history (history : List CreateTx)
@@ -338,7 +420,11 @@ theorem requests_unique_in_history (history : List CreateTx)
     SpentOnce history → a ∈ history → b ∈ history →
     createAllowed a → createAllowed b → a ≠ b →
     a.output.request ≠ b.output.request := by
-  sorry
+  intro hs ha hb ca cb hne heq
+  apply hne
+  have hsa := ca.1
+  rw [heq] at hsa
+  exact hs a b _ ha hb hsa cb.1
 
 /-- An approval minted for one request cannot be folded for another, even a
     copy that differs only in its seed. -/
@@ -348,7 +434,10 @@ theorem approval_not_replayable (hinj : ApprovalNameInjective)
     o.approval = some (approvalName cage.id r e, e) →
     stepValid cage validUntil t o →
     o.request = r := by
-  sorry
+  intro ho ⟨_, ⟨e', he', _⟩, _⟩
+  rw [ho] at he'
+  simp only [Option.some.injEq, Prod.mk.injEq] at he'
+  exact (hinj _ _ _ _ _ _ he'.1).2.1.symm
 
 /-! ## Theorems: approval -/
 
@@ -360,14 +449,26 @@ theorem approval_live_for_window (tx : ApproveTx) (t : Time) :
     t ≤ tx.validUntil + tx.input.request.minApprovalWindow →
     ∃ e, tx.output.approval =
       some (approvalName tx.cageRef.id tx.input.request e, e) ∧ t ≤ e := by
-  sorry
+  intro hA ht
+  obtain ⟨-, -, h3, -, -, -, h7, -⟩ := hA
+  exact ⟨tx.expiry, h7, Int.le_trans ht h3⟩
 
 /-- Over any number of approvals, the oracle takes from a request at most its
     declared approval fee. -/
 theorem approval_fee_paid_once (o o' : RequestOutput) :
     o.approval = none → ApprovalChain o o' →
     o.lovelace - o.request.approvalFee ≤ o'.lovelace := by
-  sorry
+  intro hnone h
+  cases h with
+  | refl => omega
+  | step tx o' hA hc =>
+    have hA' := hA
+    obtain ⟨-, -, -, -, -, -, h7, -, h9, -⟩ := hA'
+    rw [hnone] at h9
+    simp only at h9
+    have hsome : tx.output.approval.isSome := by rw [h7]; rfl
+    have hle := approvalChain_reapproval_keeps _ _ hc hsome
+    omega
 
 /-- An approval is minted only with the signature of the oracle of the cage
     its request names, and leaves the request and its tags unchanged. -/
@@ -377,7 +478,8 @@ theorem approval_requires_cage_oracle (tx : ApproveTx) :
     tx.cageRef.id = tx.input.request.cage ∧
     tx.output.request = tx.input.request ∧
     tx.output.tags = tx.input.tags := by
-  sorry
+  intro ⟨h1, h2, _, h4, h5, _⟩
+  exact ⟨h2, h1, h4, h5⟩
 
 /-- An approval minted for one cage cannot be consumed by a fold of another
     cage. -/
@@ -387,7 +489,14 @@ theorem approval_bound_to_cage
     approveAllowed atx → foldAccepted ftx → o ∈ ftx.requests →
     o.approval = atx.output.approval →
     ftx.cageIn.id = atx.cageRef.id ∧ o.request = atx.input.request := by
-  sorry
+  intro hA hF ho happ
+  obtain ⟨-, -, -, -, -, -, h7, -⟩ := hA
+  obtain ⟨-, -, -, hrun⟩ := hF
+  obtain ⟨t0, _, ⟨e, he, _⟩, _⟩ := foldRun_step_valid hrun o ho
+  rw [happ, h7] at he
+  simp only [Option.some.injEq, Prod.mk.injEq] at he
+  have := hinj _ _ _ _ _ _ he.1
+  exact ⟨this.1.symm, this.2.1.symm⟩
 
 /-! ## Theorems: folds -/
 
@@ -398,7 +507,9 @@ theorem fold_only_cage_approved (tx : FoldTx) :
       o.request.cage = tx.cageIn.id ∧
       ∃ e, o.approval = some (approvalName tx.cageIn.id o.request e, e) ∧
         tx.validUntil ≤ e := by
-  sorry
+  intro ⟨_, _, _, hrun⟩ o ho
+  obtain ⟨_, h1, h2, _⟩ := foldRun_step_valid hrun o ho
+  exact ⟨h1, h2⟩
 
 /-- Every condition of every folded request held on the tree reached just
     before that request was applied. -/
@@ -408,7 +519,8 @@ theorem fold_conditions_hold_when_applied (tx : FoldTx) :
       ∀ c ∈ o.request.conditions,
         c.holds (applyAll tx.cageIn.trie
           ((tx.requests.take n).map (·.request.write))) := by
-  sorry
+  intro ⟨_, _, _, hrun⟩
+  exact foldRun_conditions hrun
 
 /-- The tree moves only by the folded writes, in the folded order: there is
     no rejection and no other change. -/
@@ -416,12 +528,15 @@ theorem fold_root_is_folded_writes (tx : FoldTx) :
     foldAccepted tx →
     tx.cageOut.trie = applyAll tx.cageIn.trie
       (tx.requests.map (·.request.write)) := by
-  sorry
+  intro ⟨_, _, _, hrun⟩
+  exact foldRun_result hrun
 
 /-- A fold burns every tag and approval of the requests it consumes. -/
 theorem fold_burns_request_tokens (tx : FoldTx) :
     foldAccepted tx → ∀ o ∈ tx.requests, ∀ a ∈ tokensOf o, a ∈ tx.burned := by
-  sorry
+  intro ⟨_, _, hb, _⟩ o ho a ha
+  rw [hb]
+  exact List.mem_flatMap.2 ⟨o, ho, ha⟩
 
 /-- A blind write with a live approval of this cage folds on any tree. -/
 theorem blind_write_folds_on_any_tree
@@ -432,12 +547,17 @@ theorem blind_write_folds_on_any_tree
     validUntil ≤ e →
     o.request.conditions = [] →
     FoldRun cage validUntil t [o] (o.request.write.apply t) := by
-  sorry
+  intro h1 h2 h3 h4
+  refine FoldRun.cons t o [] _ ⟨h1, ⟨e, h2, h3⟩, ?_⟩ (FoldRun.nil _)
+  intro c hc
+  rw [h4] at hc
+  cases hc
 
 /-- Whether a fold is accepted does not depend on who submits it. -/
 theorem fold_permissionless (tx : FoldTx) (others : List Signer) :
     foldAccepted tx → foldAccepted { tx with signers := others } := by
-  sorry
+  intro h
+  exact h
 
 /-- Two requests that both insert the same key into an absent slot never
     fold together unless a request between them unsets that key. -/
@@ -466,12 +586,22 @@ theorem request_spent_only_by_lifecycle (o : RequestOutput)
     (∃ tx, s = .refused tx ∧ refuseAllowed tx ∧ tx.input = o) ∨
     (∃ signers burned, s = .withdrawn signers burned ∧
       o.request.owner ∈ signers) := by
-  sorry
+  intro h
+  cases s with
+  | folded tx => exact Or.inl ⟨tx, rfl, h.1, h.2⟩
+  | approved tx =>
+    obtain ⟨hA, hi⟩ := h
+    have hreq := hA.2.2.2.1
+    exact Or.inr (Or.inl ⟨tx, rfl, hA, hi, by rw [hreq, hi]⟩)
+  | refused tx => exact Or.inr (Or.inr (Or.inl ⟨tx, rfl, h.1, h.2⟩))
+  | withdrawn signers burned =>
+    exact Or.inr (Or.inr (Or.inr ⟨signers, burned, rfl, h.1⟩))
 
 /-- A requester who declares no refusal fee can never be refused for a fee. -/
 theorem refusal_opt_in (tx : RefuseTx) :
     tx.input.request.refusalFee = 0 → ¬ refuseAllowed tx := by
-  sorry
+  intro h0 ⟨_, _, h3, _⟩
+  omega
 
 /-- A paid refusal is signed by the cage's oracle, happens only before any
     approval (so the requester never pays both fees), takes at most the
@@ -484,13 +614,15 @@ theorem refusal_pays_at_most_fee_and_records (tx : RefuseTx) :
     tx.refundTo = tx.input.request.refundAddress ∧
     tx.input.lovelace - tx.input.request.refusalFee ≤ tx.refundLovelace ∧
     tx.record.request = tx.input.request := by
-  sorry
+  intro ⟨_, h2, _, h4, _, h6, h7, h8⟩
+  exact ⟨h2, h4, h6, h7, h8⟩
 
 /-- The owner can always withdraw, whatever approval the output carries. -/
 theorem owner_withdraws_any_time (o : RequestOutput)
     (signers : List Signer) :
     o.request.owner ∈ signers →
     requestSpendAllowed o (.withdrawn signers (tokensOf o)) := by
-  sorry
+  intro h
+  exact ⟨h, rfl⟩
 
 end RequestApprovalFold
