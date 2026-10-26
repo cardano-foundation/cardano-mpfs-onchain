@@ -17,7 +17,7 @@ is a separate milestone ticket
 ```mermaid
 flowchart LR
   decisions["Decision record<br/>specs/request-approval-fold"] -- "encoded as" --> model["Lean model<br/>states, transactions, Step"]
-  model -- "stated as" --> theorems["60 theorems"]
+  model -- "stated as" --> theorems["78 theorems"]
   theorems -- "proved, standard axioms only" --> proofs["Proofs"]
   theorems -- "reachable examples" --> witnesses["Witnesses"]
   audit1["Statement and proof audit"] -. "reads types against decisions" .-> theorems
@@ -31,8 +31,9 @@ flowchart LR
 |---|---|
 | Trie, writes, conditions | The tree as a map from keys to values; `set` and `unset`; `absent` and `equals`; ordered application within a fold |
 | Cage state | Registry identity, oracle set, protocol hash and tree |
-| Request output | Registry, owner, seed, one write, conditions, a fee per oracle, deadline, window, evidence, escrow and tag |
-| Transactions | Creation, judgment, fold, complete account, owner withdrawal and judgment burn, each with its guard |
+| Request output | Registry, owner, seed, one write, conditions, a fee per oracle, deadline, window, evidence, escrow and one tag per oracle |
+| Price notice | An oracle's price token and its current fee, optionally per protocol |
+| Transactions | Creation, judgment, fold, complete account, owner withdrawal, judgment burn, and price notice minting and update, each with its guard |
 | Step | The authoritative transition relation over a global state, labelled by the exact transaction performed |
 
 Modelling choices the decisions left open, ruled before the model was
@@ -42,16 +43,9 @@ fees; time is a single observed value whose soundness against transaction
 validity intervals is assumed; names are collision-free structured values,
 standing for the hashes the implementation will use.
 
-!!! note "Decisions not yet in the model"
-    Four points were settled after the audited model was merged: one tag per
-    oracle instead of one per request, an on-chain price notice per oracle,
-    acceptance of ordering by the folder and of hold-up, and the encodings.
-    The model still has one tag per request and no price notices; updating it
-    is part of [#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116).
-
 ## What is proved
 
-All 60 theorems are proved; `#print axioms` lists only `propext`,
+All 78 theorems are proved; `#print axioms` lists only `propext`,
 `Classical.choice` and `Quot.sound` for each.
 
 | Guarantee | Proved by |
@@ -68,6 +62,9 @@ All 60 theorems are proved; `#print axioms` lists only `propext`,
 | A request leaves only through a legal exit bound to the transaction that removed it, every exit burns its tag, and before the window ends every oracle has judged and is paid | `live_removal_is_legal_exit`, `request_spent_only_by_lifecycle`, `every_exit_burns_tag`, `exits_remove_consumed`, `fold_removes_consumed`, `early_exit_requires_all_judgments`, `early_exit_pays_every_oracle`, `before_deadline_only_approvals` |
 | An oracle answering both ways is reachable and changes no payment; dead judgments can always be burned, and a burn removes exactly the token burned | `equivocation_reachable`, `dead_judgment_can_burn`, `burn_removes_one`, `burn_keeps_history` |
 | The shipped `Insert`, `Delete` and `Update` are writes with a condition on their own key, with the same effect on the tree | `old_operations_correspond` |
+| An oracle's tag is in a live request exactly when that oracle judges the request's registry, across all registries; each live request holds one tag per oracle, none repeated, and every removal burns them | `discovery_iff`, `discovery_across_registries`, `reachable_live_tags`, `reachable_tags_unique`, `reachable_registry_valid`, `live_removal_burns_oracle_tags` |
+| Only an oracle can mint or update its price notice; notices change no registry, request, judgment or payment, and bind nothing | `price_mint_inversion`, `price_update_inversion`, `price_mint_available`, `price_update_available`, `reachable_notice_names`, `notice_change_authorized`, `price_notice_noninterference`, `notices_do_not_bind_protocol` |
+| Every hashed name is led by its role; names are injective and names of different roles never coincide | `tag_name_injective`, `price_name_injective`, `different_roles_never_coincide`, `names_have_leading_roles` |
 
 ## How it was checked
 
@@ -84,12 +81,18 @@ flowchart LR
   d --> r
   r --> a2["Statement audit: passed"]
   r --> m2["Mutation audit:<br/>no surviving mutant"]
+  a2 --> x["Extension: tags per oracle,<br/>price notices, role-led names<br/>78 theorems"]
+  m2 --> x
+  x --> a3["Statement audit: passed"]
+  x --> m3["Mutation audit:<br/>no surviving mutant"]
 ```
 
 | Audit | First candidate | Repaired candidate |
 |---|---|---|
 | Statements and proofs: does each theorem say what the decisions promise, is it reachable, is it proved? | Two failures: the legal-exit theorem did not bind the exit to the actual removal, and the approval-disclosure theorem relied on an assumption no decision granted | Passed on every row except the independent blind reading of the statements, which was not commissioned |
 | Mutations: does breaking the model make a theorem fail? | Six model changes passed every theorem: forged judgment references at the fold and at settlement, a request for a foreign registry, a diverted remainder, swapped fees, a burn that kept the token, a duplicate request in a fold | 98 single-edit mutants; none passes the full build; 59 of 60 theorems are each killed by a relevant mutant |
+
+The extension for tags per oracle, price notices and role-led names was audited the same way: the statement and proof audit passed every row except the uncommissioned blind reading, and the mutation audit ran 100 single-edit mutants, none of which passes the full build; 75 of 78 theorems are each killed by a relevant mutant.
 
 What the mutation audit could not count as killed, none of it a defect:
 
@@ -99,13 +102,17 @@ What the mutation audit could not count as killed, none of it a defect:
 - a mutant that forbids an oracle from answering both ways does falsify the
   equivocation theorem, as a separate proof shows, but the build fails first
   in the examples, so the strict rule of the audit leaves it uncounted.
+- the theorems that tags are unique per request and that discovery works
+  across registries are each guarded by an earlier theorem that the
+  relevant mutant breaks first (registry validity, and discovery itself), so
+  the fault is caught but not credited to them.
 
 ## What is not covered
 
 | Not covered | Where it is tracked |
 |---|---|
 | One request script per release, serving every registry in both roles: the model has no notion of a script or a release | Recorded as a model omission; implemented by [#110](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/110) |
-| Folders and oracles finding work by asset queries: the model has no query layer | Recorded as a model omission; implemented by [#113](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/113) |
+| Folders finding approved requests: the model proves oracle discovery through tags, but has no query for approvals | Recorded as a model omission; implemented by [#113](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/113) |
 | An executable model, codecs and a replay corpus for conformance testing | [#109](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/109) |
 | Conformance of the Aiken validators with the model | [#114](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/114) |
 | Concrete encodings and hashes of names and datums | [#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116) |
