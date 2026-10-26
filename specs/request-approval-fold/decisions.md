@@ -107,13 +107,60 @@ against this record.
 
 ## Discovery
 
-- **The requester mints a tag** under the request script's policy into the
-  request output. Minting requires the seed spent in the same transaction and
-  the cage state as a reference input, proving that the registry exists.
-- **Every path that consumes a request burns its tag**, so an asset query
+- **The requester mints one tag per oracle** of the registry under the
+  request script's policy, all into the request output. Each tag is named
+  after its oracle, so an oracle finds every pending request across every
+  registry with one asset query, with no index of the registries that list
+  it. Minting requires the seed spent in the same transaction and the cage
+  state as a reference input, proving that the registry exists. One tag per
+  request named after the registry was rejected: an oracle would first have to
+  find every registry naming it.
+- **Every path that consumes a request burns its tags**, so an asset query
   returns only live requests.
 - **Folders find work through approval tokens.**
 - The address staking-part alternative was declined.
+
+## Prices, ordering and hold-up
+
+- **Each oracle publishes an on-chain price notice.** It is an output holding
+  a price token minted under the release policy with the oracle's signature
+  and named after the oracle; its datum carries the oracle's current fee,
+  optionally per protocol. The oracle changes its price by spending and
+  recreating the output with a new datum; the token keeps its name. A wallet
+  prices a registry with one asset query per oracle. The notice is not
+  binding: an oracle can still ignore a request, but it then publicly
+  contradicts its own signed notice. Prices in the registry's protocol
+  document were rejected because that document is fixed by hash; prices on
+  each oracle's own endpoint were rejected as unverifiable and undiscoverable.
+- **Ordering by the folder is accepted.** When approved requests conflict, the
+  folder's order decides which wins, and bids can buy that order. The loser
+  costs its requester only the fees: its condition fails, it cannot fold, and
+  it settles after its deadline. An application that wants fair ordering gets
+  it from its oracles, which see every request and can approve only one of
+  conflicting requests. First-come-first-served on chain was rejected: the
+  chain cannot prove that an older approved request was skipped.
+- **Hold-up by complementary oracles is accepted.** Each oracle can block a
+  request by not answering until its price is paid, so the total price of
+  judgment may exceed that of one integrated oracle. Since silence earns
+  nothing and refusal pays the same as approval, holding out is only pricing.
+  Fixed prices or a fee cap in the registry were rejected: an immutable
+  registry would freeze them forever, and an oracle could still go silent.
+
+## Encodings
+
+- **Everything is specified in CDDL, describing the Plutus Data encoding.**
+  Datums and redeemers are Plutus Data, laid out in Aiken's default
+  constructor encoding. One CDDL file in the repository describes them and
+  the preimages of hashed names, with test vectors pinning the exact bytes,
+  including definite or indefinite lengths, so that off-chain encoders match
+  the chain byte for byte.
+- **A hashed name is blake2b-256 of `serialise_data` of a tuple whose first
+  field is the token's role** (tag, approval, refusal or price), followed by
+  the fields it binds. 32 bytes is the asset-name maximum, and the leading
+  role keeps every kind of token apart. Hand-built CBOR was rejected: a
+  validator would assemble it in script code on every mint and burn.
+- **Keys, values and evidence are opaque bytes on chain**; their meaning is the
+  registry's own protocol, a CDDL document named by hash in the registry.
 
 ## Money
 
@@ -168,15 +215,7 @@ cage have no counterpart.
 
 ## Not decided
 
-- One tag per request, named after the registry, or one tag per oracle, named
-  after the oracle, so that each oracle finds all its pending requests across
-  every registry with one asset query.
-- Ordering as an auction: conflicting approved requests are ordered by the
-  folder, and bids decide which wins.
-- Hold-up by complementary oracles: each oracle can block a request, so the
-  total price of judgment tends to exceed that of one integrated oracle.
-- Encodings of the hashed names (the Singular line uses CBOR specified in
-  CDDL), the datum layout and the migration of existing cages.
+- The migration or coexistence of existing cages.
 - Fold cost: the cost per condition proof and per judgment reference input is
   to be measured on a devnet.
 
@@ -186,7 +225,7 @@ sequenceDiagram
   participant O as Oracles
   participant F as Folder
   participant C as Cage state
-  R->>R: create request, spend seed, mint tag, escrow fees
+  R->>R: create request, spend seed, mint one tag per oracle, escrow fees
   O->>O: judge off chain
   alt every oracle approves
     O->>O: mint approvals by reference to the request

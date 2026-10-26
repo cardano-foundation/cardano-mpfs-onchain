@@ -42,6 +42,13 @@ fees; time is a single observed value whose soundness against transaction
 validity intervals is assumed; names are collision-free structured values,
 standing for the hashes the implementation will use.
 
+!!! note "Decisions not yet in the model"
+    Four points were settled after the audited model was merged: one tag per
+    oracle instead of one per request, an on-chain price notice per oracle,
+    acceptance of ordering by the folder and of hold-up, and the encodings.
+    The model still has one tag per request and no price notices; updating it
+    is part of [#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116).
+
 ## What is proved
 
 All 60 theorems are proved; `#print axioms` lists only `propext`,
