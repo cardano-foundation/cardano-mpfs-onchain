@@ -135,9 +135,9 @@ deposits stuck, and it costs the oracle nothing to let that happen. It is also
 why a cage cannot yet be a genuinely public registry: someone always holds the
 key.
 
-The planned fix lets anyone clear expired requests, and lets a validator — a
-rule, not a person — decide what a batch may do. See
-[Permissionless Registries](roadmap/permissionless-registries.md). Like the
+The planned fix removes the key holder: a registry names the oracles that
+judge its requests, and anyone can fold what they approved. See
+[Permissionless multi-oracle registries](design/registries/index.md). Like the
 batching upgrade, none of it has shipped.
 
 ## 9. A short glossary

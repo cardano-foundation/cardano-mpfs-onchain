@@ -49,8 +49,8 @@ submit modification requests to the per-cage request address and can retract
 them during Phase 2. Observers reconstruct state from chain history.
 
 Every path out of a request other than Phase 2 retraction runs through the
-oracle. Removing that dependency is roadmap work, not shipped behaviour: see
-[Permissionless Registries](../roadmap/permissionless-registries.md).
+oracle. Removing that dependency is designed but not shipped: see
+[Permissionless multi-oracle registries](../design/registries/index.md).
 
 ## Transaction Lifecycle
 

@@ -40,8 +40,8 @@ Run `aiken check` (or `just test`) for validator tests. Run `lake build` in
 The two off-chain behavior rows about the oracle are the liveness hole: an
 oracle that stops acting strands funds at the request address, and nothing
 on-chain forces it to act. The
-[permissionless registries roadmap](../roadmap/permissionless-registries.md)
-is the plan to close the exit half of it.
+[permissionless multi-oracle registries](../design/registries/index.md)
+design closes it: requests leave through time windows no party controls.
 
 ## 1. Token Uniqueness
 
@@ -128,9 +128,8 @@ withdrawal requirement, it never replaces the owner signature. The shipped
 `staking.ak` stub returns `True` for every withdrawal, so a cage booted with
 it gains no guarantee — both points are
 [#79](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/79),
-and the delegated authorization a permissionless registry needs is roadmap
-work, not shipped behaviour
-([roadmap](../roadmap/permissionless-registries.md)).
+and a permissionless registry is a separate design, not shipped behaviour
+([permissionless multi-oracle registries](../design/registries/index.md)).
 
 Representative tests: `modify_missing_signature`, `end_missing_signature`,
 `sweep_wrong_signer`, `retract_wrong_signer`,

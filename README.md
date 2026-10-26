@@ -30,22 +30,23 @@ Full documentation is available at **[cardano-foundation.github.io/cardano-mpfs-
 - [Proof System](https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/proofs/) — MPF proof format, verification, and performance
 - [Security Properties](https://cardano-foundation.github.io/cardano-mpfs-onchain/architecture/properties/) — on-chain invariants and proof links
 - [Haskell Cage Library](https://cardano-foundation.github.io/cardano-mpfs-onchain/haskell-cage/) — off-chain types, tx builders, test vectors
-- [Permissionless Registries](https://cardano-foundation.github.io/cardano-mpfs-onchain/roadmap/permissionless-registries/) — roadmap: what is planned and not yet shipped
+- [Permissionless multi-oracle registries](https://cardano-foundation.github.io/cardano-mpfs-onchain/design/registries/) — design: decided, modelled in Lean and audited, not yet implemented
 
 ## Where this is going
 
 Every way a request leaves the cage, other than the requester's own Phase 2
 retraction, needs the state owner's signature. That makes the oracle a
 liveness dependency and stops a cage from serving as a public registry.
-Permissionless Phase 3 sweep (#98), plugin cages (#99) and the keri registry
-plugin (#104) are the planned answer; the
-[roadmap page](https://cardano-foundation.github.io/cardano-mpfs-onchain/roadmap/permissionless-registries/)
-has the detail. Its first consumer is the
-[cardano-keri](https://github.com/lambdasistemi/cardano-keri) AID registry
+The [permissionless multi-oracle registries](https://cardano-foundation.github.io/cardano-mpfs-onchain/design/registries/)
+design is the planned answer: anyone creates a registry by naming its oracles
+and protocol, one request script per release serves every registry, and anyone
+can fold what the oracles approved. It is decided, modelled in Lean and
+independently audited; its implementation is the milestone
+[Permissionless multi-oracle registries](https://github.com/cardano-foundation/cardano-mpfs-onchain/milestone/3).
+The [cardano-keri](https://github.com/lambdasistemi/cardano-keri) AID registry
 (milestone M1, epic
-[K6](https://github.com/lambdasistemi/cardano-keri/issues/324)), which runs
-on a permissioned cage today and consumes one interface from it: the leaf map
-`absent` / `live` / `closed(epoch, sn)` / `convicted`.
+[K6](https://github.com/lambdasistemi/cardano-keri/issues/324)) runs on a
+permissioned cage today.
 
 ## Quick start
 
