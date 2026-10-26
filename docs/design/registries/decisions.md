@@ -35,7 +35,7 @@ flowchart LR
 | Decision | Chosen | Rejected | Why |
 |---|---|---|---|
 | Who may create a registry | Anyone, by minting a cage state that names its oracles and protocol | Creating a cage that applies a per-cage script | No script per registry means nothing to publish or audit per registry |
-| How many oracles | A non-empty set, every one of which must approve | One oracle per registry | Different oracles check different things, so applications are composed from oracles, which may be shared between applications |
+| How many oracles | Any number, every one of which must approve; at least one oracle or a rule | One oracle per registry; at least one oracle in every registry | Different oracles check different things, so applications are composed from oracles. A registry with a rule needs no oracle: a rule admitting one owner gives a personal registry anyone can fold |
 | Changing the oracle set | Never: the oracles and the protocol are the registry's identity | An owner who can change it; changes approved by the current oracles | Every entry means "judged by these oracles under this protocol"; changing them leaves part of the tree judged one way and part another, and no migration repairs that |
 | Owner, end, transfer | None | An owner who can end or freeze the registry | The oracles are the only judges and they only judge requests; a central power above distributed judgment makes no sense. A registry whose oracles stop answering simply stops moving |
 | Oracle consent to being listed | Not needed | Requiring oracles to sign the registry | Listing is an offer of business; an oracle that does not serve a registry never answers it |
@@ -59,8 +59,28 @@ flowchart LR
 | What a judgment's name binds | The registry, the request with its seed, the oracle and the verdict | The registry and request only | Without oracle and verdict, approvals and refusals from different oracles would collide |
 | Approval expiry | None: the request's deadline bounds every judgment | An expiry chosen by the oracle, with a minimum window protecting the requester | Once fees are paid only at the fold, a late or short-lived approval costs the requester nothing; an oracle that finds a deadline too far for its judgment simply does not answer |
 | How oracles find work | One tag per oracle, minted with the request and named after the oracle; one asset query finds an oracle's work across every registry | One tag named after the registry; inspecting the address's staking part | A registry tag forces each oracle to index every registry that names it; the staking-part trick was declined as obscure |
-| How folders find work | Approval tokens | A separate index | The approvals already identify registry and request |
+| How folders find work | The request token: one query per registry lists its live requests, and the expected approval names are computed and looked up exactly | Searching approval tokens; a separate index | A registry without oracles has no approvals; the request token covers every registry and every live request |
 | An oracle answering both ways | Accepted, not prevented | A ballot per oracle minted with the request and burned at judgment, so each oracle can answer once | Under one exit per window, equivocation changes no payment and no outcome; the two verdicts stay on chain under the oracle's signature, so it is public and provable. Ballots would add one output per oracle to every request |
+
+## Rules, request tokens and oracle conditions
+
+```mermaid
+flowchart LR
+  requester([Requester]) -- "conditions: its intent" --> request[(Request)]
+  rule([Registry rule, at creation]) -- "demands conditions,<br/>mints the request token" --> request
+  oracle([Each oracle, at approval]) -- "adds conditions<br/>bound in the approval's name" --> approval[(Approval)]
+  request --> fold([Fold])
+  approval --> fold
+  fold -- "proves every condition<br/>at the request's turn" --> tree[(Tree)]
+```
+
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| Where a registry's on-chain rules live | A compiled minting policy named by hash in the cage state, minting the request token at creation | A fixed vocabulary of rules built into the release; a rule program interpreted by the fold; a rule run by the fold through a zero withdrawal | Registries are immutable, so a fixed vocabulary would lock each to its release; an interpreter costs fold budget; at the fold the rule would traverse every batch, while everything it checks is fixed in the request at creation |
+| How a rule constrains the tree | It demands conditions in the request; the fold proves them | Letting the rule read the tree | The tree is a root hash; the fold already proves conditions at the right point of the batch, so the rule validates the program and the fold executes it |
+| The condition language | `absent`, `present`, `equals` | Predicates on values; facts about key prefixes | Each construct is a permanent cost in the fold; value predicates wait until a registry needs them, and per-key proofs cannot establish prefix facts |
+| What makes a request genuine | A request token per request, minted only through the creation checks and burned by every exit | The oracle tags | A registry without oracles has no tags; the request token also lists a registry's live requests with one query |
+| An oracle whose rules the request's conditions do not cover | It approves with its own conditions, bound in the approval's name and proved by the fold at the request's turn | Refusing, and the requester re-creating the request | The oracle judged against the tree it saw; its conditions make the approval usable only while what it assumed still holds |
 
 ## Money and exits
 
