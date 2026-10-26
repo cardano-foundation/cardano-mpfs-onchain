@@ -12,13 +12,13 @@ request's own deadline and window, both chosen by the requester.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Pending: requester creates it,<br/>spends the seed, mints the tag
+  [*] --> Pending: requester creates it,<br/>spends the seed, mints the tags
   Pending --> Folded: fold, before the deadline,<br/>with an approval from every oracle
   Pending --> Settled: complete account, inside the window,<br/>with a verdict from every oracle
   Pending --> Withdrawn: owner, after the window
-  Folded --> [*]: write applied, oracles paid,<br/>remainder to the folder, tag burned
-  Settled --> [*]: oracles paid, remainder to the owner,<br/>tag burned
-  Withdrawn --> [*]: everything to the owner,<br/>tag burned
+  Folded --> [*]: write applied, oracles paid,<br/>remainder to the folder, tags burned
+  Settled --> [*]: oracles paid, remainder to the owner,<br/>tags burned
+  Withdrawn --> [*]: everything to the owner,<br/>tags burned
   note left of Pending
     Oracles mint approvals and refusals
     by reference: the request does not move
@@ -61,9 +61,9 @@ sequenceDiagram
   participant R as Requester
   participant P as Request script (release-wide)
   participant C as Cage state
-  R->>P: spend the seed output, mint one tag named after the registry
+  R->>P: spend the seed output, mint one tag per oracle, each named after its oracle
   P->>C: read the cage state by reference (the registry exists)
-  P-->>R: tag minted only if escrow covers the sum of the oracles' fees
+  P-->>R: tags minted only if escrow covers the sum of the oracles' fees
   R->>P: request output: registry, owner, seed, one write,<br/>conditions, fee per oracle, deadline, window, evidence
 ```
 
@@ -119,10 +119,10 @@ sequenceDiagram
   Note over A,J: from the deadline to the deadline plus the window
   A->>Q: spend the request
   A->>J: read one verdict per oracle (approval or refusal)
-  A-->>A: pay every oracle its fee, remainder to the owner, burn the tag
+  A-->>A: pay every oracle its fee, remainder to the owner, burn the tags
   Note over W,Q: after the window
   W->>Q: spend the request with the owner's signature
-  W-->>W: take everything, burn the tag
+  W-->>W: take everything, burn the tags
 ```
 
 After the window the chain cannot tell a silent oracle from an approval the

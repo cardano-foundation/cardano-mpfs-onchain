@@ -35,7 +35,7 @@ The people involved and what each one gets:
 ```mermaid
 flowchart LR
   creator([Registry creator]) -- "mints, naming oracles and protocol" --> state[(Cage state:<br/>root, oracles, protocol)]
-  requester([Requester]) -- "creates request, mints tag,<br/>escrows fees" --> request[(Request output<br/>at the release request address)]
+  requester([Requester]) -- "creates request, mints one tag<br/>per oracle, escrows fees" --> request[(Request output<br/>at the release request address)]
   oracle([Each oracle]) -- "reads request, judges off chain,<br/>mints approval or refusal" --> judgment[(Judgment token<br/>in the oracle's wallet)]
   folder([Folder]) -- "spends requests, reads judgments,<br/>proves conditions" --> state
   request -- "consumed by fold,<br/>settlement or withdrawal" --> folder

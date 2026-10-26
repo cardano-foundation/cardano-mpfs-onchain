@@ -58,7 +58,7 @@ flowchart LR
 | How an oracle approves | Mints an approval token, with the request output as a reference input, into any output (typically its own wallet) | Minting into the request output, which spends it; one voucher output per oracle at the script | Spending the request makes several oracles race for one output; vouchers put several extra outputs per request at the script |
 | What a judgment's name binds | The registry, the request with its seed, the oracle and the verdict | The registry and request only | Without oracle and verdict, approvals and refusals from different oracles would collide |
 | Approval expiry | None: the request's deadline bounds every judgment | An expiry chosen by the oracle, with a minimum window protecting the requester | Once fees are paid only at the fold, a late or short-lived approval costs the requester nothing; an oracle that finds a deadline too far for its judgment simply does not answer |
-| How oracles find work | A tag minted with the request, named after the registry; one asset query | Inspecting the address's staking part | The staking-part trick was declined as obscure; a token query is standard |
+| How oracles find work | One tag per oracle, minted with the request and named after the oracle; one asset query finds an oracle's work across every registry | One tag named after the registry; inspecting the address's staking part | A registry tag forces each oracle to index every registry that names it; the staking-part trick was declined as obscure |
 | How folders find work | Approval tokens | A separate index | The approvals already identify registry and request |
 | An oracle answering both ways | Accepted, not prevented | A ballot per oracle minted with the request and burned at judgment, so each oracle can answer once | Under one exit per window, equivocation changes no payment and no outcome; the two verdicts stay on chain under the oracle's signature, so it is public and provable. Ballots would add one output per oracle to every request |
 
@@ -73,19 +73,20 @@ flowchart LR
 | When a settlement is allowed | Only from the deadline to the deadline plus the window | At any time; before the deadline with at least one refusal | Any overlap with the fold window creates a race between folder and owner; an early exit on one refusal lets the owner hide the other approvals, or pays oracles that never judged |
 | A silent oracle | After the window the owner takes everything and may pay those who answered | Paying every oracle regardless | The chain cannot tell a silent oracle from an approval the owner chooses not to show; a silent oracle losing its fee is the incentive to answer |
 
+## Prices, ordering and encodings
+
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| How a requester learns the price | Each oracle keeps an on-chain price notice: a token named after it, minted with its signature, whose datum carries its current fee | Prices in the registry's protocol document; prices on each oracle's own endpoint | The protocol document is fixed by hash, so prices could never change; private endpoints are neither discoverable nor verifiable. The notice is not binding, but ignoring a request that pays the posted price is public |
+| Conflicting approved requests | The folder's order decides, and bids can buy it; applications wanting fairness have their oracles approve only one of conflicting requests | First come, first served enforced on chain | The chain cannot prove that an older approved request was skipped; the losing request costs only its fees, because it settles |
+| Oracles holding up a request | Accepted: holding out is pricing | Fixed prices or a fee cap in the registry | An immutable registry would freeze prices forever, and an oracle could still go silent; silence earns nothing and refusal pays the same as approval |
+| Encodings | Everything in CDDL, describing the Plutus Data encoding, with test vectors pinning exact bytes | Hand-built CBOR layouts | `serialise_data` is one cheap builtin; hand-built bytes would be assembled in script code on every mint and burn |
+| Hashed token names | blake2b-256 of `serialise_data` of a tuple led by the token's role (tag, approval, refusal, price) | Names without a role field | 32 bytes is the asset-name maximum; the leading role keeps every kind of token apart |
+
+These were settled in [#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116).
+
 ## Not decided
 
-These points are tracked in
-[#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116):
-
-- one tag per request named after the registry, or one tag per oracle so that
-  each oracle finds all its pending requests across every registry with one
-  query;
-- ordering as an auction: when approved requests conflict, the folder's order
-  decides which wins, and bids can buy that order;
-- hold-up by complementary oracles: each oracle can block a request, so the
-  total price of judgment tends to exceed that of one integrated oracle;
-- the encodings of names and datums, CBOR specified in CDDL as in Singular;
 - the migration or coexistence of existing cages
   ([#117](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/117));
 - the fold cost per condition proof and per judgment reference, to be measured

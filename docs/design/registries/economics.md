@@ -40,9 +40,10 @@ design splits that into separate markets:
 - **Ordering.** The folder chooses the order of a fold. When two approved
   requests conflict, for example both setting a key under the condition that
   it is absent, the order decides which one wins, and bids can buy that order.
-  In the shipped cage this power belonged to the owner. Whether that is
-  acceptable is an application question, and an open decision
-  ([#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116)).
+  In the shipped cage this power belonged to the owner. This is accepted: the
+  losing request costs only its fees, and an application that wants fair
+  ordering gets it from its oracles, which can approve only one of
+  conflicting requests.
 
 ## Risks each role carries
 
@@ -60,7 +61,13 @@ When every oracle must approve, each can block a request, and fees are fixed
 in the request: an oracle cannot raise its price on chain, but it can decline
 until the requester re-creates the request with a higher fee. Complementary
 monopolies tend to price the whole above what one integrated oracle would.
-This is recorded as an open point; the design neither prevents nor rewards it.
+This is accepted: since silence earns nothing and a refusal pays the same as
+an approval, holding out is only pricing. To make prices discoverable, each
+oracle keeps an on-chain price notice: a token named after it whose datum
+carries its current fee, so a wallet adds up a registry's price with one query
+per oracle before creating a request. The notice is not binding, but an oracle
+ignoring requests that pay its posted price contradicts its own signed notice
+in public.
 
 ## The shipped cage as a special case
 
@@ -74,7 +81,8 @@ This is recorded as an open point; the design neither prevents nor rewards it.
 | The processing window, then the retract window | The deadline, then the settlement window, then the owner's withdrawal |
 | Owner can transfer or end the cage | No counterpart |
 
-Simulating the shipped cage costs a tag minted and burned per request, one
+Simulating the shipped cage costs a tag minted and burned per request (one
+oracle, one tag), one
 more script run per fold transaction, and a larger datum. It costs no extra
 proof: a condition and a write on the same key share one Merkle Patricia
 Forestry proof. Conditions on other keys are new, and paid for only when used.
