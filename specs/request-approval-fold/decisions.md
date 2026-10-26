@@ -139,10 +139,13 @@ against this record.
   carry this role, which matters for a registry with no oracles and hence no
   tags. Every exit burns it.
 - **Folders find work through the request token.** One query by the request
-  token of a registry returns every live request of that registry; for each,
-  the folder computes the expected approval names, which are deterministic,
-  and looks them up by exact name. Nothing foldable is missed and nothing
-  unfoldable is included.
+  token of a registry returns every live request of that registry. An
+  approval's name binds the oracle's conditions, which the folder cannot know
+  in advance, so the folder lists the registry's judgment outputs by the
+  release policy and reads each one's datum; a refusal, or an approval without
+  conditions, can also be looked up by its computed name. From the live
+  requests and the authentic judgment outputs, nothing foldable is missed and
+  nothing unfoldable is included.
 - **The seed is checked when tags are minted.** It protects judgments from
   replay, so a registry without oracles, which has no judgments, needs none.
 
