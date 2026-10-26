@@ -420,7 +420,8 @@ theorem dead_judgment_can_burn (s : State) (c : CageId) (r : Request)
     Step s (.burn (judgmentName c r oracle verdict conditions)) (afterBurn s (judgmentName c r oracle verdict conditions)) ∧
       (afterBurn s (judgmentName c r oracle verdict conditions)).live = s.live ∧
       (afterBurn s (judgmentName c r oracle verdict conditions)).cage = s.cage := by
-  sorry
+  intro hm _
+  exact ⟨Step.burn s _ hm, rfl, rfl⟩
 
 theorem judgments_do_not_consume (s : State) (tx : JudgmentTx) :
     (afterJudgment s tx).live = s.live ∧ (afterJudgment s tx).cage = s.cage := by

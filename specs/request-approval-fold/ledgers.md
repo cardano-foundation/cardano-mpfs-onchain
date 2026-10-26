@@ -10,9 +10,22 @@ M105 and A13 remain accepted mutation-evidence limits and are not repaired here.
 ## Statements and witnesses
 
 113 theorem declarations: all 111 prior names retained, two additions. This repair
-restates only T35 and T83 and adds T112 and T113. In the statement phase these four
-are OPEN with intentional sorry; the other 109 proof bodies and statement types
-are unchanged. The reachable examples compile without using admitted guarantees.
+restates only T35 and T83 and adds T112 and T113. The statement commit 629233a
+carried four intentional admissions; phase 2 proves all four without changing any
+of the 113 frozen statement types or any model/witness bytes. All 113 theorems
+are PROVED; 0 REFUTED, 0 OPEN. The other 109 proof bodies are unchanged.
+The reachable examples compile without using admitted guarantees.
+
+Fresh .lake verification passed the prescribed lake build (15 jobs). Compiler
+inventory and #print axioms reconcile all 113 theorem names; all 113 theorem,
+152 named witness-definition and eight concrete theorem-instance queries use only
+propext, Classical.choice and Quot.sound. The eight instances include the audit's
+dead conditional judgment, all four rule-bearing exits, actual creation binding,
+and both policy branches. Compiled custom-axiom and sorryAx controls are rejected
+by the evidence parser; empty, truncated, duplicate and wrong-name inventories
+are also rejected. Receipts: lean-author-5/evidence/clean-build.log, axioms.log,
+witness-axioms.log, instances.log, inventory.log and verification.json. These are
+local kernel/model results; fresh independent audits and acceptance remain pending.
 
 W01–W46 are in Witnesses.lean, W47–W60 in RepairWitnesses.lean, W61–W78 in
 TagsPricesWitnesses.lean, and W79–W113 plus W35b/W83b in RulesWitnesses.lean.
@@ -37,7 +50,21 @@ T112, request-policy-release falsifies T113. All three probes compile using only
 Model, with propext as their sole axiom; all edits are reverted. Receipts and
 exact instruments: lean-author-5/evidence/statements-<mutant>.log and
 instruments/<mutant>-counterexample.lean in the orchestration runtime.
-These are creator regression results; fresh independent mutation audit follows.
+With the proofs in place, all three exact audit mutants fail the full build at
+the owning theorem, after all prior modules compile. Model-only probes containing
+the unchanged owning declaration reproduce each failure independently:
+
+| Mutant | Owning theorem | Semantic failure |
+|---|---|---|
+| rule-request | creation_rule_input_binding | substituted conditions do not establish admission of the actual output request |
+| rule-signatures | creation_rule_input_binding | fabricated owner signature does not establish admission under actual tx.signers |
+| request-policy-release | creation_request_policy | release mint/output policy contradicts the required rule policy and release exclusion |
+
+Receipts: evidence/proofs-<mutant>.log and proofs-<mutant>-owner.log. The same
+isolated declarations compile on the restored model (owner-control.log), while
+the three mutant counterexamples fail at admission on that model (control-<mutant>.log).
+All mutation edits are reverted. These are creator regression results; fresh
+independent mutation audit follows.
 
 The semantic law is Step with FoldRun for ordered application. Provenance and
 consumption inversions expose actual actions, source references and their evidence.
@@ -114,7 +141,7 @@ requests; T08/T40/T41 retain seed/datum guarantees precisely where judgments exi
 | T32 | early_exit_requires_all_judgments | Early exits show every judgment | W32 | withdrawAllowed: omit after-window guard | PROVED |
 | T33 | early_exit_pays_every_oracle | Early exits pay every oracle | W33 | accountAllowed: permit empty oracle payments | PROVED |
 | T34 | before_deadline_only_approvals | Before the deadline only approvals or oracle signatures authorize an exit | W34 | hasApproval: use refusal instead of approval | PROVED |
-| T35 | dead_judgment_can_burn | Every held dead judgment burns, for every verdict and condition list, preserving cage/live requests | W35 and W35b (dead_condition_bearing_witness) | burn-live-guard; alternatively Step.burn rejects nonempty approval conditions | OPEN |
+| T35 | dead_judgment_can_burn | Every held dead judgment burns, for every verdict and condition list, preserving cage/live requests | W35 and W35b (dead_condition_bearing_witness) | burn-live-guard; alternatively Step.burn rejects nonempty approval conditions | PROVED |
 | T36 | judgments_do_not_consume | Judgment minting consumes no request | W36 | afterJudgment: replace live with [] | PROVED |
 | T37 | exits_remove_consumed | Exit terminality | W37 | afterExit: preserve live unchanged | PROVED |
 | T38 | fold_removes_consumed | Fold terminality | W38 | afterFold: preserve live unchanged | PROVED |
@@ -165,7 +192,7 @@ requests; T08/T40/T41 retain seed/datum guarantees precisely where judgments exi
 | T80 | step_rule_immutable | step rule immutable | W80 | drop rule-preservation guard in foldAccepted | PROVED |
 | T81 | history_rule_immutable | history rule immutable | W81 | afterJudgment clears cage.rule | PROVED |
 | T82 | reachable_rule_admitted | reachable rule admitted | W82 | drop ruleAdmits at creation | PROVED |
-| T83 | every_rule_allows_burn | Actual fold/account/withdraw/burn Steps available under lifecycle requirements for any rule, without re-admission | W83 and W83b, all four reached rule-bearing exit paths | Step.fold/account/withdraw add ruleAdmits on exit signatures; Step.burn adds a rule gate; stepValid re-runs rule (rule-at-fold) | OPEN |
+| T83 | every_rule_allows_burn | Actual fold/account/withdraw/burn Steps available under lifecycle requirements for any rule, without re-admission | W83 and W83b, all four reached rule-bearing exit paths | Step.fold/account/withdraw add ruleAdmits on exit signatures; Step.burn adds a rule gate; stepValid re-runs rule (rule-at-fold) | PROVED |
 | T84 | fold_rule_predicate_independent | fold rule predicate independent | W84 | stepValid evaluates the admission predicate again | PROVED |
 | T85 | reachable_request_tokens | reachable request tokens | W85 | wellFormed allows no request token | PROVED |
 | T86 | fold_requires_request_token | fold requires request token | W86 | stepValid omits wellFormed | PROVED |
@@ -195,8 +222,8 @@ requests; T08/T40/T41 retain seed/datum guarantees precisely where judgments exi
 | T110 | empty_fold_allowed | empty fold allowed | W110 | foldAccepted requires a nonempty batch | PROVED |
 | T111 | empty_fold_earns_nothing | empty fold earns nothing | W111 | foldAccepted permits a payment on an empty batch | PROVED |
 
-| T112 | creation_rule_input_binding | Actual creation binds Rule.admits to the singleton output request and exact creating signatures | W112 ruledCreateStep, separate creator signature and demanded condition | rule-request and rule-signatures, exact surviving audit edits | OPEN |
-| T113 | creation_request_policy | Actual creation uses rule policy and never release if rule exists, release otherwise; both mint and output provenance | W113 ruledCreateStep and step_create cover both branches | request-policy-release, exact surviving audit edit | OPEN |
+| T112 | creation_rule_input_binding | Actual creation binds Rule.admits to the singleton output request and exact creating signatures | W112 ruledCreateStep, separate creator signature and demanded condition | rule-request and rule-signatures, exact surviving audit edits | PROVED |
+| T113 | creation_request_policy | Actual creation uses rule policy and never release if rule exists, release otherwise; both mint and output provenance | W113 ruledCreateStep and step_create cover both branches | request-policy-release, exact surviving audit edit | PROVED |
 
 ## Semantic atoms
 

@@ -99,14 +99,50 @@ theorem every_rule_allows_burn (s : State) (rule : Rule)
       tx.beneficiary = tx.input.request.owner → tx.paid = tx.input.value →
       Step s (.withdraw tx) (afterExit s tx.input)) ∧
     (∀ name ∈ s.judgments, Step s (.burn name) (afterBurn s name)) := by
-  sorry
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro tx hc hl he hid ho hp hr hn hb ha ht hg
+    apply Step.fold s tx hc hl he
+    refine ⟨hid, ho, hp, hr, hn, hb, ha, ?_⟩
+    have buildRun : ∀ (os : List RequestOutput) (t : Trie),
+        (∀ (i : Nat) (o : RequestOutput), os[i]? = some o →
+          wellFormed tx.cageIn o ∧ tx.now < o.request.deadline ∧
+          hasApproval tx.cageIn o.request tx.refs tx.signers tx.conditions ∧
+          (∀ condition ∈ o.request.conditions,
+            condition.holds (applyAll t ((os.take i).map (·.request.write)))) ∧
+          ∀ oracle ∈ tx.cageIn.oracles, ∀ condition ∈ tx.conditions o.request oracle,
+            condition.holds (applyAll t ((os.take i).map (·.request.write)))) →
+        FoldRun tx.cageIn tx.now tx.refs tx.signers tx.conditions t os
+          (applyAll t (os.map (·.request.write))) := by
+      intro os
+      induction os with
+      | nil => intro t _; exact .nil t
+      | cons o os ih =>
+        intro t guards
+        apply FoldRun.cons
+        · simpa only [List.take_zero, List.map_nil, applyAll] using guards 0 o rfl
+        · apply ih (o.request.write.apply t)
+          intro i out hout
+          simpa only [List.take_succ_cons, List.map_cons, applyAll] using
+            guards (i + 1) out (by simpa only [List.getElem?_cons_succ] using hout)
+    rw [ht]
+    exact buildRun tx.requests tx.cageIn.trie hg
+  · intro tx hc hl he hw hv hb hp hlo hhi
+    exact Step.account s tx hc hl he ⟨hw, hv, hb, hp, hlo, hhi⟩
+  · intro tx hl ht hs hb hp hv
+    exact Step.withdraw s tx hl ⟨ht, hs, hb, hp, hv⟩
+  · intro name hn
+    exact Step.burn s name hn
 
 /-- The rule receives the request actually created and the actual creating signatures. -/
 theorem creation_rule_input_binding {s s' : State} {tx : CreateTx} {o : RequestOutput}
     (rule : Rule) :
     Step s (.create tx o) s' → s.cage.rule = some rule →
       tx.outputs = [o] ∧ o ∈ s'.live ∧ rule.admits o.request tx.signers := by
-  sorry
+  intro hs hr
+  cases hs with
+  | create tx o hc ha _ _ =>
+    refine ⟨ha.2.1, List.mem_cons_self, ?_⟩
+    simpa only [ruleAdmits, hc, hr] using ha.2.2.2.2.1
 
 /-- The abstract minting and held-token policies agree with the registry's choice. -/
 theorem creation_request_policy {s s' : State} {tx : CreateTx} {o : RequestOutput} :
@@ -117,7 +153,22 @@ theorem creation_request_policy {s s' : State} {tx : CreateTx} {o : RequestOutpu
         tx.policy = .rule rule.hash ∧ o.policy = .rule rule.hash ∧
         tx.policy ≠ .release ∧ o.policy ≠ .release) ∧
       (s.cage.rule = none → tx.policy = .release ∧ o.policy = .release) := by
-  sorry
+  intro hs
+  cases hs with
+  | create tx o hc ha _ _ =>
+    have hm : tx.policy = requestPolicy s.cage := by
+      simpa only [hc] using ha.2.2.2.2.2
+    have ho : o.policy = requestPolicy s.cage := by
+      simpa only [hc] using ha.2.2.2.1.2.2.2.2
+    refine ⟨ha.2.1, ?_, ?_, ?_, ?_⟩
+    · simpa only [hc] using ha.2.2.2.1.2.2.2.1
+    · rw [ha.2.2.1, hc]
+      simp
+    · intro rule hr
+      simp only [requestPolicy, hr] at hm ho
+      exact ⟨hm, ho, by simp [hm], by simp [ho]⟩
+    · intro hr
+      simpa only [requestPolicy, hr] using And.intro hm ho
 
 /-- The fold cannot re-evaluate a rule: replacing its predicate without changing
     its hash has no effect on the turn's checks. Creation still evaluates it. -/
