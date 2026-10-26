@@ -163,9 +163,6 @@ def ruleAdmits (c : CageState) (r : Request) (signers : List Signer) : Prop :=
   | none => True
   | some rule => rule.admits r signers
 
-/-- Burns have no rule predicate; every exit is admitted by the rule policy. -/
-def ruleBurnAllowed (_rule : Rule) : Prop := True
-
 /-- The first field of a name is its domain-separating role. -/
 inductive TokenRole where
   | tag | approval | refusal | price | request

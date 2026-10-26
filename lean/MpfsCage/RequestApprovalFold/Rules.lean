@@ -59,8 +59,65 @@ theorem reachable_rule_admitted (s : State) :
     | account => exact keep o (List.mem_filter.mp ho).1
     | withdraw => exact keep o (List.mem_filter.mp ho).1
 
-theorem every_rule_allows_burn (rule : Rule) : ruleBurnAllowed rule := by
-  trivial
+/-- Every exit is available under its lifecycle requirements, for any admission
+    predicate. Fold conditions are stated at each actual prefix, without using
+    the creation rule or an exit-acceptance helper as a premise. -/
+theorem every_rule_allows_burn (s : State) (rule : Rule)
+    (_hrule : s.cage.rule = some rule) :
+    (∀ tx : FoldTx,
+      tx.cageIn = s.cage →
+      (∀ o ∈ tx.requests, o ∈ s.live) →
+      (∀ name ∈ tx.refs, name ∈ s.judgments) →
+      tx.cageOut.id = tx.cageIn.id →
+      tx.cageOut.oracles = tx.cageIn.oracles →
+      tx.cageOut.protocol = tx.cageIn.protocol →
+      tx.cageOut.rule = tx.cageIn.rule →
+      tx.requests.Nodup →
+      tx.burned = tx.requests.flatMap tokensOf →
+      tx.allocations = tx.requests.map (fun o => allocation tx.cageIn o tx.folder) →
+      tx.cageOut.trie = applyAll tx.cageIn.trie (tx.requests.map (·.request.write)) →
+      (∀ (i : Nat) (o : RequestOutput), tx.requests[i]? = some o →
+        wellFormed tx.cageIn o ∧ tx.now < o.request.deadline ∧
+        hasApproval tx.cageIn o.request tx.refs tx.signers tx.conditions ∧
+        (∀ condition ∈ o.request.conditions,
+          condition.holds (applyAll tx.cageIn.trie ((tx.requests.take i).map (·.request.write)))) ∧
+        ∀ oracle ∈ tx.cageIn.oracles, ∀ condition ∈ tx.conditions o.request oracle,
+          condition.holds (applyAll tx.cageIn.trie ((tx.requests.take i).map (·.request.write)))) →
+      Step s (.fold tx) (afterFold s tx)) ∧
+    (∀ tx : AccountTx,
+      tx.cageRef = s.cage → tx.input ∈ s.live →
+      (∀ name ∈ tx.refs, name ∈ s.judgments) →
+      wellFormed tx.cageRef tx.input → hasAccount tx.cageRef tx.input.request tx.refs →
+      tx.burned = tokensOf tx.input →
+      tx.paid = allocation tx.cageRef tx.input tx.input.request.owner →
+      tx.input.request.deadline ≤ tx.now →
+      tx.now ≤ tx.input.request.deadline + tx.input.request.window →
+      Step s (.account tx) (afterExit s tx.input)) ∧
+    (∀ tx : WithdrawTx,
+      tx.input ∈ s.live → tx.input.request.deadline + tx.input.request.window < tx.now →
+      tx.input.request.owner ∈ tx.signers → tx.burned = tokensOf tx.input →
+      tx.beneficiary = tx.input.request.owner → tx.paid = tx.input.value →
+      Step s (.withdraw tx) (afterExit s tx.input)) ∧
+    (∀ name ∈ s.judgments, Step s (.burn name) (afterBurn s name)) := by
+  sorry
+
+/-- The rule receives the request actually created and the actual creating signatures. -/
+theorem creation_rule_input_binding {s s' : State} {tx : CreateTx} {o : RequestOutput}
+    (rule : Rule) :
+    Step s (.create tx o) s' → s.cage.rule = some rule →
+      tx.outputs = [o] ∧ o ∈ s'.live ∧ rule.admits o.request tx.signers := by
+  sorry
+
+/-- The abstract minting and held-token policies agree with the registry's choice. -/
+theorem creation_request_policy {s s' : State} {tx : CreateTx} {o : RequestOutput} :
+    Step s (.create tx o) s' →
+      tx.outputs = [o] ∧ o.requestTokens = [requestName s.cage.id] ∧
+      requestName s.cage.id ∈ tx.minted ∧
+      (∀ rule, s.cage.rule = some rule →
+        tx.policy = .rule rule.hash ∧ o.policy = .rule rule.hash ∧
+        tx.policy ≠ .release ∧ o.policy ≠ .release) ∧
+      (s.cage.rule = none → tx.policy = .release ∧ o.policy = .release) := by
+  sorry
 
 /-- The fold cannot re-evaluate a rule: replacing its predicate without changing
     its hash has no effect on the turn's checks. Creation still evaluates it. -/

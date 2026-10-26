@@ -414,15 +414,13 @@ theorem before_deadline_only_approvals (o : RequestOutput) (spend : RequestSpend
     omega
 
 theorem dead_judgment_can_burn (s : State) (c : CageId) (r : Request)
-    (oracle : Signer) (verdict : Bool) :
-    judgmentName c r oracle verdict ∈ s.judgments →
+    (oracle : Signer) (verdict : Bool) (conditions : List Condition) :
+    judgmentName c r oracle verdict conditions ∈ s.judgments →
     (∀ o ∈ s.live, o.request ≠ r) →
-    Step s (.burn (judgmentName c r oracle verdict)) (afterBurn s (judgmentName c r oracle verdict)) ∧
-      (afterBurn s (judgmentName c r oracle verdict)).live = s.live ∧
-      (afterBurn s (judgmentName c r oracle verdict)).cage = s.cage := by
-
-  intro hm _
-  exact ⟨Step.burn s _ hm, rfl, rfl⟩
+    Step s (.burn (judgmentName c r oracle verdict conditions)) (afterBurn s (judgmentName c r oracle verdict conditions)) ∧
+      (afterBurn s (judgmentName c r oracle verdict conditions)).live = s.live ∧
+      (afterBurn s (judgmentName c r oracle verdict conditions)).cage = s.cage := by
+  sorry
 
 theorem judgments_do_not_consume (s : State) (tx : JudgmentTx) :
     (afterJudgment s tx).live = s.live ∧ (afterJudgment s tx).cage = s.cage := by

@@ -295,4 +295,123 @@ example : Reachable s1 ∧ Step s1 (.fold emptyFold) (afterFold s1 emptyFold) :=
 example : Reachable s1 ∧ foldAccepted emptyFold ∧ emptyFold.requests = [] :=
   ⟨reachable1, empty_fold_ok, rfl⟩
 
+-- W35b: the audit's dead condition-bearing approval is in the quantified domain.
+def deadConditional := afterFold conditional2 conditionalFold
+def conditionalName := judgmentName cage.id request "alice" true [.absent "y"]
+def deadConditionalReachable : Reachable deadConditional :=
+  .next reachableConditional2 conditional_step_fold
+
+def dead_condition_bearing_witness :
+    Reachable deadConditional ∧ conditionalName ∈ deadConditional.judgments ∧
+    (∀ o ∈ deadConditional.live, o.request ≠ request) ∧
+    judgmentName cage.id request "alice" true [] ∉ deadConditional.judgments ∧
+    Step deadConditional (.burn conditionalName) (afterBurn deadConditional conditionalName) :=
+  ⟨deadConditionalReachable, by decide, by decide, by decide, .burn _ _ (by decide)⟩
+example : Reachable deadConditional ∧ conditionalName ∈ deadConditional.judgments ∧
+    (∀ o ∈ deadConditional.live, o.request ≠ request) ∧
+    Step deadConditional (.burn conditionalName) (afterBurn deadConditional conditionalName) ∧
+    (afterBurn deadConditional conditionalName).live = deadConditional.live ∧
+    (afterBurn deadConditional conditionalName).cage = deadConditional.cage :=
+  ⟨deadConditionalReachable, by decide, by decide, .burn _ _ (by decide), rfl, rfl⟩
+
+-- W83b: all four actual exits in a rule-bearing registry, without the creator.
+def creatorRule : Rule := ⟨"creator-only", fun r signatures =>
+  "creator" ∈ signatures ∧ Condition.absent "x" ∈ r.conditions⟩
+def ruledCage : CageState := { cage with rule := some creatorRule }
+def ruledOutput : RequestOutput := { output with policy := .rule "creator-only" }
+def ruledCreate : CreateTx :=
+  { create with
+    cageRef := ruledCage, outputs := [ruledOutput],
+    signers := ["creator"], policy := .rule "creator-only" }
+def ruled0 := initial ruledCage
+def ruled1 := afterCreate ruled0 ruledCreate ruledOutput
+def ruledReachable0 : Reachable ruled0 := by
+  apply Reachable.registry ruledCage []
+  simp [registryCreated, RegistryValid, ruledCage, cage]
+def ruledCreateAllowed : createAllowed ruledCreate ruledOutput := by concrete
+def ruledCreateStep : Step ruled0 (.create ruledCreate ruledOutput) ruled1 :=
+  .create _ _ _ rfl ruledCreateAllowed (by decide) (by decide)
+def ruledReachable1 : Reachable ruled1 := .next ruledReachable0 ruledCreateStep
+def ruledJudge (oracle : Signer) (verdict : Bool) : JudgmentTx :=
+  { conditionalJudge oracle with
+    cageRef := ruledCage, requestRef := ruledOutput,
+    approve := verdict,
+    minted := [judgmentName cage.id request oracle verdict [.absent "y"]] }
+def ruledJudgeAllowed (oracle : Signer) (verdict : Bool) (h : oracle ∈ cage.oracles) :
+    judgmentAllowed (ruledJudge oracle verdict) :=
+  ⟨rfl, h, by simp [ruledJudge, conditionalJudge, judge], by change 2 < 10; decide, rfl, rfl⟩
+def ruled2 := afterJudgment ruled1 (ruledJudge "alice" true)
+def ruled3 := afterJudgment ruled2 (ruledJudge "bob" false)
+def ruledReachable2 : Reachable ruled2 :=
+  .next ruledReachable1 (.judge _ _ rfl (by decide) (ruledJudgeAllowed _ _ (by decide)))
+def ruledReachable3 : Reachable ruled3 :=
+  .next ruledReachable2 (.judge _ _ rfl (by decide) (ruledJudgeAllowed _ _ (by decide)))
+def ruledFold : FoldTx :=
+  { conditionalSigned with
+    cageIn := ruledCage,
+    cageOut := { ruledCage with trie := request.write.apply emptyTrie },
+    requests := [ruledOutput], allocations := [allocation ruledCage ruledOutput "folder"] }
+def ruledFoldAllowed : foldAccepted ruledFold := by
+  refine ⟨rfl, rfl, rfl, rfl, by decide, rfl, rfl, ?_⟩
+  apply FoldRun.cons
+  · refine ⟨by concrete, by decide, ?_, ?_, ?_⟩
+    · intro oracle h; exact Or.inr h
+    · intro condition h
+      change condition ∈ [Condition.absent "x"] at h
+      simp only [List.mem_singleton] at h
+      subst condition; rfl
+    · intro oracle _ condition h
+      change condition ∈ [Condition.absent "y"] at h
+      simp only [List.mem_singleton] at h
+      subst condition; rfl
+  exact FoldRun.nil _
+def ruledFoldStep : Step ruled3 (.fold ruledFold) (afterFold ruled3 ruledFold) :=
+  .fold _ _ rfl (by decide) (by decide) ruledFoldAllowed
+def ruledAccount : AccountTx :=
+  ⟨ruledCage, ruledOutput, ruled3.judgments, 10, "anyone", tokensOf ruledOutput,
+    allocation ruledCage ruledOutput "owner"⟩
+def ruledAccountAllowed : accountAllowed ruledAccount := by
+  refine ⟨by concrete, ?_, rfl, rfl, by decide, by decide⟩
+  intro oracle h
+  change oracle ∈ cage.oracles at h
+  simp only [cage, List.mem_cons, List.not_mem_nil, or_false] at h
+  rcases h with rfl | rfl
+  · exact ⟨true, [.absent "y"], by decide⟩
+  · exact ⟨false, [.absent "y"], by decide⟩
+def ruledAccountStep : Step ruled3 (.account ruledAccount) (afterExit ruled3 ruledOutput) :=
+  .account _ _ rfl (by decide) (fun _ h => h) ruledAccountAllowed
+def ruledWithdraw : WithdrawTx := { withdraw with input := ruledOutput }
+def ruledWithdrawStep : Step ruled3 (.withdraw ruledWithdraw) (afterExit ruled3 ruledOutput) :=
+  .withdraw _ _ (by decide) (by concrete)
+def ruledDead := afterExit ruled3 ruledOutput
+def ruledDeadReachable : Reachable ruledDead := .next ruledReachable3 ruledWithdrawStep
+example : Reachable ruled3 ∧ ruled3.cage.rule = some creatorRule ∧
+    Step ruled3 (.fold ruledFold) (afterFold ruled3 ruledFold) ∧
+    Step ruled3 (.account ruledAccount) (afterExit ruled3 ruledOutput) ∧
+    Step ruled3 (.withdraw ruledWithdraw) ruledDead ∧
+    ¬ creatorRule.admits ruledOutput.request ruledFold.signers ∧
+    ¬ creatorRule.admits ruledOutput.request [] ∧
+    ¬ creatorRule.admits ruledOutput.request ruledWithdraw.signers :=
+  ⟨ruledReachable3, rfl, ruledFoldStep, ruledAccountStep, ruledWithdrawStep,
+    by simp [creatorRule, ruledFold, conditionalSigned], by simp [creatorRule],
+    by simp [creatorRule, ruledWithdraw, withdraw]⟩
+example : Reachable ruledDead ∧ ruledDead.cage.rule = some creatorRule ∧
+    conditionalName ∈ ruledDead.judgments ∧
+    Step ruledDead (.burn conditionalName) (afterBurn ruledDead conditionalName) :=
+  ⟨ruledDeadReachable, rfl, by decide, .burn _ _ (by decide)⟩
+
+-- W112: actual output and creating signatures, under a nontrivial predicate.
+example : Reachable ruled0 ∧ Step ruled0 (.create ruledCreate ruledOutput) ruled1 ∧
+    ruled0.cage.rule = some creatorRule ∧ ruledCreate.outputs = [ruledOutput] ∧
+    ruledOutput ∈ ruled1.live ∧ creatorRule.admits ruledOutput.request ruledCreate.signers :=
+  ⟨ruledReachable0, ruledCreateStep, rfl, rfl, by decide, by change "creator" ∈ ["creator"] ∧ _; decide⟩
+-- W113: both policy branches have genuine reachable creation steps.
+example : Reachable ruled0 ∧ Step ruled0 (.create ruledCreate ruledOutput) ruled1 ∧
+    ruled0.cage.rule = some creatorRule ∧ ruledCreate.policy = .rule creatorRule.hash ∧
+    ruledOutput.policy = .rule creatorRule.hash ∧ ruledCreate.policy ≠ .release :=
+  ⟨ruledReachable0, ruledCreateStep, rfl, rfl, rfl, by decide⟩
+example : Reachable s0 ∧ Step s0 (.create create output) s1 ∧
+    s0.cage.rule = none ∧ create.policy = .release ∧ output.policy = .release :=
+  ⟨reachable0, step_create, rfl, rfl, rfl⟩
+
 end RequestApprovalFold.Witnesses
