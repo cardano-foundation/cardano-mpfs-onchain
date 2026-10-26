@@ -27,6 +27,11 @@ against this record.
   who submits it. The folder chooses which approved requests to include and
   their order; it cannot apply an unapproved request, change a write, or
   consume a request without applying it.
+- **Empty folds are allowed.** A fold that applies no request earns nothing
+  and costs its submitter a transaction fee; folders are paid only by the
+  requests they apply, so they keep the registry moving. Forbidding empty folds
+  would only stop deliberate griefing, at the price of another check in every
+  fold.
 - **No externalized state.** Unlike Singular, the fold mints and burns no
   per-key token; everything stays in the tree. Generalizing to both designs is
   out of scope.
