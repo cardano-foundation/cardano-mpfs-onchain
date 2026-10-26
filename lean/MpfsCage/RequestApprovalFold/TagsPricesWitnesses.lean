@@ -50,17 +50,18 @@ example : Reachable s1 ∧ Reachable s4 ∧
 
 -- W69: a distinct registry shares alice, but not bob, with the first registry.
 def otherCage : CageState :=
-  ⟨⟨"policy", "other-registry"⟩, ["alice", "carol"], "other-protocol", emptyTrie⟩
+  ⟨⟨"policy", "other-registry"⟩, ["alice", "carol"], "other-protocol", emptyTrie, none⟩
 def otherOutput : RequestOutput :=
   ⟨{ request with cage := otherCage.id, seed := "other-seed" }, 10,
-    [tagName "alice", tagName "carol"]⟩
+    [tagName "alice", tagName "carol"], "other-output", [requestName otherCage.id], .release⟩
 def otherCreate : CreateTx :=
-  ⟨["other-seed"], otherCage, otherOutput.tags, [otherOutput]⟩
+  ⟨["other-seed"], otherCage, tokensOf otherOutput, [otherOutput], [], .release⟩
 def otherState := afterCreate (initial otherCage) otherCreate otherOutput
 
 def reachableOther : Reachable otherState := by
   apply Reachable.next (Reachable.registry otherCage [] ?_)
   · apply Step.create (initial otherCage) otherCreate otherOutput rfl
+    · concrete
     · concrete
     · concrete
   · simp [registryCreated, RegistryValid, otherCage]
