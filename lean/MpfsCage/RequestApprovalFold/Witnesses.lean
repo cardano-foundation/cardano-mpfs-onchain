@@ -10,8 +10,8 @@ def cage : CageState := ⟨⟨"policy", "registry"⟩, ["alice", "bob"], "protoc
 def request : Request :=
   ⟨cage.id, "owner", "seed0", .set "x" "v", [.absent "x"], "evidence",
     [("alice", 2), ("bob", 3)], 10, 5⟩
-def output : RequestOutput := ⟨request, 10, [tagName cage.id]⟩
-def create : CreateTx := ⟨[request.seed], cage, [tagName cage.id], [output]⟩
+def output : RequestOutput := ⟨request, 10, cage.oracles.map tagName⟩
+def create : CreateTx := ⟨[request.seed], cage, cage.oracles.map tagName, [output]⟩
 def s0 := initial cage
 def s1 := afterCreate s0 create output
 
@@ -122,7 +122,7 @@ example : Reachable s0 ∧ createAllowed create output := ⟨reachable0, create_
 
 -- A second distinct seed is live alongside the first.
 def output1 : RequestOutput := { output with request := { request with seed := "seed1" } }
-def create1 : CreateTx := ⟨["seed1"], cage, [tagName cage.id], [output1]⟩
+def create1 : CreateTx := ⟨["seed1"], cage, cage.oracles.map tagName, [output1]⟩
 def step_create1 : Step s1 (.create create1 output1) (afterCreate s1 create1 output1) :=
   Step.create s1 create1 output1 rfl (by concrete) (by concrete)
 def spent_once : SpentOnce [create, create1] := by
@@ -152,7 +152,7 @@ example : Reachable s1 ∧ judgmentAllowed (judge "alice" true) :=
 example : Reachable s2 ∧ approved "alice" = judgmentName cage.id request "alice" true :=
   ⟨reachable2, rfl⟩
 -- W11
-example : Reachable s2 ∧ tagName cage.id ∈ output.tags ∧ approved "alice" ∈ s2.judgments :=
+example : Reachable s2 ∧ tagName "alice" ∈ output.tags ∧ approved "alice" ∈ s2.judgments :=
   ⟨reachable2, by concrete, by concrete⟩
 -- W12
 example : Reachable s3 ∧ foldAccepted fold := ⟨reachable3, fold_ok⟩
@@ -232,7 +232,7 @@ example : Reachable s3 ∧ Reachable mixed ∧ Reachable s1 ∧
     ⟨account_ok false, rfl⟩, ⟨withdraw_ok, rfl⟩⟩
 -- W31
 example : Reachable mixed ∧ requestSpendAllowed output (.accounted (account false)) ∧
-    tagName cage.id ∈ tokensOf output :=
+    tagName "alice" ∈ tokensOf output :=
   ⟨reachableMixed, ⟨account_ok false, rfl⟩, by concrete⟩
 -- W32
 example : Reachable s3 ∧ requestSpendAllowed output (.folded fold) ∧
@@ -297,8 +297,8 @@ def unsetOutput : RequestOutput :=
   { output with request := { request with seed := "unset-seed", write := .unset "x", conditions := [] } }
 def againOutput : RequestOutput :=
   { output with request := { request with seed := "again-seed" } }
-def createUnset : CreateTx := ⟨["unset-seed"], cage, [tagName cage.id], [unsetOutput]⟩
-def createAgain : CreateTx := ⟨["again-seed"], cage, [tagName cage.id], [againOutput]⟩
+def createUnset : CreateTx := ⟨["unset-seed"], cage, cage.oracles.map tagName, [unsetOutput]⟩
+def createAgain : CreateTx := ⟨["again-seed"], cage, cage.oracles.map tagName, [againOutput]⟩
 def withUnset := afterCreate s1 createUnset unsetOutput
 def withAgain := afterCreate withUnset createAgain againOutput
 
