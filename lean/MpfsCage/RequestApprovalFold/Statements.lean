@@ -12,9 +12,9 @@ theorem applyAll_append (t : Trie) (xs ys : List Write) :
   | cons w ws ih => exact ih (w.apply t)
 
 theorem foldRun_step_valid {c : CageState} {now : Time} {refs : List TokenName}
-    {signers : List Signer} {t t' : Trie} {os : List RequestOutput}
-    (h : FoldRun c now refs signers t os t') :
-    ∀ o ∈ os, ∃ t0, stepValid c now refs signers t0 o := by
+    {signers : List Signer} {conditions : OracleConditions} {t t' : Trie} {os : List RequestOutput}
+    (h : FoldRun c now refs signers conditions t os t') :
+    ∀ o ∈ os, ∃ t0, stepValid c now refs signers conditions t0 o := by
   induction h with
   | nil => intro o ho; cases ho
   | cons t o' os t' hv _ ih =>
@@ -24,16 +24,16 @@ theorem foldRun_step_valid {c : CageState} {now : Time} {refs : List TokenName}
     | tail _ hm => exact ih o hm
 
 theorem foldRun_result {c : CageState} {now : Time} {refs : List TokenName}
-    {signers : List Signer} {t t' : Trie} {os : List RequestOutput}
-    (h : FoldRun c now refs signers t os t') :
+    {signers : List Signer} {conditions : OracleConditions} {t t' : Trie} {os : List RequestOutput}
+    (h : FoldRun c now refs signers conditions t os t') :
     t' = applyAll t (os.map (·.request.write)) := by
   induction h with
   | nil => rfl
   | cons _ _ _ _ _ _ ih => exact ih
 
 theorem foldRun_conditions {c : CageState} {now : Time} {refs : List TokenName}
-    {signers : List Signer} {t t' : Trie} {os : List RequestOutput}
-    (h : FoldRun c now refs signers t os t') :
+    {signers : List Signer} {conditions : OracleConditions} {t t' : Trie} {os : List RequestOutput}
+    (h : FoldRun c now refs signers conditions t os t') :
     ∀ (n : Nat) (o : RequestOutput), os[n]? = some o → ∀ condition ∈ o.request.conditions,
       condition.holds (applyAll t ((os.take n).map (·.request.write))) := by
   induction h with
@@ -44,7 +44,7 @@ theorem foldRun_conditions {c : CageState} {now : Time} {refs : List TokenName}
     | zero =>
       simp at ho
       subst o
-      exact hv.2.2.2
+      exact hv.2.2.2.1
     | succ n =>
       simp only [List.getElem?_cons_succ] at ho
       simpa [List.take_succ_cons, applyAll] using ih n o ho
@@ -70,7 +70,7 @@ theorem applyAll_keeps_present (k : Key) :
       · exact h
 
 theorem registry_creation (c : CageState) (existing : List CageId) :
-    registryCreated c existing → c.id ∉ existing ∧ c.oracles ≠ [] ∧
+    registryCreated c existing → c.id ∉ existing ∧ (c.oracles ≠ [] ∨ c.rule.isSome) ∧
       c.oracles.Nodup ∧ c.trie = emptyTrie := by
   intro ⟨h, ⟨hn, hd⟩, ht⟩
   exact ⟨h, hn, hd, ht⟩
@@ -78,56 +78,55 @@ theorem registry_creation (c : CageState) (existing : List CageId) :
 theorem create_tags_existing_cage (tx : CreateTx) (o : RequestOutput) :
     createAllowed tx o → tx.outputs = [o] ∧
       tx.cageRef.id = o.request.cage ∧
-      tx.minted = tx.cageRef.oracles.map tagName ∧
-      o.tags = tx.cageRef.oracles.map tagName ∧ o.request.seed ∈ tx.spent ∧
+      tx.minted = tx.cageRef.oracles.map tagName ++ [requestName tx.cageRef.id] ∧
+      o.tags = tx.cageRef.oracles.map tagName ∧ (tx.cageRef.oracles ≠ [] → o.request.seed ∈ tx.spent) ∧
       totalFees tx.cageRef o.request ≤ o.value := by
-  intro ⟨hs, ho, hm, hc, ht, hf⟩
-  exact ⟨ho, hc.symm, hm, ht, hs, hf⟩
-
+  intro h
+  exact ⟨h.2.1, h.2.2.2.1.1.symm, h.2.2.1, h.2.2.2.1.2.1, h.1, h.2.2.2.1.2.2.1⟩
 
 
 theorem requests_unique_in_history (history : List CreateTx)
     (a b : CreateTx) (oa ob : RequestOutput) :
     SpentOnce history → a ∈ history → b ∈ history →
-    createAllowed a oa → createAllowed b ob → a ≠ b →
+    createAllowed a oa → createAllowed b ob → a.cageRef.oracles ≠ [] →
+    b.cageRef.oracles ≠ [] → a ≠ b →
     oa.request ≠ ob.request := by
-  intro hs ha hb ca cb hne heq
+  intro hs ha hb ca cb hna hnb hne heq
   apply hne
-  have hsa := ca.1
+  have hsa := ca.1 hna
   rw [heq] at hsa
-  exact hs a b _ ha hb hsa cb.1
+  exact hs a b _ ha hb hsa (cb.1 hnb)
+
 
 theorem judgment_authorized_and_bound (tx : JudgmentTx) :
     judgmentAllowed tx → tx.oracle ∈ tx.cageRef.oracles ∧
       tx.oracle ∈ tx.signers ∧ tx.requestRef.request.cage = tx.cageRef.id ∧
       tx.now < tx.requestRef.request.deadline ∧ tx.spent = [] ∧
-      tx.minted = [judgmentName tx.cageRef.id tx.requestRef.request tx.oracle tx.approve] := by
+      tx.minted = [judgmentName tx.cageRef.id tx.requestRef.request tx.oracle tx.approve tx.conditions] := by
   intro ⟨hc, ho, hs, ht, hp, hm⟩
   exact ⟨ho, hs, hc, ht, hp, hm⟩
 
 theorem judgment_not_replayable (c c' : CageId) (r r' : Request)
-    (oracle oracle' : Signer) (verdict verdict' : Bool) :
-    judgmentName c r oracle verdict = judgmentName c' r' oracle' verdict' →
-      c = c' ∧ r = r' ∧ r.seed = r'.seed ∧ oracle = oracle' ∧ verdict = verdict' := by
+    (oracle oracle' : Signer) (verdict verdict' : Bool) (conditions conditions' : List Condition) :
+    judgmentName c r oracle verdict conditions = judgmentName c' r' oracle' verdict' conditions' →
+      c = c' ∧ r = r' ∧ r.seed = r'.seed ∧ oracle = oracle' ∧ verdict = verdict' ∧
+      (verdict = true → conditions = conditions') := by
   intro h
   cases verdict <;> cases verdict' <;>
     simp only [judgmentName, tokenName, Bool.false_eq_true, if_false, if_true,
       TokenName.mk.injEq, NameBinding.judgment.injEq] at h
-  · obtain ⟨_, hc, hr, ho⟩ := h
-    exact ⟨hc, hr, congrArg Request.seed hr, ho, rfl⟩
+  · obtain ⟨_, hc, hr, ho, _⟩ := h
+    exact ⟨hc, hr, congrArg Request.seed hr, ho, rfl, by intro hf; cases hf⟩
   · cases h.1
   · cases h.1
-  · obtain ⟨_, hc, hr, ho⟩ := h
-    exact ⟨hc, hr, congrArg Request.seed hr, ho, rfl⟩
-
+  · obtain ⟨_, hc, hr, ho, hconds⟩ := h
+    exact ⟨hc, hr, congrArg Request.seed hr, ho, rfl, fun _ => hconds⟩
 
 
 theorem token_roles_separated (tagOracle : Signer) (c' : CageId) (r : Request)
     (oracle : Signer) (verdict : Bool) :
     tagName tagOracle ≠ judgmentName c' r oracle verdict := by
   cases verdict <;> simp [tagName, judgmentName, tokenName]
-
-
 
 theorem fold_preserves_registry (tx : FoldTx) :
     foldAccepted tx → tx.cageOut.id = tx.cageIn.id ∧
@@ -149,8 +148,6 @@ theorem step_preserves_registry {s s' : State} {action : Action} (h : Step s act
   | fold tx hc _ _ hf => simpa [afterFold, hc] using fold_preserves_registry tx hf
   | priceMint => exact ⟨rfl, rfl, rfl⟩
   | priceUpdate => exact ⟨rfl, rfl, rfl⟩
-
-
 
 theorem history_preserves_registry {s s' : State} (h : History s s') :
     s'.cage.id = s.cage.id ∧ s'.cage.oracles = s.cage.oracles ∧
@@ -176,13 +173,11 @@ theorem only_fold_changes_tree {s s' : State} {action : Action} (h : Step s acti
   | priceMint => exact False.elim (hne rfl)
   | priceUpdate => exact False.elim (hne rfl)
 
-
-
 theorem fold_only_approved_before_deadline (tx : FoldTx) :
     foldAccepted tx → ∀ o ∈ tx.requests,
       o.request.cage = tx.cageIn.id ∧ tx.now < o.request.deadline ∧
-      hasApproval tx.cageIn o.request tx.refs tx.signers := by
-  intro ⟨_, _, _, _, _, _, hr⟩ o ho
+      hasApproval tx.cageIn o.request tx.refs tx.signers tx.conditions := by
+  intro ⟨_, _, _, _, _, _, _, hr⟩ o ho
   obtain ⟨_, hv⟩ := foldRun_step_valid hr o ho
   exact ⟨hv.1.1, hv.2.1, hv.2.2.1⟩
 
@@ -191,18 +186,18 @@ theorem fold_conditions_hold_when_applied (tx : FoldTx) :
       ∀ condition ∈ o.request.conditions,
         condition.holds (applyAll tx.cageIn.trie
           ((tx.requests.take n).map (·.request.write))) := by
-  intro ⟨_, _, _, _, _, _, hr⟩
+  intro ⟨_, _, _, _, _, _, _, hr⟩
   exact foldRun_conditions hr
 
 theorem fold_root_is_folded_writes (tx : FoldTx) :
     foldAccepted tx → tx.cageOut.trie =
       applyAll tx.cageIn.trie (tx.requests.map (·.request.write)) := by
-  intro ⟨_, _, _, _, _, _, hr⟩
+  intro ⟨_, _, _, _, _, _, _, hr⟩
   exact foldRun_result hr
 
 theorem fold_burns_tags (tx : FoldTx) :
     foldAccepted tx → tx.burned = tx.requests.flatMap tokensOf := by
-  intro ⟨_, _, _, _, hb, _⟩
+  intro ⟨_, _, _, _, _, hb, _⟩
   exact hb
 
 theorem fold_pays_and_keeps_rest (tx : FoldTx) :
@@ -210,7 +205,7 @@ theorem fold_pays_and_keeps_rest (tx : FoldTx) :
       allocation tx.cageIn o tx.folder ∈ tx.allocations ∧
       ∀ oracle ∈ tx.cageIn.oracles,
         (oracle, o.request.fee oracle) ∈ (allocation tx.cageIn o tx.folder).oracles := by
-  intro ⟨_, _, _, _, _, hp, _⟩ o ho
+  intro ⟨_, _, _, _, _, _, hp, _⟩ o ho
   constructor
   · rw [hp]
     exact List.mem_map.mpr ⟨o, ho, rfl⟩
@@ -221,7 +216,7 @@ theorem allocation_conserves_value (c : CageState) (o : RequestOutput) (to : Sig
     wellFormed c o →
       ((allocation c o to).oracles.map Prod.snd).sum +
         (allocation c o to).remainder = o.value := by
-  intro ⟨_, _, hf⟩
+  intro ⟨_, _, hf, _⟩
   have he : ((allocation c o to).oracles.map Prod.snd).sum = totalFees c o.request := by
     simp [allocation, oraclePayments, totalFees, List.map_map, Function.comp_def]
   rw [he]
@@ -229,15 +224,20 @@ theorem allocation_conserves_value (c : CageState) (o : RequestOutput) (to : Sig
   omega
 
 theorem blind_write_folds_on_any_tree (c : CageState) (now : Time)
-    (refs : List TokenName) (signers : List Signer) (o : RequestOutput) (t : Trie) :
+    (refs : List TokenName) (signers : List Signer) (conditions : OracleConditions) (o : RequestOutput) (t : Trie) :
     wellFormed c o → now < o.request.deadline →
-    hasApproval c o.request refs signers → o.request.conditions = [] →
-    FoldRun c now refs signers t [o] (o.request.write.apply t) := by
-  intro hw ht ha hc
-  refine FoldRun.cons t o [] _ ⟨hw, ht, ha, ?_⟩ (FoldRun.nil _)
-  intro condition hm
-  rw [hc] at hm
-  cases hm
+    hasApproval c o.request refs signers conditions → o.request.conditions = [] →
+    (∀ oracle ∈ c.oracles, conditions o.request oracle = []) →
+    FoldRun c now refs signers conditions t [o] (o.request.write.apply t) := by
+  intro hw ht ha hc hocs
+  refine FoldRun.cons t o [] _ ⟨hw, ht, ha, ?_, ?_⟩ (FoldRun.nil _)
+  · intro condition hm
+    rw [hc] at hm
+    cases hm
+  · intro oracle ho condition hm
+    rw [hocs oracle ho] at hm
+    cases hm
+
 
 theorem fold_permissionless (tx : FoldTx) (other : Signer) :
     foldAccepted tx → foldAccepted { tx with submitter := other } := by
@@ -246,14 +246,14 @@ theorem fold_permissionless (tx : FoldTx) (other : Signer) :
 /-- An accepted prefix ending in a set cannot reach a later absent condition
     without an intervening unset. `middle` is the exact intervening segment. -/
 theorem absent_inserts_exclusive (c : CageState) (now : Time)
-    (refs : List TokenName) (signers : List Signer) (t t' : Trie)
+    (refs : List TokenName) (signers : List Signer) (conditions : OracleConditions) (t t' : Trie)
     (a b : RequestOutput) (middle tail : List RequestOutput) (k : Key) (v : Val) :
-    FoldRun c now refs signers t (a :: (middle ++ b :: tail)) t' →
+    FoldRun c now refs signers conditions t (a :: (middle ++ b :: tail)) t' →
     a.request.write = .set k v → Condition.absent k ∈ b.request.conditions →
     ∃ q ∈ middle, q.request.write = .unset k := by
   intro hr hset habsent
   have impossible : ∀ (ms : List RequestOutput) (u u' : Trie),
-      FoldRun c now refs signers u (ms ++ b :: tail) u' →
+      FoldRun c now refs signers conditions u (ms ++ b :: tail) u' →
       (u k).isSome → (∀ q ∈ ms, q.request.write ≠ .unset k) → False := by
     intro ms
     induction ms with
@@ -261,7 +261,7 @@ theorem absent_inserts_exclusive (c : CageState) (now : Time)
       intro u u' hrun hp _
       cases hrun with
       | cons _ _ _ _ hv _ =>
-        have hn := hv.2.2.2 (.absent k) habsent
+        have hn := hv.2.2.2.1 (.absent k) habsent
         change u k = none at hn
         rw [hn] at hp
         contradiction
@@ -293,7 +293,6 @@ theorem account_complete_and_pays (tx : AccountTx) :
   intro ⟨_, ha, hb, hp, _⟩
   exact ⟨ha, hb, hp⟩
 
-
 theorem account_anyone_in_window (tx : AccountTx) (now : Time) (other : Signer) :
     accountAllowed tx → tx.input.request.deadline ≤ now →
     now ≤ tx.input.request.deadline + tx.input.request.window →
@@ -301,13 +300,11 @@ theorem account_anyone_in_window (tx : AccountTx) (now : Time) (other : Signer) 
   intro ⟨hw, ha, hb, hp, _⟩ hlo hhi
   exact ⟨hw, ha, hb, hp, hlo, hhi⟩
 
-
 theorem account_fee_neutral (a b : AccountTx) :
     accountAllowed a → accountAllowed b →
     a.cageRef = b.cageRef → a.input = b.input → a.paid = b.paid := by
   intro ha hb hc hi
   rw [ha.2.2.2.1, hb.2.2.2.1, hc, hi]
-
 
 theorem withdraw_only_owner_after_window (tx : WithdrawTx) :
     withdrawAllowed tx → tx.input.request.owner ∈ tx.signers ∧
@@ -352,7 +349,6 @@ theorem every_exit_burns_tag (o : RequestOutput) (spend : RequestSpend) :
     rw [h.1.2.2.1, h.2]
     exact ht
 
-
 theorem early_exit_requires_all_judgments (o : RequestOutput) (spend : RequestSpend) :
     requestSpendAllowed o spend → spend.now ≤ o.request.deadline + o.request.window →
     ∃ c, spend.cage = some c ∧
@@ -370,7 +366,6 @@ theorem early_exit_requires_all_judgments (o : RequestOutput) (spend : RequestSp
     rw [h.2] at hlate
     change tx.now ≤ o.request.deadline + o.request.window at ht
     exact False.elim (Nat.not_lt_of_ge ht hlate)
-
 
 /-- Stronger than the approved-oracle guarantee: every oracle is paid on
     every early exit, even without non-equivocation. -/
@@ -398,13 +393,12 @@ theorem early_exit_pays_every_oracle (o : RequestOutput) (spend : RequestSpend) 
     change tx.now ≤ o.request.deadline + o.request.window at ht
     exact False.elim (Nat.not_lt_of_ge ht hlate)
 
-
 /-- Before the deadline a permitted exit is a fold, using only approvals or signatures. -/
 theorem before_deadline_only_approvals (o : RequestOutput) (spend : RequestSpend) :
     requestSpendAllowed o spend → spend.now < o.request.deadline →
     ∃ tx, spend = .folded tx ∧ o ∈ tx.requests ∧
       ∀ oracle ∈ tx.cageIn.oracles,
-        judgmentName tx.cageIn.id o.request oracle true ∈ tx.refs ∨ oracle ∈ tx.signers := by
+        judgmentName tx.cageIn.id o.request oracle true (tx.conditions o.request oracle) ∈ tx.refs ∨ oracle ∈ tx.signers := by
   intro h ht
   cases spend with
   | folded tx => exact ⟨tx, rfl, h.2, (fold_only_approved_before_deadline tx h.1 o h.2).2.2⟩
@@ -419,18 +413,15 @@ theorem before_deadline_only_approvals (o : RequestOutput) (spend : RequestSpend
     simp only [Time] at *
     omega
 
-
 theorem dead_judgment_can_burn (s : State) (c : CageId) (r : Request)
-    (oracle : Signer) (verdict : Bool) :
-    judgmentName c r oracle verdict ∈ s.judgments →
+    (oracle : Signer) (verdict : Bool) (conditions : List Condition) :
+    judgmentName c r oracle verdict conditions ∈ s.judgments →
     (∀ o ∈ s.live, o.request ≠ r) →
-    Step s (.burn (judgmentName c r oracle verdict)) (afterBurn s (judgmentName c r oracle verdict)) ∧
-      (afterBurn s (judgmentName c r oracle verdict)).live = s.live ∧
-      (afterBurn s (judgmentName c r oracle verdict)).cage = s.cage := by
-
+    Step s (.burn (judgmentName c r oracle verdict conditions)) (afterBurn s (judgmentName c r oracle verdict conditions)) ∧
+      (afterBurn s (judgmentName c r oracle verdict conditions)).live = s.live ∧
+      (afterBurn s (judgmentName c r oracle verdict conditions)).cage = s.cage := by
   intro hm _
   exact ⟨Step.burn s _ hm, rfl, rfl⟩
-
 
 theorem judgments_do_not_consume (s : State) (tx : JudgmentTx) :
     (afterJudgment s tx).live = s.live ∧ (afterJudgment s tx).cage = s.cage := by
@@ -459,59 +450,62 @@ theorem used_seeds_monotone {s s' : State} {action : Action} (h : Step s action 
   | priceMint => exact hm
   | priceUpdate => exact hm
 
-
-
 theorem reachable_requests_have_spent_seeds (s : State) :
-    Reachable s → ∀ o ∈ s.live, o.request.seed ∈ s.usedSeeds := by
-
+    Reachable s → s.cage.oracles ≠ [] → ∀ o ∈ s.live, o.request.seed ∈ s.usedSeeds := by
   intro hr
   induction hr with
-  | registry => intro o ho; cases ho
+  | registry => intro _ o ho; cases ho
   | @next s s' action hr hs ih =>
-    intro o ho
+    intro hnon o ho
+    have hnon' : s.cage.oracles ≠ [] := by simpa only [(step_preserves_registry hs).2.1] using hnon
     cases hs with
-    | create tx created hc hcreate hfresh =>
-      change o ∈ created :: _ at ho
+    | create tx created hc hcreate hfresh hout =>
       rcases List.mem_cons.mp ho with he | hm
       · subst o
-        exact List.mem_append_left _ hcreate.1
-      · exact List.mem_append_right _ (ih o hm)
-    | judge => exact ih o ho
-    | burn => exact ih o ho
-    | fold =>
-      exact ih o (List.mem_filter.mp ho).1
-    | account =>
-      exact ih o (List.mem_filter.mp ho).1
-    | withdraw =>
-      exact ih o (List.mem_filter.mp ho).1
-    | priceMint => exact ih o ho
-    | priceUpdate => exact ih o ho
-
+        exact List.mem_append_left _ (hcreate.1 (by simpa only [hc] using hnon'))
+      · exact List.mem_append_right _ (ih hnon' o hm)
+    | judge => exact ih hnon' o ho
+    | burn => exact ih hnon' o ho
+    | fold => exact ih hnon' o (List.mem_filter.mp ho).1
+    | account => exact ih hnon' o (List.mem_filter.mp ho).1
+    | withdraw => exact ih hnon' o (List.mem_filter.mp ho).1
+    | priceMint => exact ih hnon' o ho
+    | priceUpdate => exact ih hnon' o ho
 
 
 theorem spent_seed_cannot_create_again (s : State) (tx : CreateTx) (o : RequestOutput) :
-    o.request.seed ∈ s.usedSeeds → createAllowed tx o →
+    o.request.seed ∈ s.usedSeeds → createAllowed tx o → tx.cageRef.oracles ≠ [] →
     ¬ (∀ seed ∈ tx.spent, seed ∉ s.usedSeeds) := by
-  intro hs hc hf
-  exact hf _ hc.1 hs
+  intro hs hc ho hf
+  exact hf _ (hc.1 ho) hs
+
 
 /-- A consumed live request is never live again along a subsequent history. -/
 theorem request_never_reappears (s s' : State) (o : RequestOutput) :
-    History s s' → o.request.seed ∈ s.usedSeeds → o ∉ s.live → o ∉ s'.live := by
+    History s s' → o.ref ∈ s.usedOutputs → o ∉ s.live → o ∉ s'.live := by
 
   intro hh
   induction hh with
   | refl => intro _ hn; exact hn
   | @next s t u action hs hh ih =>
     intro hseed hgone
-    apply ih (used_seeds_monotone hs _ hseed)
+    apply ih ((by
+      cases hs with
+      | create => exact List.mem_cons_of_mem _ hseed
+      | judge => exact hseed
+      | fold => exact hseed
+      | account => exact hseed
+      | withdraw => exact hseed
+      | burn => exact hseed
+      | priceMint => exact hseed
+      | priceUpdate => exact hseed))
     intro hm
     cases hs with
-    | create tx created hc hcreate hfresh =>
+    | create tx created hc hcreate hfresh hout =>
       change o ∈ created :: _ at hm
       rcases List.mem_cons.mp hm with he | hm
       · subst o
-        exact hfresh _ hcreate.1 hseed
+        exact hout hseed
       · exact hgone hm
     | judge => exact hgone hm
     | burn => exact hgone hm
@@ -521,10 +515,8 @@ theorem request_never_reappears (s s' : State) (o : RequestOutput) :
     | priceMint => exact hgone hm
     | priceUpdate => exact hgone hm
 
-
-
-theorem one_oracle_signature_suffices (c : CageState) (r : Request) (oracle : Signer) :
-    c.oracles = [oracle] → hasApproval c r [] [oracle] := by
+theorem one_oracle_signature_suffices (c : CageState) (r : Request) (oracle : Signer) (conditions : OracleConditions) :
+    c.oracles = [oracle] → hasApproval c r [] [oracle] conditions := by
   intro hc oracle' hm
   rw [hc] at hm
   exact Or.inr hm
@@ -569,8 +561,6 @@ theorem live_removal_is_legal_exit {s s' : State} {action : Action} (h : Step s 
   | priceMint => exact False.elim (hgone hm)
   | priceUpdate => exact False.elim (hgone hm)
 
-
-
 theorem new_judgment_is_authorized {s s' : State} {action : Action} (h : Step s action s') (name : TokenName) :
     name ∈ s'.issued → name ∉ s.issued →
     ∃ tx, judgmentAllowed tx ∧ tx.cageRef = s.cage ∧
@@ -589,7 +579,5 @@ theorem new_judgment_is_authorized {s s' : State} {action : Action} (h : Step s 
   | burn => exact False.elim (hn hm)
   | priceMint => exact False.elim (hn hm)
   | priceUpdate => exact False.elim (hn hm)
-
-
 
 end RequestApprovalFold

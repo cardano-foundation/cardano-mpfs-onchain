@@ -2,16 +2,16 @@ import MpfsCage.RequestApprovalFold.Statements
 
 namespace RequestApprovalFold.Witnesses
 
-macro "concrete" : tactic => `(tactic| ((try simp only [createAllowed, wellFormed, withdrawAllowed, Condition.holds, stepValid, hasApproval]) <;> decide))
+macro "concrete" : tactic => `(tactic| ((try simp only [createAllowed, wellFormed, withdrawAllowed, Condition.holds, stepValid, hasApproval, ruleAdmits, requestPolicy, noOracleConditions]) <;> (repeat' apply And.intro) <;> (first | exact True.intro | decide)))
 
 /-! Concrete two-oracle traces. Witness proofs use only production definitions,
     constructors and core lemmas, never the candidate theorem statements. -/
-def cage : CageState := ⟨⟨"policy", "registry"⟩, ["alice", "bob"], "protocol", emptyTrie⟩
+def cage : CageState := ⟨⟨"policy", "registry"⟩, ["alice", "bob"], "protocol", emptyTrie, none⟩
 def request : Request :=
   ⟨cage.id, "owner", "seed0", .set "x" "v", [.absent "x"], "evidence",
     [("alice", 2), ("bob", 3)], 10, 5⟩
-def output : RequestOutput := ⟨request, 10, cage.oracles.map tagName⟩
-def create : CreateTx := ⟨[request.seed], cage, cage.oracles.map tagName, [output]⟩
+def output : RequestOutput := ⟨request, 10, cage.oracles.map tagName, "output0", [requestName cage.id], .release⟩
+def create : CreateTx := ⟨[request.seed], cage, tokensOf output, [output], [], .release⟩
 def s0 := initial cage
 def s1 := afterCreate s0 create output
 
@@ -19,7 +19,7 @@ def approved (oracle : Signer) := judgmentName cage.id request oracle true
 def refused (oracle : Signer) := judgmentName cage.id request oracle false
 
 def judge (oracle : Signer) (verdict : Bool) : JudgmentTx :=
-  ⟨cage, output, oracle, verdict, 2, [oracle], [],
+  ⟨cage, output, oracle, verdict, [], 2, [oracle], [],
     [judgmentName cage.id request oracle verdict]⟩
 def s2 := afterJudgment s1 (judge "alice" true)
 def s3 := afterJudgment s2 (judge "bob" true)
@@ -27,7 +27,7 @@ def mixed := afterJudgment s2 (judge "bob" false)
 
 def fold : FoldTx :=
   ⟨cage, { cage with trie := request.write.apply cage.trie }, [output],
-    [approved "alice", approved "bob"], [], 3, "folder", "anybody",
+    [approved "alice", approved "bob"], [], 3, "folder", noOracleConditions, "anybody",
     tokensOf output, [allocation cage output "folder"]⟩
 def s4 := afterFold s3 fold
 
@@ -43,8 +43,7 @@ def create_ok : createAllowed create output := by
 
 def reachable0 : Reachable s0 := Reachable.registry cage [] registry_ok
 def step_create : Step s0 (.create create output) s1 := by
-  apply Step.create s0 create output rfl create_ok
-  simp [s0, initial]
+  apply Step.create s0 create output rfl create_ok <;> simp [s0, initial]
 def reachable1 : Reachable s1 := .next reachable0 step_create
 
 def judge_ok (oracle : Signer) (verdict : Bool) (h : oracle ∈ cage.oracles) :
@@ -61,8 +60,8 @@ def step_mixed : Step s2 (.judge (judge "bob" false)) mixed :=
   Step.judge s2 (judge "bob" false) rfl (by concrete) (judge_ok _ _ (by concrete))
 def reachableMixed : Reachable mixed := .next reachable2 step_mixed
 
-def valid_step : stepValid cage 3 fold.refs [] cage.trie output := by
-  refine ⟨by concrete, by concrete, ?_, ?_⟩
+def valid_step : stepValid cage 3 fold.refs [] noOracleConditions cage.trie output := by
+  refine ⟨by concrete, by concrete, ?_, ?_, ?_⟩
   · intro oracle h
     simp only [cage, List.mem_cons, List.not_mem_nil, or_false] at h
     rcases h with rfl | rfl <;> exact Or.inl (by concrete)
@@ -70,11 +69,12 @@ def valid_step : stepValid cage 3 fold.refs [] cage.trie output := by
     simp only [output, request, List.mem_singleton] at h
     subst condition
     rfl
+  · intro oracle _ condition hm; cases hm
 
-def run_ok : FoldRun cage 3 fold.refs [] cage.trie [output] fold.cageOut.trie :=
+def run_ok : FoldRun cage 3 fold.refs [] noOracleConditions cage.trie [output] fold.cageOut.trie :=
   .cons _ _ _ _ valid_step (.nil _)
 def fold_ok : foldAccepted fold :=
-  ⟨rfl, rfl, rfl, by concrete, rfl, rfl, run_ok⟩
+  ⟨rfl, rfl, rfl, rfl, by concrete, rfl, rfl, run_ok⟩
 def step_fold : Step s3 (.fold fold) s4 := by
   apply Step.fold s3 fold rfl (by concrete) (by concrete) fold_ok
 
@@ -87,8 +87,8 @@ def account_ok (verdict : Bool) : accountAllowed (account verdict) := by
   change oracle ∈ cage.oracles at h
   simp only [cage, List.mem_cons, List.not_mem_nil, or_false] at h
   rcases h with rfl | rfl
-  · exact ⟨true, by simp [account, approved, output]⟩
-  · exact ⟨verdict, by simp [account, output]⟩
+  · exact ⟨true, [], by simp [account, approved, output]⟩
+  · exact ⟨verdict, [], by simp [account, output]⟩
 def withdraw_ok : withdrawAllowed withdraw := by concrete
 
 def step_account : Step mixed (.account (account false)) (afterExit mixed output) :=
@@ -103,13 +103,13 @@ def history04 : History s0 s4 :=
 example : Reachable s0 ∧ request.write.apply emptyTrie "x" = some "v" :=
   ⟨reachable0, rfl⟩
 -- W02
-example : Reachable s3 ∧ FoldRun cage 3 fold.refs [] cage.trie [output] fold.cageOut.trie :=
+example : Reachable s3 ∧ FoldRun cage 3 fold.refs [] noOracleConditions cage.trie [output] fold.cageOut.trie :=
   ⟨reachable3, run_ok⟩
 -- W03
-example : Reachable s3 ∧ FoldRun cage 3 fold.refs [] cage.trie [output] fold.cageOut.trie :=
+example : Reachable s3 ∧ FoldRun cage 3 fold.refs [] noOracleConditions cage.trie [output] fold.cageOut.trie :=
   ⟨reachable3, run_ok⟩
 -- W04: the absent condition is present in the input, not a vacuous empty list.
-example : Reachable s3 ∧ FoldRun cage 3 fold.refs [] cage.trie [output] fold.cageOut.trie ∧
+example : Reachable s3 ∧ FoldRun cage 3 fold.refs [] noOracleConditions cage.trie [output] fold.cageOut.trie ∧
     output.request.conditions = [.absent "x"] := ⟨reachable3, run_ok, rfl⟩
 -- W05
 example : Reachable s4 ∧ (s4.cage.trie "x").isSome ∧
@@ -121,10 +121,10 @@ example : registryCreated cage [] ∧ Reachable s0 := ⟨registry_ok, reachable0
 example : Reachable s0 ∧ createAllowed create output := ⟨reachable0, create_ok⟩
 
 -- A second distinct seed is live alongside the first.
-def output1 : RequestOutput := { output with request := { request with seed := "seed1" } }
-def create1 : CreateTx := ⟨["seed1"], cage, cage.oracles.map tagName, [output1]⟩
+def output1 : RequestOutput := { output with request := { request with seed := "seed1" }, ref := "output1" }
+def create1 : CreateTx := ⟨["seed1"], cage, tokensOf output1, [output1], [], .release⟩
 def step_create1 : Step s1 (.create create1 output1) (afterCreate s1 create1 output1) :=
-  Step.create s1 create1 output1 rfl (by concrete) (by concrete)
+  Step.create s1 create1 output1 rfl (by concrete) (by concrete) (by concrete)
 def spent_once : SpentOnce [create, create1] := by
   intro a b seed ha hb hsa hsb
   simp only [List.mem_cons, List.not_mem_nil, or_false] at ha hb
@@ -186,14 +186,14 @@ example : Reachable s1 ∧ wellFormed cage output ∧ (allocation cage output "f
   ⟨reachable1, by concrete, rfl⟩
 
 -- Blind writes are separately created, not post-creation datum alterations.
-def blind : RequestOutput := { output with request := { request with conditions := [] } }
+def blind : RequestOutput := { output with request := { request with conditions := [] }, ref := "unset-output" }
 def createBlind : CreateTx := { create with outputs := [blind] }
 def blindState := afterCreate s0 createBlind blind
 def reachableBlind : Reachable blindState :=
-  .next reachable0 (Step.create s0 createBlind blind rfl (by concrete) (by concrete))
+  .next reachable0 (Step.create s0 createBlind blind rfl (by concrete) (by concrete) (by concrete))
 -- W22
 example : Reachable blindState ∧ wellFormed cage blind ∧ 3 < blind.request.deadline ∧
-    hasApproval cage blind.request [] ["alice", "bob"] ∧ blind.request.conditions = [] := by
+    hasApproval cage blind.request [] ["alice", "bob"] noOracleConditions ∧ blind.request.conditions = [] := by
   refine ⟨reachableBlind, by concrete, by concrete, ?_, rfl⟩
   intro oracle h
   exact Or.inr h
@@ -269,7 +269,7 @@ example : Reachable s4 ∧ request.seed ∈ s4.usedSeeds ∧ createAllowed creat
 -- W42: burning dead evidence is a nontrivial post-exit history.
 def deadBurn : Step s4 (.burn (approved "alice")) (afterBurn s4 (approved "alice")) := Step.burn s4 _ (by concrete)
 example : Reachable s4 ∧ History s4 (afterBurn s4 (approved "alice")) ∧
-    request.seed ∈ s4.usedSeeds ∧ output ∉ s4.live :=
+    output.ref ∈ s4.usedOutputs ∧ output ∉ s4.live :=
   ⟨reachable4, .next deadBurn (.refl _), by concrete, by concrete⟩
 -- W43
 example : Reachable (initial { cage with oracles := ["alice"] }) ∧
@@ -294,36 +294,36 @@ example : Reachable s1 ∧ Step s1 (.judge (judge "alice" true)) s2 ∧ approved
 -- W24b: all antecedents of the exclusivity theorem hold on this reachable
 -- batch, including the intervening unset that its conclusion requires.
 def unsetOutput : RequestOutput :=
-  { output with request := { request with seed := "unset-seed", write := .unset "x", conditions := [] } }
+  { output with request := { request with seed := "unset-seed", write := .unset "x", conditions := [] }, ref := "unset-output" }
 def againOutput : RequestOutput :=
-  { output with request := { request with seed := "again-seed" } }
-def createUnset : CreateTx := ⟨["unset-seed"], cage, cage.oracles.map tagName, [unsetOutput]⟩
-def createAgain : CreateTx := ⟨["again-seed"], cage, cage.oracles.map tagName, [againOutput]⟩
+  { output with request := { request with seed := "again-seed" }, ref := "again-output" }
+def createUnset : CreateTx := ⟨["unset-seed"], cage, tokensOf unsetOutput, [unsetOutput], [], .release⟩
+def createAgain : CreateTx := ⟨["again-seed"], cage, tokensOf againOutput, [againOutput], [], .release⟩
 def withUnset := afterCreate s1 createUnset unsetOutput
 def withAgain := afterCreate withUnset createAgain againOutput
 
 def reachableBatch : Reachable withAgain := by
   apply Reachable.next (Reachable.next reachable1 (Step.create s1 createUnset unsetOutput rfl
-    (by concrete) (by concrete)))
-  exact Step.create withUnset createAgain againOutput rfl (by concrete) (by concrete)
+    (by concrete) (by concrete) (by concrete)))
+  exact Step.create withUnset createAgain againOutput rfl (by concrete) (by concrete) (by concrete)
 
-def tripleRun : FoldRun cage 3 [] ["alice", "bob"] emptyTrie
+def tripleRun : FoldRun cage 3 [] ["alice", "bob"] noOracleConditions emptyTrie
     [output, unsetOutput, againOutput]
     (againOutput.request.write.apply
       (unsetOutput.request.write.apply (output.request.write.apply emptyTrie))) := by
   apply FoldRun.cons
   · simp [stepValid, wellFormed, hasApproval, cage, output, request,
-      totalFees, Request.fee, Condition.holds, emptyTrie]
+      totalFees, Request.fee, Condition.holds, requestPolicy, noOracleConditions, emptyTrie]
   apply FoldRun.cons
   · simp [stepValid, wellFormed, hasApproval, cage, output, request, unsetOutput,
-      totalFees, Request.fee, Condition.holds, emptyTrie, Write.apply]
+      totalFees, Request.fee, Condition.holds, requestPolicy, noOracleConditions, emptyTrie, Write.apply]
   apply FoldRun.cons
   · simp [stepValid, wellFormed, hasApproval, cage, output, request, unsetOutput,
-      againOutput, totalFees, Request.fee, Condition.holds, emptyTrie, Write.apply]
+      againOutput, totalFees, Request.fee, Condition.holds, requestPolicy, noOracleConditions, emptyTrie, Write.apply]
   exact FoldRun.nil _
 
 example : Reachable withAgain ∧
-    FoldRun cage 3 [] ["alice", "bob"] emptyTrie
+    FoldRun cage 3 [] ["alice", "bob"] noOracleConditions emptyTrie
       (output :: ([unsetOutput] ++ againOutput :: []))
       (againOutput.request.write.apply
         (unsetOutput.request.write.apply (output.request.write.apply emptyTrie))) ∧

@@ -17,7 +17,7 @@ is a separate milestone ticket
 ```mermaid
 flowchart LR
   decisions["Decision record<br/>specs/request-approval-fold"] -- "encoded as" --> model["Lean model<br/>states, transactions, Step"]
-  model -- "stated as" --> theorems["78 theorems"]
+  model -- "stated as" --> theorems["113 theorems"]
   theorems -- "proved, standard axioms only" --> proofs["Proofs"]
   theorems -- "reachable examples" --> witnesses["Witnesses"]
   audit1["Statement and proof audit"] -. "reads types against decisions" .-> theorems
@@ -29,35 +29,32 @@ flowchart LR
 
 | Part | What it captures |
 |---|---|
-| Trie, writes, conditions | The tree as a map from keys to values; `set` and `unset`; `absent` and `equals`; ordered application within a fold |
-| Cage state | Registry identity, oracle set, protocol hash and tree |
-| Request output | Registry, owner, seed, one write, conditions, a fee per oracle, deadline, window, evidence, escrow and one tag per oracle |
+| Trie, writes, conditions | The tree as a map from keys to values; `set` and `unset`; `absent`, `present` and `equals`; ordered application within a fold |
+| Cage state | Registry identity, oracle set, protocol hash, optional rule and tree |
+| Request output | Registry, owner, seed, a fresh output reference, one write, conditions, a fee per oracle, deadline, window, evidence, escrow, its request token and one tag per oracle |
+| Judgment | Registry, request, oracle, verdict and, for an approval, the oracle's own conditions, all bound in its name |
 | Price notice | An oracle's price token and its current fee, optionally per protocol |
 | Transactions | Creation, judgment, fold, complete account, owner withdrawal, judgment burn, and price notice minting and update, each with its guard |
 | Step | The authoritative transition relation over a global state, labelled by the exact transaction performed |
 
 Modelling choices the decisions left open, ruled before the model was
-written: the oracle set is non-empty and has no repeated oracle; each oracle
+written: a registry has at least one oracle or a rule, and no repeated oracle;
+the rule is an abstract predicate over one request and the creating
+transaction's signatures; each oracle
 has its own non-negative fee; creation requires escrow covering the sum of the
 fees; time is a single observed value whose soundness against transaction
 validity intervals is assumed; names are collision-free structured values,
 standing for the hashes the implementation will use.
 
-!!! note "Decisions not yet in the model"
-    Registry rules, request tokens, the `present` condition and oracle-added
-    conditions were decided after this model was audited. The model still
-    requires at least one oracle per registry, has no rules or request tokens,
-    and its approvals carry no conditions.
-
 ## What is proved
 
-All 78 theorems are proved; `#print axioms` lists only `propext`,
+All 113 theorems are proved; `#print axioms` lists only `propext`,
 `Classical.choice` and `Quot.sound` for each.
 
 | Guarantee | Proved by |
 |---|---|
 | A registry's oracles and protocol never change, and only a fold changes its tree | `registry_creation`, `fold_preserves_registry`, `step_preserves_registry`, `history_preserves_registry`, `only_fold_changes_tree` |
-| A request is created only with its seed spent, for a registry present in the state, with one tag and enough escrow; no request ever recurs | `create_tags_existing_cage`, `creation_references_source`, `creation_funds_declared_fees`, `requests_unique_in_history`, `used_seeds_monotone`, `reachable_requests_have_spent_seeds`, `spent_seed_cannot_create_again`, `request_never_reappears` |
+| A request is created only for a registry present in the state, with its seed spent, one tag per oracle and enough escrow; no request ever recurs | `create_tags_existing_cage`, `creation_references_source`, `creation_funds_declared_fees`, `requests_unique_in_history`, `used_seeds_monotone`, `reachable_requests_have_spent_seeds`, `spent_seed_cannot_create_again`, `request_never_reappears` |
 | Only an oracle of the registry can judge, before the deadline, and a judgment binds registry, request, oracle and verdict and cannot be replayed | `judgment_authorized_and_bound`, `judgment_not_replayable`, `token_roles_separated`, `new_judgment_is_authorized`, `judgments_do_not_consume` |
 | A fold applies only fully approved requests, before the deadline, each at most once, with its conditions true against the tree at its turn, and the new root is exactly the writes applied in order | `fold_only_approved_before_deadline`, `fold_references_authentic`, `fold_requests_unique`, `fold_conditions_hold_when_applied`, `fold_root_is_folded_writes`, `foldRun_step_valid`, `foldRun_result`, `foldRun_conditions`, `applyAll_append`, `applyAll_keeps_present`, `absent_inserts_exclusive`, `blind_write_folds_on_any_tree` |
 | Anyone may fold, and one oracle signature on the fold stands for that oracle's approval | `fold_permissionless`, `one_oracle_signature_suffices` |
@@ -70,7 +67,14 @@ All 78 theorems are proved; `#print axioms` lists only `propext`,
 | The shipped `Insert`, `Delete` and `Update` are writes with a condition on their own key, with the same effect on the tree | `old_operations_correspond` |
 | An oracle's tag is in a live request exactly when that oracle judges the request's registry, across all registries; each live request holds one tag per oracle, none repeated, and every removal burns them | `discovery_iff`, `discovery_across_registries`, `reachable_live_tags`, `reachable_tags_unique`, `reachable_registry_valid`, `live_removal_burns_oracle_tags` |
 | Only an oracle can mint or update its price notice; notices change no registry, request, judgment or payment, and bind nothing | `price_mint_inversion`, `price_update_inversion`, `price_mint_available`, `price_update_available`, `reachable_notice_names`, `notice_change_authorized`, `price_notice_noninterference`, `notices_do_not_bind_protocol` |
-| Every hashed name is led by its role; names are injective and names of different roles never coincide | `tag_name_injective`, `price_name_injective`, `different_roles_never_coincide`, `names_have_leading_roles` |
+| Every hashed name is led by its role; names are injective and names of different roles never coincide | `tag_name_injective`, `price_name_injective`, `different_roles_never_coincide`, `names_have_leading_roles`, `request_name_injective` |
+| A registry's rule is fixed at creation and judges exactly the request created and the creating transaction's signatures; it is never consulted again, so every exit and every judgment burn works whatever the rule says | `creation_rule_and_token`, `creation_rule_input_binding`, `step_rule_immutable`, `history_rule_immutable`, `reachable_rule_admitted`, `fold_rule_predicate_independent`, `every_rule_allows_burn` |
+| Each live request holds its registry's request token, minted by the rule's policy when the registry has a rule and by the release policy otherwise; the fold needs it and every exit burns it | `creation_request_policy`, `reachable_request_tokens`, `fold_requires_request_token`, `every_exit_burns_request_token`, `live_removal_burns_request_token` |
+| The request token of a registry is held exactly by its live requests, across all registries; output references are fresh and never repeat | `request_token_discovery`, `request_token_discovery_across_registries`, `output_refs_monotone`, `reachable_output_refs`, `reachable_output_refs_unique` |
+| A registry needs at least one oracle or a rule; with no oracles it needs no seed, no approvals to fold and no verdicts to settle | `unguarded_registry_impossible`, `zero_oracle_needs_rule`, `zero_oracle_evidence_empty`, `zero_oracle_creation_without_seed`, `zero_oracle_fold_without_approvals`, `zero_oracle_account_without_verdicts` |
+| A fold applies a request only if its own conditions and every approving oracle's conditions hold on the tree at its turn; an approval cannot be shown with other conditions, and one whose conditions no longer hold cannot be used | `present_condition_semantics`, `foldRun_oracle_conditions`, `fold_all_conditions_hold`, `approval_conditions_cannot_change`, `stale_approval_unusable`, `fold_evidence_binds_conditions` |
+| A folder that lists a registry's live requests and the authentic judgment outputs finds exactly the foldable requests | `expected_approval_lookup`, `folder_discovery_exact`, `folder_discovery_executable` |
+| An empty fold is allowed and earns nothing | `empty_fold_allowed`, `empty_fold_earns_nothing` |
 
 ## How it was checked
 
@@ -100,6 +104,30 @@ flowchart LR
 
 The extension for tags per oracle, price notices and role-led names was audited the same way: the statement and proof audit passed every row except the uncommissioned blind reading, and the mutation audit ran 100 single-edit mutants, none of which passes the full build; 75 of 78 theorems are each killed by a relevant mutant.
 
+```mermaid
+flowchart LR
+  y["Extension: rules, request tokens,<br/>oracle conditions<br/>111 theorems"] --> a4["Statement audit:<br/>two theorems too weak"]
+  y --> m4["Mutation audit:<br/>rule input and policy unprotected"]
+  a4 --> z["Repair:<br/>113 theorems"]
+  m4 --> z
+  z --> a5["Statement audit: passed"]
+  z --> m5["Mutation audit:<br/>no surviving mutant"]
+```
+
+The extension for registry rules, request tokens, registries without oracles,
+the `present` condition and oracle conditions needed one repair. The statement
+audit found the dead-judgment burn theorem limited to approvals without
+conditions, and the rule-burn theorem true by definition. The mutation audit
+found that a rule fed a different request or different signatures, or a
+request token minted by the release policy despite a rule, broke no theorem.
+The repair restated the first two theorems over the actual transitions and
+added theorems binding the rule to the created request and the creating
+signatures, and the request token to the rule's policy. On the repair, the
+statement and proof audit passed every row except the uncommissioned blind
+reading, and the mutation audit ran 145 single-edit mutants, none of which
+passes the full build; 105 of 113 theorems are each killed by a relevant
+mutant.
+
 What the mutation audit could not count as killed, none of it a defect:
 
 - the theorem that the windows cover all time is arithmetic over time alone,
@@ -111,14 +139,20 @@ What the mutation audit could not count as killed, none of it a defect:
 - the theorems that tags are unique per request and that discovery works
   across registries are each guarded by an earlier theorem that the
   relevant mutant breaks first (registry validity, and discovery itself), so
-  the fault is caught but not credited to them.
+  the fault is caught but not credited to them;
+- in the same way, discovery of requests across registries, the burn of the
+  request token on every removal, the need for a rule in a registry without
+  oracles, and the uselessness of a stale approval are each guarded by an
+  earlier theorem (request-token discovery, the burn of tags on every exit,
+  the impossibility of a registry with neither oracles nor rule, and the fold
+  proving every condition) that the relevant mutant breaks first.
 
 ## What is not covered
 
 | Not covered | Where it is tracked |
 |---|---|
 | One request script per release, serving every registry in both roles: the model has no notion of a script or a release | Recorded as a model omission; implemented by [#110](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/110) |
-| Folders finding approved requests: the model proves oracle discovery through tags, but has no query for approvals | Recorded as a model omission; implemented by [#113](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/113) |
+| The ledger queries folders run: the model proves that a folder finds exactly the foldable requests from a registry's live requests and the authentic judgment outputs, but the queries that produce them are outside it | Implemented by [#113](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/113) |
 | An executable model, codecs and a replay corpus for conformance testing | [#109](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/109) |
 | Conformance of the Aiken validators with the model | [#114](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/114) |
 | Concrete encodings and hashes of names and datums | [#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116) |

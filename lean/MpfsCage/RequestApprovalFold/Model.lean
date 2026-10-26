@@ -3,58 +3,78 @@ import MpfsCage.Lib
 /-!
 # Permissionless registries: candidate semantic model
 
-Authority: specs/request-approval-fold/decisions.md, with the parent's
-A-001-model-boundaries ruling and A-002 time ruling of 25 October 2026. A registry has a fresh state
-identity, a nonempty duplicate-free oracle list (representing a finite set),
-and an immutable protocol hash. Distinct identities may share that metadata.
-Time is a scalar: judgments/folds are strictly before the deadline and owner
-withdrawals strictly after deadline + window. Complete accounts require
-deadline ≤ now ≤ deadline + window. Equivocation is permitted. Fees are independent natural
-amounts, fully escrowed at creation; allocations are per request and per role,
-so coincident addresses do not reuse one payment for two obligations.
+Authority: decisions.md at 097c17a; A-001-model-boundaries items 3/4;
+A-002 time windows; lean-author-4 A-001 discovery/output-identity ruling.
+Registry creation requires at least one oracle or a rule and duplicate-free
+oracles. State-token identity, protocol, oracle list and optional rule are
+immutable. A rule packages its opaque compiled-policy hash with an abstract
+predicate on the one request and creating signatures. The predicate sees no
+trie; it runs only in createAllowed. Predicates and hashes are assumed to name
+the same policy consistently, rather than proving code/hash correspondence.
 
-Creation places one oracle-named tag for every registry oracle into the
-request output; every exit burns all these tags. Discovery is modeled as
-filtering live request outputs by the queried tag, including across registries.
-Arbitrary folder ordering has no auction or fairness guarantee. Protocol hashes
-and evidence are opaque strings; no wire format or migration model. Names are
-structured values with a leading role and the bound fields: this is a collision-free canonical-encoding abstraction,
-not a cryptographic injectivity proof. Trie contents abstract sound forestry
-proofs. Signatures, references, token ownership, fresh registry state tokens,
-and scalar-time/validity-interval agreement are ledger boundary assumptions.
-`spent` denotes protocol inputs; funding inputs and chain transaction fees
-are outside the value account. In particular judgment minting spends no
-request or cage input, not literally no fee-paying ledger input.
+A request output has a fresh ledger output reference, retained in usedOutputs,
+separate from its datum seed. Only nonempty oracle lists require a spent seed
+when tags are minted. Seedless requests may have identical datums: distinct
+output references preserve UTxO uniqueness and no resurrection. Judgment-bound
+datum uniqueness uses spent seeds for oracle-bearing registries, with ledger-wide
+SpentOnce for cross-registry uniqueness. The opaque seed field remains present
+but need not be spent by a zero-oracle request.
 
-`Step` is the authoritative per-registry transition relation. Its state holds
-live outputs, used seeds, and authentic minted judgments. `Reachable` starts
-at registry creation; only `Step.fold` can change the cage. Cross-registry
-seed uniqueness additionally uses the ledger-wide `SpentOnce` premise.
-Structured name equality includes the complete request, hence its seed,
-write, conditions, evidence, fees, deadline, window and owner.
+Creation has one request output, exactly one registry-named request token and
+one tag per oracle. Its policy is the rule hash when present, otherwise the
+shared release-policy role. All exits burn the request token and every tag.
+Token names are collision-free structured values with a leading role, not a
+cryptographic injectivity or canonical-encoding proof. RequestPolicy is an
+abstract policy-source distinction; real deployed mint/spend identities and
+cross-policy asset accounting remain ledger boundaries (D11).
 
-D11 (one shared request-policy identity per release in spend and mint roles)
-and D25 (enumerating approved work from the judgment record) remain explicit
-omissions. Oracle discovery through request tags is now modeled; deployment
-identity and folder discovery through judgment tokens remain outside the model.
-Judgment lists count token occurrences: one burn erases one occurrence; the
-permanent issued record retains every mint, including repeated verdicts.
+Judgment names bind registry, complete request, oracle, verdict and approval
+conditions. Refusals carry no conditions in their name. A structured name
+stands for an authenticated token whose carried datum has been decoded and
+checked against the recomputed name; no separate unchecked datum is admitted.
+FoldTx.conditions selects the condition list for each request/oracle. A token
+reference must bind that exact list; an oracle signature authenticates the
+whole fold body, including the selection. Both paths prove the conditions at
+the actual intermediate trie, together with the requester's conditions.
 
-Price notices are signed, nonbinding advertisements. A datum contains a
-nonnegative default fee and optional per-protocol entries; these are advertised
-values, never read by request, judgment or exit guards. Notice occurrences are
-held in a list: no unique mint per oracle, canonical fee schedule, or oracle
-liveness is asserted. Updates consume one held occurrence, preserve its oracle
-and token, and require that oracle's signature. Notices may be published by any
-oracle, independently of membership in the local registry. The per-registry
-machine carries a notice observation alongside its protocol state; no global
-UTxO model or cross-registry synchronization of price observations is claimed.
-Payments are transaction allocations, not accumulated account balances: price
-actions have no payment allocation and preserve all protocol state.
+Request-token queries enumerate all live requests of the named registry.
+Approval discovery is relative to the complete authentic judgment inventory,
+including carried condition lists, and explicit signatures; a request alone
+cannot predict arbitrary oracle-selected conditions. Operationally this is a
+release-policy token listing with each judgment datum. expectedApprovals
+recomputes names after selecting those conditions; folderFinds checks the
+actual tree/time/turn. This closes D25 at the inventory-relative model layer,
+not indexer completeness or an off-chain search/selection algorithm.
 
-The executable oracle driver, JSON codecs and replay corpus are explicitly
-outside this commission. This is a local model candidate, not implementation,
-ledger, independent audit or acceptance evidence.
+Step is the authoritative per-registry relation; Reachable starts at creation.
+Only folding changes the trie. Empty folds are allowed and earn nothing.
+Time is scalar: judgments/folds need now < deadline; account settlement needs
+deadline ≤ now ≤ deadline + window; owner withdrawal needs deadline + window
+< now. Scalar-time/validity-interval agreement is an external assumption.
+Equivocation is allowed. Judgment holdings count occurrences; one burn erases
+one, while issued retains every mint. Signatures, authenticated references,
+ownership, fresh UTxO/state-token identities, spent-once inputs and sound trie
+proofs are ledger boundary assumptions. Unconditional rule burns are independent
+of the admission predicate; no exit requests the creating signatures again.
+
+Fees are independent naturals, fully escrowed at creation. Allocations are per
+request and role: exact declared fees, then the entire remainder to the folder
+on fold or owner on settlement; withdrawal returns everything. Coincident
+addresses do not reuse payments. Funding inputs and chain fees are outside the
+protocol account. Registry protocol hashes and request evidence are opaque.
+
+Price notices are signed, nonbinding advertisements. Each has a natural default
+fee and optional per-protocol entries, never read by protocol guards. Updates
+consume one held occurrence, preserve its oracle/token, and need its signature.
+No unique mint, canonical schedule, liveness or global synchronized notice view
+is asserted. Any oracle can advertise. Payments are action allocations, not
+accumulated balances. Price actions preserve protocol state and pay nothing.
+
+Arbitrary folder order, hold-up and oracle silence are accepted; no fairness,
+response or progress guarantee. Concrete CDDL/CBOR/hash encoding, migration,
+real policy deployment, cost/devnet evidence, executable surface, JSON codecs,
+driver and replay corpus are outside this commission. This is an abstract local
+candidate, not implementation, ledger, hosted CI or independent acceptance.
 -/
 namespace RequestApprovalFold
 
@@ -73,11 +93,13 @@ structure CageId where
   deriving DecidableEq, Repr
 
 inductive Condition where
+  | present (key : Key)
   | absent (key : Key)
   | equals (key : Key) (value : Val)
   deriving DecidableEq, Repr
 
 def Condition.holds (t : Trie) : Condition → Prop
+  | .present k => ∃ v, t k = some v
   | .absent k => t k = none
   | .equals k v => t k = some v
 
@@ -94,17 +116,6 @@ def applyAll (t : Trie) : List Write → Trie
   | [] => t
   | w :: ws => applyAll (w.apply t) ws
 
-structure CageState where
-  id : CageId
-  oracles : List Signer
-  protocol : String
-  trie : Trie
-
-def RegistryValid (c : CageState) : Prop := c.oracles ≠ [] ∧ c.oracles.Nodup
-
-def registryCreated (c : CageState) (existing : List CageId) : Prop :=
-  c.id ∉ existing ∧ RegistryValid c ∧ c.trie = emptyTrie
-
 structure Request where
   cage : CageId
   owner : Signer
@@ -120,14 +131,47 @@ structure Request where
 def Request.fee (r : Request) (oracle : Signer) : Nat :=
   ((r.fees.find? (fun p => p.1 == oracle)).map Prod.snd).getD 0
 
+/-- Abstract compiled policy: its hash and meaning are fixed together. No tree argument. -/
+structure Rule where
+  hash : String
+  admits : Request → List Signer → Prop
+
+structure CageState where
+  id : CageId
+  oracles : List Signer
+  protocol : String
+  trie : Trie
+  rule : Option Rule := none
+
+def RegistryValid (c : CageState) : Prop := (c.oracles ≠ [] ∨ c.rule.isSome) ∧ c.oracles.Nodup
+
+def registryCreated (c : CageState) (existing : List CageId) : Prop :=
+  c.id ∉ existing ∧ RegistryValid c ∧ c.trie = emptyTrie
+
+inductive RequestPolicy where
+  | release
+  | rule (hash : String)
+  deriving DecidableEq, Repr
+
+def requestPolicy (c : CageState) : RequestPolicy :=
+  match c.rule with
+  | none => .release
+  | some rule => .rule rule.hash
+
+def ruleAdmits (c : CageState) (r : Request) (signers : List Signer) : Prop :=
+  match c.rule with
+  | none => True
+  | some rule => rule.admits r signers
+
 /-- The first field of a name is its domain-separating role. -/
 inductive TokenRole where
-  | tag | approval | refusal | price
+  | tag | approval | refusal | price | request
   deriving DecidableEq, Repr
 
 inductive NameBinding where
+  | registry (cage : CageId)
   | oracle (signer : Signer)
-  | judgment (cage : CageId) (request : Request) (oracle : Signer)
+  | judgment (cage : CageId) (request : Request) (oracle : Signer) (conditions : List Condition)
   deriving DecidableEq, Repr
 
 structure TokenName where
@@ -139,8 +183,11 @@ def tokenName (role : TokenRole) (binding : NameBinding) : TokenName := ⟨role,
 
 def tagName (oracle : Signer) : TokenName := tokenName .tag (.oracle oracle)
 
-def judgmentName (c : CageId) (r : Request) (o : Signer) (v : Bool) : TokenName :=
-  tokenName (if v then .approval else .refusal) (.judgment c r o)
+def requestName (c : CageId) : TokenName := tokenName .request (.registry c)
+
+def judgmentName (c : CageId) (r : Request) (o : Signer) (v : Bool)
+    (conditions : List Condition := []) : TokenName :=
+  tokenName (if v then .approval else .refusal) (.judgment c r o (if v then conditions else []))
 
 def priceName (oracle : Signer) : TokenName := tokenName .price (.oracle oracle)
 
@@ -148,26 +195,34 @@ structure RequestOutput where
   request : Request
   value : Nat
   tags : List TokenName
+  ref : OutputRef
+  requestTokens : List TokenName
+  policy : RequestPolicy
   deriving DecidableEq, Repr
 
-def tokensOf (o : RequestOutput) := o.tags
+def tokensOf (o : RequestOutput) := o.tags ++ o.requestTokens
 
 def totalFees (c : CageState) (r : Request) : Nat :=
   (c.oracles.map r.fee).sum
 
 def wellFormed (c : CageState) (o : RequestOutput) : Prop :=
   o.request.cage = c.id ∧ o.tags = c.oracles.map tagName ∧
-  totalFees c o.request ≤ o.value
+  totalFees c o.request ≤ o.value ∧
+  o.requestTokens = [requestName c.id] ∧ o.policy = requestPolicy c
 
 structure CreateTx where
   spent : List OutputRef
   cageRef : CageState
   minted : List TokenName
   outputs : List RequestOutput
+  signers : List Signer
+  policy : RequestPolicy
 
 def createAllowed (tx : CreateTx) (o : RequestOutput) : Prop :=
-  o.request.seed ∈ tx.spent ∧ tx.outputs = [o] ∧
-  tx.minted = tx.cageRef.oracles.map tagName ∧ wellFormed tx.cageRef o
+  (tx.cageRef.oracles ≠ [] → o.request.seed ∈ tx.spent) ∧ tx.outputs = [o] ∧
+  tx.minted = tx.cageRef.oracles.map tagName ++ [requestName tx.cageRef.id] ∧
+  wellFormed tx.cageRef o ∧ ruleAdmits tx.cageRef o.request tx.signers ∧
+  tx.policy = requestPolicy tx.cageRef
 
 def SpentOnce (history : List CreateTx) : Prop :=
   ∀ a b seed, a ∈ history → b ∈ history →
@@ -178,6 +233,7 @@ structure JudgmentTx where
   requestRef : RequestOutput
   oracle : Signer
   approve : Bool
+  conditions : List Condition
   now : Time
   signers : List Signer
   spent : List OutputRef
@@ -187,30 +243,37 @@ def judgmentAllowed (tx : JudgmentTx) : Prop :=
   tx.requestRef.request.cage = tx.cageRef.id ∧
   tx.oracle ∈ tx.cageRef.oracles ∧ tx.oracle ∈ tx.signers ∧
   tx.now < tx.requestRef.request.deadline ∧ tx.spent = [] ∧
-  tx.minted = [judgmentName tx.cageRef.id tx.requestRef.request tx.oracle tx.approve]
+  tx.minted = [judgmentName tx.cageRef.id tx.requestRef.request tx.oracle tx.approve tx.conditions]
+
+/-- Chosen conditions for each request/oracle, in the signed fold body.
+    References must bind exactly this selection; signers authenticate the whole body. -/
+abbrev OracleConditions := Request → Signer → List Condition
+
+def noOracleConditions : OracleConditions := fun _ _ => []
 
 def hasApproval (c : CageState) (r : Request) (refs : List TokenName)
-    (signers : List Signer) : Prop :=
+    (signers : List Signer) (conditions : OracleConditions) : Prop :=
   ∀ oracle ∈ c.oracles,
-    judgmentName c.id r oracle true ∈ refs ∨ oracle ∈ signers
+    judgmentName c.id r oracle true (conditions r oracle) ∈ refs ∨ oracle ∈ signers
 
 def hasAccount (c : CageState) (r : Request) (refs : List TokenName) : Prop :=
-  ∀ oracle ∈ c.oracles, ∃ verdict,
-    judgmentName c.id r oracle verdict ∈ refs
+  ∀ oracle ∈ c.oracles, ∃ verdict conditions,
+    judgmentName c.id r oracle verdict conditions ∈ refs
 
 def stepValid (c : CageState) (now : Time) (refs : List TokenName)
-    (signers : List Signer) (t : Trie) (o : RequestOutput) : Prop :=
+    (signers : List Signer) (conditions : OracleConditions) (t : Trie) (o : RequestOutput) : Prop :=
   wellFormed c o ∧ now < o.request.deadline ∧
-  hasApproval c o.request refs signers ∧
-  ∀ condition ∈ o.request.conditions, condition.holds t
+  hasApproval c o.request refs signers conditions ∧
+  (∀ condition ∈ o.request.conditions, condition.holds t) ∧
+  ∀ oracle ∈ c.oracles, ∀ condition ∈ conditions o.request oracle, condition.holds t
 
 inductive FoldRun (c : CageState) (now : Time) (refs : List TokenName)
-    (signers : List Signer) : Trie → List RequestOutput → Trie → Prop where
-  | nil (t : Trie) : FoldRun c now refs signers t [] t
+    (signers : List Signer) (conditions : OracleConditions) : Trie → List RequestOutput → Trie → Prop where
+  | nil (t : Trie) : FoldRun c now refs signers conditions t [] t
   | cons (t : Trie) (o : RequestOutput) (os : List RequestOutput) (t' : Trie) :
-      stepValid c now refs signers t o →
-      FoldRun c now refs signers (o.request.write.apply t) os t' →
-      FoldRun c now refs signers t (o :: os) t'
+      stepValid c now refs signers conditions t o →
+      FoldRun c now refs signers conditions (o.request.write.apply t) os t' →
+      FoldRun c now refs signers conditions t (o :: os) t'
 
 abbrev Payment := Signer × Nat
 
@@ -235,16 +298,17 @@ structure FoldTx where
   signers : List Signer
   now : Time
   folder : Signer
+  conditions : OracleConditions
   submitter : Signer
   burned : List TokenName
   allocations : List Allocation
 
 def foldAccepted (tx : FoldTx) : Prop :=
   tx.cageOut.id = tx.cageIn.id ∧ tx.cageOut.oracles = tx.cageIn.oracles ∧
-  tx.cageOut.protocol = tx.cageIn.protocol ∧ tx.requests.Nodup ∧
+  tx.cageOut.protocol = tx.cageIn.protocol ∧ tx.cageOut.rule = tx.cageIn.rule ∧ tx.requests.Nodup ∧
   tx.burned = tx.requests.flatMap tokensOf ∧
   tx.allocations = tx.requests.map (fun o => allocation tx.cageIn o tx.folder) ∧
-  FoldRun tx.cageIn tx.now tx.refs tx.signers tx.cageIn.trie tx.requests tx.cageOut.trie
+  FoldRun tx.cageIn tx.now tx.refs tx.signers tx.conditions tx.cageIn.trie tx.requests tx.cageOut.trie
 
 structure AccountTx where
   cageRef : CageState
@@ -312,8 +376,8 @@ def RequestSpend.cage : RequestSpend → Option CageState
 
 def RequestSpend.evidence (s : RequestSpend) (r : Request) (oracle : Signer) : Prop :=
   match s with
-  | .folded tx => judgmentName tx.cageIn.id r oracle true ∈ tx.refs ∨ oracle ∈ tx.signers
-  | .accounted tx => ∃ verdict, judgmentName tx.cageRef.id r oracle verdict ∈ tx.refs
+  | .folded tx => judgmentName tx.cageIn.id r oracle true (tx.conditions r oracle) ∈ tx.refs ∨ oracle ∈ tx.signers
+  | .accounted tx => ∃ verdict conditions, judgmentName tx.cageRef.id r oracle verdict conditions ∈ tx.refs
   | .withdrawn _ => False
 
 def NonEquivocating (names : List TokenName) : Prop :=
@@ -360,14 +424,18 @@ structure State where
   -- A permanent mint record: burning evidence does not erase equivocation.
   issued : List TokenName
   notices : List PriceNotice
+  usedOutputs : List OutputRef
 
-def initial (c : CageState) : State := ⟨c, [], [], [], [], []⟩
+def initial (c : CageState) : State := ⟨c, [], [], [], [], [], []⟩
 
 def removeRequests (live spent : List RequestOutput) :=
   live.filter (fun o => o ∉ spent)
 
 def afterCreate (s : State) (tx : CreateTx) (o : RequestOutput) : State :=
-  { s with usedSeeds := tx.spent ++ s.usedSeeds, live := o :: s.live }
+  { s with
+    usedSeeds := tx.spent ++ s.usedSeeds
+    live := o :: s.live
+    usedOutputs := o.ref :: s.usedOutputs }
 
 def afterJudgment (s : State) (tx : JudgmentTx) : State :=
   { s with judgments := tx.minted ++ s.judgments, issued := tx.minted ++ s.issued }
@@ -390,6 +458,26 @@ def afterPriceUpdate (s : State) (tx : PriceUpdateTx) : State :=
 /-- One asset query, independent of registry identity. -/
 def discover (oracle : Signer) (outputs : List RequestOutput) : List RequestOutput :=
   outputs.filter (fun o => tagName oracle ∈ o.tags)
+
+/-- Request-token query; the input list is the authenticated UTxO inventory. -/
+def discoverRequests (c : CageId) (outputs : List RequestOutput) : List RequestOutput :=
+  outputs.filter (fun o => requestName c ∈ o.requestTokens)
+
+/-- Full recomputed approval name for each chosen carried condition list. -/
+def expectedApprovals (c : CageState) (r : Request) (conditions : OracleConditions) : List TokenName :=
+  c.oracles.map (fun oracle => judgmentName c.id r oracle true (conditions r oracle))
+
+/-- Inventory-relative work at a particular turn, including signed redeemer evidence.
+    This relation does not promise a computable enumeration of arbitrary predicates/trees. -/
+def folderFinds (s : State) (now : Time) (signers : List Signer)
+    (conditions : OracleConditions) (t : Trie) (o : RequestOutput) : Prop :=
+  o ∈ discoverRequests s.cage.id s.live ∧
+  wellFormed s.cage o ∧ now < o.request.deadline ∧
+  (∀ oracle ∈ s.cage.oracles,
+    judgmentName s.cage.id o.request oracle true (conditions o.request oracle) ∈ s.judgments ∨
+    oracle ∈ signers) ∧
+  (∀ condition ∈ o.request.conditions, condition.holds t) ∧
+  ∀ oracle ∈ s.cage.oracles, ∀ condition ∈ conditions o.request oracle, condition.holds t
 
 inductive Action where
   | create (tx : CreateTx) (output : RequestOutput)
@@ -423,7 +511,8 @@ def Action.isPrice : Action → Bool
 inductive Step : State → Action → State → Prop where
   | create (s : State) (tx : CreateTx) (o : RequestOutput) :
       tx.cageRef = s.cage → createAllowed tx o →
-      (∀ seed ∈ tx.spent, seed ∉ s.usedSeeds) → Step s (.create tx o) (afterCreate s tx o)
+      (∀ seed ∈ tx.spent, seed ∉ s.usedSeeds) → o.ref ∉ s.usedOutputs →
+      Step s (.create tx o) (afterCreate s tx o)
   | judge (s : State) (tx : JudgmentTx) :
       tx.cageRef = s.cage → tx.requestRef ∈ s.live → judgmentAllowed tx →
       Step s (.judge tx) (afterJudgment s tx)

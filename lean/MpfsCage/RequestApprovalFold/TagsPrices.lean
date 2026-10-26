@@ -27,12 +27,22 @@ theorem names_have_leading_roles (c : CageId) (r : Request) (oracle : Signer) :
   exact ⟨rfl, rfl, rfl, rfl⟩
 
 theorem reachable_registry_valid (s : State) :
-    Reachable s → s.cage.oracles ≠ [] ∧ s.cage.oracles.Nodup := by
+    Reachable s → (s.cage.oracles ≠ [] ∨ s.cage.rule.isSome) ∧ s.cage.oracles.Nodup := by
   intro hr
   induction hr with
   | registry c existing hc => exact hc.2.1
   | next _ hs ih =>
-    simpa only [(step_preserves_registry hs).2.1] using ih
+    cases hs with
+    | fold tx hc hl hj hf =>
+      simpa only [afterFold, hf.2.1, hf.2.2.2.1, hc] using ih
+    | create => exact ih
+    | judge => exact ih
+    | account => exact ih
+    | withdraw => exact ih
+    | burn => exact ih
+    | priceMint => exact ih
+    | priceUpdate => exact ih
+
 
 /-- Exact holdings, not just one direction of discovery. -/
 theorem reachable_live_tags (s : State) :
@@ -49,10 +59,10 @@ theorem reachable_live_tags (s : State) :
       simpa only [hmeta.1, hmeta.2.1] using ih o ho
     intro o ho
     cases hs with
-    | create tx created hc ha _ =>
+    | create tx created hc ha _ _ =>
       rcases List.mem_cons.mp ho with rfl | hm
-      · exact ⟨ha.2.2.2.1.trans (congrArg CageState.id hc),
-          by simpa only [hc] using ha.2.2.2.2.1⟩
+      · exact ⟨ha.2.2.2.1.1.trans (congrArg CageState.id hc),
+          by simpa only [hc] using ha.2.2.2.1.2.1⟩
       · exact keep o hm
     | judge => exact keep o ho
     | burn => exact keep o ho
@@ -120,6 +130,7 @@ theorem live_removal_burns_oracle_tags {s s' : State} {action : Action}
   refine ⟨spend, he, ha, ?_⟩
   intro oracle hm
   apply every_exit_burns_tag o spend ha
+  apply List.mem_append_left
   change tagName oracle ∈ o.tags
   rw [(reachable_live_tags s hr o ho).2]
   exact List.mem_map.mpr ⟨oracle, hm, rfl⟩
@@ -201,7 +212,7 @@ theorem notices_do_not_bind_protocol {s s' : State} {action : Action}
     Step { s with notices := notices } action { s' with notices := notices } := by
   intro hs hp
   cases hs with
-  | create tx o hc ha hf => exact Step.create _ tx o hc ha hf
+  | create tx o hc ha hf hout => exact Step.create _ tx o hc ha hf hout
   | judge tx hc hl ha => exact Step.judge _ tx hc hl ha
   | fold tx hc hl hj ha => exact Step.fold _ tx hc hl hj ha
   | account tx hc hl hj ha => exact Step.account _ tx hc hl hj ha

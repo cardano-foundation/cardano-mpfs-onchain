@@ -16,7 +16,6 @@ theorem exit_time_window (o : RequestOutput) (spend : RequestSpend) :
   | accounted tx => simpa only [h.2] using h.1.2.2.2.2
   | withdrawn tx => simpa only [h.2] using h.1.1
 
-
 /-- This partitions time, not availability: missing evidence can still block an exit. -/
 theorem exit_windows_cover (r : Request) (now : Time) :
     now < r.deadline ∨
@@ -24,7 +23,6 @@ theorem exit_windows_cover (r : Request) (now : Time) :
     r.deadline + r.window < now := by
   simp only [Time] at *
   omega
-
 
 /-- Two allowed spends of the same output at the same time have the same exit kind. -/
 theorem exit_kind_unique (o : RequestOutput) (a b : RequestSpend) :
@@ -39,13 +37,11 @@ theorem exit_kind_unique (o : RequestOutput) (a b : RequestSpend) :
   have htb := exit_time_window o b hb
   cases a <;> cases b <;> simp only [RequestSpend.now, Time] at * <;> (first | trivial | omega)
 
-
 theorem fold_references_authentic {s s' : State} (tx : FoldTx) :
     Step s (.fold tx) s' → ∀ name ∈ tx.refs, name ∈ s.judgments := by
   intro h
   cases h with
   | fold _ _ _ href _ => exact href
-
 
 theorem account_references_authentic {s s' : State} (tx : AccountTx) :
     Step s (.account tx) s' → ∀ name ∈ tx.refs, name ∈ s.judgments := by
@@ -53,13 +49,11 @@ theorem account_references_authentic {s s' : State} (tx : AccountTx) :
   cases h with
   | account _ _ _ href _ => exact href
 
-
 theorem creation_references_source {s s' : State} (tx : CreateTx) (o : RequestOutput) :
     Step s (.create tx o) s' → tx.cageRef = s.cage ∧ o.request.cage = s.cage.id := by
   intro h
   cases h with
-  | create _ _ hc ha _ => exact ⟨hc, ha.2.2.2.1.trans (congrArg CageState.id hc)⟩
-
+  | create _ _ hc ha _ _ => exact ⟨hc, ha.2.2.2.1.1.trans (congrArg CageState.id hc)⟩
 
 /-- Expected fees are read directly from the declared fee entries, independently
     of Request.fee, totalFees, oraclePayments and allocation. The whole allocation
@@ -73,8 +67,7 @@ theorem fold_payments_concrete (tx : FoldTx) :
         remainder := o.value - (tx.cageIn.oracles.map (fun oracle =>
           ((o.request.fees.find? (fun p => p.1 == oracle)).map Prod.snd).getD 0)).sum }) := by
   intro h
-  simpa only [allocation, oraclePayments, totalFees, Request.fee] using h.2.2.2.2.2.1
-
+  simpa only [allocation, oraclePayments, totalFees, Request.fee] using h.2.2.2.2.2.2.1
 
 theorem account_payments_concrete (tx : AccountTx) :
     accountAllowed tx →
@@ -88,16 +81,14 @@ theorem account_payments_concrete (tx : AccountTx) :
   rw [h.2.2.2.1]
   exact ⟨rfl, rfl, rfl, rfl⟩
 
-
 theorem creation_funds_declared_fees {s s' : State} (tx : CreateTx) (o : RequestOutput) :
     Step s (.create tx o) s' →
     (s.cage.oracles.map (fun oracle =>
       ((o.request.fees.find? (fun p => p.1 == oracle)).map Prod.snd).getD 0)).sum ≤ o.value := by
   intro h
   cases h with
-  | create _ _ hc ha _ =>
-    simpa only [totalFees, Request.fee, hc] using ha.2.2.2.2.2
-
+  | create _ _ hc ha _ _ =>
+    simpa only [totalFees, Request.fee, hc] using ha.2.2.2.1.2.2.1
 
 /-- Minting can repeat a name. Burning one token decreases its multiplicity by
     exactly one; it does not erase another token with the same name. -/
@@ -111,30 +102,27 @@ theorem burn_removes_one {s s' : State} (name : TokenName) :
     rw [List.count_erase_self]
     omega
 
-
 theorem burn_keeps_history {s s' : State} (name : TokenName) :
     Step s (.burn name) s' → s'.issued = s.issued := by
   intro h
   cases h
   rfl
 
-
 theorem fold_requests_unique (tx : FoldTx) :
     foldAccepted tx → tx.requests.Nodup := by
   intro h
-  exact h.2.2.2.1
-
+  exact h.2.2.2.2.1
 
 /-- Every verdict assignment, including refusals, is usable in the account
     window when all of its genuinely minted judgments are supplied. -/
 theorem account_accepts_any_verdicts (s : State) (o : RequestOutput)
-    (verdict : Signer → Bool) (now : Time) (submitter : Signer) :
+    (verdict : Signer → Bool) (conditions : Signer → List Condition) (now : Time) (submitter : Signer) :
     o ∈ s.live → wellFormed s.cage o →
     (∀ oracle ∈ s.cage.oracles,
-      judgmentName s.cage.id o.request oracle (verdict oracle) ∈ s.judgments) →
+      judgmentName s.cage.id o.request oracle (verdict oracle) (conditions oracle) ∈ s.judgments) →
     o.request.deadline ≤ now → now ≤ o.request.deadline + o.request.window →
     Step s (.account ⟨s.cage, o,
-      s.cage.oracles.map (fun oracle => judgmentName s.cage.id o.request oracle (verdict oracle)),
+      s.cage.oracles.map (fun oracle => judgmentName s.cage.id o.request oracle (verdict oracle) (conditions oracle)),
       now, submitter, tokensOf o, allocation s.cage o o.request.owner⟩) (afterExit s o) := by
   intro hl hw hj hlo hhi
   apply Step.account s _ rfl hl
@@ -143,8 +131,7 @@ theorem account_accepts_any_verdicts (s : State) (o : RequestOutput)
     exact hj oracle ho
   · refine ⟨hw, ?_, rfl, rfl, hlo, hhi⟩
     intro oracle ho
-    exact ⟨verdict oracle, List.mem_map.mpr ⟨oracle, ho, rfl⟩⟩
-
+    exact ⟨verdict oracle, conditions oracle, List.mem_map.mpr ⟨oracle, ho, rfl⟩⟩
 
 /-- Both conflicting judgments coexist in a reachable state's holdings and
     permanent mint record; minting does not enforce non-equivocation. -/
@@ -157,6 +144,5 @@ theorem equivocation_reachable :
       judgmentName s.cage.id o.request oracle false ∈ s.issued := by
   refine ⟨Witnesses.equivocal, Witnesses.output, "bob", Witnesses.reachableEquivocal,
     ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> decide
-
 
 end RequestApprovalFold
