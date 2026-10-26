@@ -24,7 +24,7 @@ The people involved and what each one gets:
 
 | Who | Wants | Sees when it works | Sees when it is refused |
 |---|---|---|---|
-| Registry creator | A registry whose rules are fixed forever | A cage state with an empty tree, its oracles and its protocol | Creation fails if the oracle set is empty or repeats an oracle |
+| Registry creator | A registry whose rules are fixed forever | A cage state with an empty tree, its oracles, its protocol and optionally a rule | Creation fails if the registry has neither an oracle nor a rule, or repeats an oracle |
 | Requester | One write applied under conditions they choose | Their write folded into the tree, their fees paid to the oracles, the rest bid to the folder | A refusal, or a fold whose conditions do not hold; after the deadline they settle and recover the rest |
 | Oracle | To be paid for judging, whatever it decides | Its fee at the fold, or at the settlement after the deadline | Nothing to refuse: an oracle that does not serve a registry simply never answers |
 | Folder | To earn the remainder of requests it folds | Approved requests applied, the remainder of each request paid to it | A fold with a missing approval, a false condition or a late time is rejected |

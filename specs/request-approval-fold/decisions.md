@@ -27,6 +27,11 @@ against this record.
   who submits it. The folder chooses which approved requests to include and
   their order; it cannot apply an unapproved request, change a write, or
   consume a request without applying it.
+- **Empty folds are allowed.** A fold that applies no request earns nothing
+  and costs its submitter a transaction fee; folders are paid only by the
+  requests they apply, so they keep the registry moving. Forbidding empty folds
+  would only stop deliberate griefing, at the price of another check in every
+  fold.
 - **No externalized state.** Unlike Singular, the fold mints and burns no
   per-key token; everything stays in the tree. Generalizing to both designs is
   out of scope.
@@ -34,8 +39,13 @@ against this record.
 ## Registries
 
 - **Anyone can create a registry.** Creating one mints the cage state with an
-  empty root, the set of oracles and the protocol. No script is applied to a
-  registry.
+  empty root, the set of oracles, the protocol and optionally a rule. No script
+  is applied to a registry.
+- **A registry needs at least one oracle or a rule.** With oracles, writes are
+  gated by their judgment; with a rule, by the rule; with both, by both. A
+  registry with a rule and no oracles is gated by its rule alone: for example a
+  rule admitting only one owner's key gives a personal registry that anyone can
+  fold. A registry with neither would accept any write and is not allowed.
 - **Everything is declared at creation and never changes.** A permissionless
   registry cannot have changeable parts, because whoever may change them would
   hold power over everyone who trusted the contract.
@@ -70,9 +80,9 @@ against this record.
   the tree by replaying folds at no cost. A protocol may store a hash as the
   value, in which case serving the preimage is the key holder's
   responsibility.
-- **A request carries conditions**: `key absent` or `key equals value`, on any
-  key, checked at the fold against the tree reached when the request is
-  applied. Compare-and-swap is a write with a condition on its own key; a
+- **A request carries conditions**: `key absent`, `key present` or `key equals
+  value`, on any key, checked at the fold against the tree reached when the
+  request is applied. Compare-and-swap is a write with a condition on its own key; a
   blind write has no conditions. Fold-time conditions are required because a
   generic system cannot foresee every state-based consideration of its
   applications. The oracles check that the conditions suffice for their rules;
@@ -88,6 +98,54 @@ against this record.
   before the deadline. The owner cannot withdraw before the deadline plus the
   window, which protects oracles that have judged from losing their fee.
 
+## Rules
+
+- **A rule is a compiled minting policy**, named by its hash in the cage
+  state and fixed at creation. It is the minting policy of the registry's
+  request token, so it runs exactly when a request is created, on that one
+  request, and never at the fold. It validates the request datum (the write,
+  the conditions, the owner) and the signatures of the creating transaction,
+  and it allows every burn unconditionally so that exits never run it again.
+  One rule script serves every registry that names it: the request token's name
+  binds the registry, and the rule checks that the request datum names the
+  same registry.
+- **A rule reaches the tree only through conditions.** The tree is a root hash,
+  so no rule can read it. A rule that depends on the tree demands the matching
+  condition in the request (insert-only demands `key absent` on the written
+  key); the fold then proves that condition against the tree at the request's
+  turn. The rule validates the program; the fold executes it.
+- **The condition language is `absent`, `present` and `equals`.** Each
+  construct is a permanent cost in the fold, which is its interpreter, and each
+  costs one Merkle Patricia Forestry proof. Predicates on values (thresholds,
+  sets of statuses) were deferred until a registry needs them, because they add
+  decoding to the fold; facts about key prefixes were rejected because per-key
+  proofs cannot establish them.
+- **A rule as a check run by the fold** was rejected: it would run on every
+  fold and traverse the whole batch, while everything it can check is fixed in
+  the request at creation. **A zero withdrawal at creation** as the trigger was
+  rejected in favour of the minting policy: it needs a staking registration per
+  rule and adds nothing.
+
+## Request tokens
+
+- **Every request carries one request token**, named after its registry and
+  led by its role, minted at creation into the single request output at the
+  release request address whose datum names that registry. It is minted by the
+  registry's rule when the registry has one, otherwise by the release policy.
+  One request is created per creation transaction.
+- **The request token is what makes a request genuine.** It can only be minted
+  through the creation checks, so a forged output at the request address cannot
+  carry it, and the fold folds only request outputs carrying it. Tags no longer
+  carry this role, which matters for a registry with no oracles and hence no
+  tags. Every exit burns it.
+- **Folders find work through the request token.** One query by the request
+  token of a registry returns every live request of that registry; for each,
+  the folder computes the expected approval names, which are deterministic,
+  and looks them up by exact name. Nothing foldable is missed and nothing
+  unfoldable is included.
+- **The seed is checked when tags are minted.** It protects judgments from
+  replay, so a registry without oracles, which has no judgments, needs none.
+
 ## Judgments
 
 - **Every oracle of the registry must approve** a request before it can fold.
@@ -95,13 +153,27 @@ against this record.
   script's policy, with the request output as a reference input. The token can
   sit in any output, typically the oracle's own wallet. Nothing is spent, so
   oracles never contend for the request output.
+- **An approval may carry the oracle's own conditions**, in the same condition
+  language. An oracle judges off chain against the tree as it saw it; its
+  conditions state what it assumed ("approved, provided k is still pending"),
+  and the fold proves them at the request's turn. An approval is therefore only
+  usable while the oracle's assumptions still hold, which no expiry could
+  achieve. Without this, an oracle whose rules the request's own conditions did
+  not cover could only refuse.
 - **A judgment's name** hashes the registry, the request (including its seed),
-  the oracle and the verdict. Judgments do not expire: the request's deadline
+  the oracle, the verdict and, for an approval, the oracle's conditions, so
+  the conditions cannot be detached from the approval or replaced. Judgments do not expire: the request's deadline
   bounds them, and an oracle that finds a deadline too far for its judgment to
   stay valid does not answer.
 - **A fold signed by an oracle counts as that oracle's approval** of every
   request in it, so a single oracle that folds itself needs no separate
-  approval transaction.
+  approval transaction. Its conditions then travel in the fold's redeemer,
+  which its signature covers.
+- **The fold collects every condition of a request**: the requester's, from the
+  request datum, and each approving oracle's, from its approval output read by
+  reference and checked against the approval's name. It matches each condition
+  to a proof in the redeemer and validates it against the tree at the request's
+  turn, then applies the write. The folder pays for these proofs from the bid.
 - **Dead judgments are harmless.** Once the request is gone its seed can never
   recur; the holder burns the token whenever it likes.
 
@@ -117,7 +189,7 @@ against this record.
   find every registry naming it.
 - **Every path that consumes a request burns its tags**, so an asset query
   returns only live requests.
-- **Folders find work through approval tokens.**
+- **Folders find work through request tokens** (see "Request tokens").
 - The address staking-part alternative was declined.
 
 ## Prices, ordering and hold-up

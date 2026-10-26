@@ -43,6 +43,12 @@ fees; time is a single observed value whose soundness against transaction
 validity intervals is assumed; names are collision-free structured values,
 standing for the hashes the implementation will use.
 
+!!! note "Decisions not yet in the model"
+    Registry rules, request tokens, the `present` condition and oracle-added
+    conditions were decided after this model was audited. The model still
+    requires at least one oracle per registry, has no rules or request tokens,
+    and its approvals carry no conditions.
+
 ## What is proved
 
 All 78 theorems are proved; `#print axioms` lists only `propext`,

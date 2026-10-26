@@ -59,8 +59,10 @@ for its deadline, which its requester chose.
 ```mermaid
 sequenceDiagram
   participant R as Requester
+  participant G as Registry rule (if any)
   participant P as Request script (release-wide)
   participant C as Cage state
+  R->>G: mint the request token: the rule checks the write,<br/>conditions and owner of this one request
   R->>P: spend the seed output, mint one tag per oracle, each named after its oracle
   P->>C: read the cage state by reference (the registry exists)
   P-->>R: tags minted only if escrow covers the sum of the oracles' fees
@@ -98,8 +100,8 @@ sequenceDiagram
   participant Q as Request outputs
   participant J as Judgment tokens
   F->>Q: spend the chosen requests, in the chosen order
-  F->>J: read one approval per oracle per request (by reference)
-  F->>C: for each request: check its conditions against the current tree,<br/>apply its write with a Merkle Patricia Forestry proof
+  F->>J: read one approval per oracle per request (by reference),<br/>with each oracle's conditions
+  F->>C: for each request: prove the requester's and the oracles' conditions<br/>against the current tree, apply its write
   C-->>F: new root, with oracles and protocol unchanged
   F->>F: pay every oracle its fee, keep the remainders, burn the tags
 ```
