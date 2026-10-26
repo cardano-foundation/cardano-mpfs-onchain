@@ -1,25 +1,25 @@
 # Candidate theorem and semantic-atom ledgers
 
-Authority: decisions.md at ef6da42, sha256
-586bcfcd7ccc3e8e83b29aaccb0cad91d9dbe7a796f04fb080eef75568be4e8b,
+Authority: decisions.md at caaebc5, sha256
+35e07d9db8a05ccdf43cd037b5a6783fa849dd110c6d1e604cb24345fa28f79f,
 A-001-model-boundaries (time item superseded), and A-002 in lean-author-2/brief.md.
 
-This ledger is an author claim. Audit is deferred. Mutants below are proposed
-single edits of production definitions, expected to falsify the named row;
-The author ran 13 isolated exact-theorem control/mutation pairs against the
-previous findings: every control compiled and each mutant failed within its
-targeted theorem. These are local sensitivity receipts, not an independent
-mutation-adequacy verdict. Exact sources and logs are in lean-author-2/evidence/regressions.
-A further equivocation control passed; the enforced-non-equivocation mutant
-broke witness construction, and a separate model-only proof established the
-negation of T60 under that mutant (exit 0). Witness syntax failure alone is
-not credited as a semantic falsifier.
+This ledger is an author claim for the tags/prices candidate. Fresh independent
+statement and mutation audits are deferred. Every mutant below is a proposed
+single edit of a production definition, not a reported mutation kill. Historical
+lean-author-2 and mutation-audit-2 receipts concern their frozen predecessor;
+they do not establish mutation coverage of this candidate. In particular the
+prior mutation report retained M48, A13 and R-a13-mint-enforce as BLOCKED.
 W01–W46 label compiled examples in Witnesses.lean; W47–W60 are in
 RepairWitnesses.lean under lean/MpfsCage/RequestApprovalFold/. Concrete proof definitions
 establish registry creation, live request creation, two independent judgments,
 a fold, mixed approval/refusal settlement, owner withdrawal and dead-token burn
 using only model constructors and core lemmas. They do not use admitted
 candidate theorems. W24b supplies the full insert/unset/insert antecedent.
+W61–W78 label compiled examples in TagsPricesWitnesses.lean. They add signed
+notice mint/update traces alongside nonempty live requests and judgment holdings,
+a second registry sharing alice, both positive and negative discovery queries,
+and a successful fold whose declared fee is below the advertised price.
 
 The semantic law is the action-indexed Step in Model.lean, with FoldRun for ordered application.
 Public guard inversions are the creation, judgment, fold, account and withdrawal
@@ -31,14 +31,31 @@ uses the explicit ledger-wide SpentOnce premise, not a global chain simulator.
 
 ## Theorems
 
-All names are in RequestApprovalFold. The 60 statements comprise 46 retained or
-replaced rows and 14 additions. All 60 are now PROVED, with 0 REFUTED and 0 OPEN.
-Phase 1 committed admissions for new/changed proofs. Phase 2 preserved all 60
-frozen types and the model; a clean lake build and 118 axiom checks passed
-(60 theorem declarations and 58 witness definitions). PROVED denotes local kernel evidence,
-not independent acceptance. Statement hashes and build receipts are in the
-lean-author-2 runtime. T20/T25/T33 retain their canonical-allocation helper
-claims; T53/T54 state exact payments independently of those shared definitions.
+All names are in RequestApprovalFold. There are 78 theorem declarations: the
+60 existing rows and 18 additions. All 78 are PROVED; 0 REFUTED and 0 OPEN.
+Phase 1 admitted 28 changed/new proofs and retained 50 proof bodies. Phase 2
+preserved all 78 frozen theorem types and the model byte-for-byte. A build from
+a clean .lake passed (13 jobs); all 152 axiom queries passed (78 theorems and
+74 witness definitions), with only propext, Classical.choice and Quot.sound.
+The mandated .#aiken Nix shell supplies Lean 4.29.0; the unchanged
+lean/lean-toolchain file declares 4.16.0. Receipts report the actual compiler.
+Evidence and statement hashes are in the lean-author-3 runtime under evidence/.
+These are local kernel/build results; independent audit and acceptance follow.
+T20/T25/T33 retain their canonical-allocation helper claims; T53/T54 state exact
+payments independently of those shared definitions.
+
+Two existing statements are restated, without dropping a guarantee:
+
+| Row | Change | Reason |
+|---|---|---|
+| T07 | Minted and output tags equal the referenced registry's oracle list mapped to tagName | One tag per oracle supersedes one registry-named tag; singleton output, seed spending, registry binding and funding retained |
+| T11 | First argument is tagOracle : Signer instead of c : CageId | Tags bind oracle identity across registries; separation from every judgment is retained |
+
+T10's full registry/request/seed/oracle/verdict binding stays unchanged. T13,
+T15, T39, T40, T42, T45 and T46 require additional price-constructor proof cases;
+their statements are unchanged. Other retained statements remain unchanged,
+including all payment and time-window guarantees. T31's singular name is retained:
+its quantifier already covers every tag in the consumed output.
 
 | Row | Theorem | Decision / semantic obligation | Reachable antecedent | Single-edit production mutant (expected falsifier) | Outcome |
 |---|---|---|---|---|---|
@@ -104,6 +121,25 @@ claims; T53/T54 state exact payments independently of those shared definitions.
 | T59 | account_accepts_any_verdicts | Every judgment mix is usable in window | W59 | hasAccount: require verdict=true (a12-refusal-account) | PROVED |
 | T60 | equivocation_reachable | Both verdicts coexist in reachable holdings and record | W60 | Step.judge: require NonEquivocating issuance (a13-mint-enforce) | PROVED |
 
+| T61 | tag_name_injective | Oracle-bound discovery name | W61 | tagName: replace oracle by a constant | PROVED |
+| T62 | price_name_injective | Oracle-bound notice name | W62 | priceName: replace oracle by a constant | PROVED |
+| T63 | different_roles_never_coincide | All distinct leading roles are disjoint | W63 | tokenName: replace role by tag | PROVED |
+| T64 | names_have_leading_roles | Tag, approval, refusal and price encode their actual roles | W64 | judgmentName: encode both verdicts as approval | PROVED |
+| T65 | reachable_registry_valid | Reachable oracle sets remain nonempty and duplicate-free | W65 | registryCreated: remove RegistryValid guard | PROVED |
+| T66 | reachable_live_tags | Exact per-oracle holdings of every live request | W66 | wellFormed: allow tags=[] | PROVED |
+| T67 | reachable_tags_unique | Exactly one occurrence per oracle, no duplicate tags | W67 | registryCreated: allow duplicate oracle entries | PROVED |
+| T68 | discovery_iff | Live request tag query is sound and complete | W68 | discover: retain every output regardless of tag | PROVED |
+| T69 | discovery_across_registries | One query spans all reachable registries | W69 | discover: query only the first output | PROVED |
+| T70 | live_removal_burns_oracle_tags | The actual removing action burns every registry-oracle tag | W70 | withdrawAllowed: remove burned guard | PROVED |
+| T71 | price_mint_inversion | Signed mint, bound name, exact issuance and output effect | W71 | priceMintAllowed: remove signature guard | PROVED |
+| T72 | price_update_inversion | Held-input authentication, signature, token retention and exact update | W72 | priceUpdateAllowed: remove signature guard | PROVED |
+| T73 | reachable_notice_names | All held notices bind their oracle and price role | W73 | priceUpdateAllowed: allow changing output.oracle | PROVED |
+| T74 | price_mint_available | Any oracle can publish any advertised datum | W74 | priceMintAllowed: require output.datum.fee=0 | PROVED |
+| T75 | price_update_available | Oracle can change a held notice to any datum | W75 | priceUpdateAllowed: require unchanged datum | PROVED |
+| T76 | price_notice_noninterference | Price actions preserve registry, requests, judgments, seeds; no payments or exit | W76 | afterPriceMint: clear judgments | PROVED |
+| T77 | notices_do_not_bind_protocol | Same protocol action and payments with arbitrary notice observations | W77 | Step.fold: require notices=[] | PROVED |
+| T78 | notice_change_authorized | New notice values have a signed actual mint/update origin | W78 | afterJudgment: prepend a fresh price notice | PROVED |
+
 ## Semantic atoms
 
 | Atom | Class | Production decision/effect | Covered rows | Adversarial case / limit |
@@ -114,7 +150,7 @@ claims; T53/T54 state exact payments independently of those shared definitions.
 | A04 | Authorization | owner signature AND strict after-window time | T28–T29, T32–T33 | deadline+window equality rejects withdrawal |
 | A05 | Evidence binding | structured role, registry, full request/seed, oracle, verdict | T07–T11, T34, T46 | copied seed, changed write, other registry/oracle/verdict; concrete encoding excluded |
 | A06 | Evidence binding | Step.judge references live output and exact cage; Step.fold/account reference minted tokens | T36, T45–T46, T50–T51 | no mint from a consumed request; fake name is not authentic evidence |
-| A07 | Evidence binding | request creation references existing cage, spends fresh seed, singleton tag and singleton output | T07–T08, T39–T41, T52 | reused seed, extra mint, split tag outputs |
+| A07 | Evidence binding | request creation references existing cage, spends fresh seed, one tag per oracle and singleton output | T07–T08, T39–T41, T52 | reused seed, extra mint, split tag outputs |
 | A08 | Money | creation funds sum of distinct oracles' independent fees | T07, T21, T55 | underfunded escrow; duplicate oracle rejected at origin |
 | A09 | Money | fold allocates exact fees and entire remainder to folder | T20–T21, T33, T53 | omit oracle, underpay, double-count same-address allocations |
 | A10 | Money | complete account pays exact fees and owner remainder | T25, T27, T33, T54 | refusal changes payment; divert rest |
@@ -130,13 +166,41 @@ claims; T53/T54 state exact payments independently of those shared definitions.
 | A20 | Composition | old operation translation retains own-key precondition and tree effect | T44 | no claim that shipped validators implement this new lifecycle |
 | A21 | Time | fold before deadline; account in closed window; withdrawal strictly after | T26, T34, T47–T49 | account at deadline and deadline+window accepted; windows do not promise evidence availability |
 
+| A22 | Discovery | creation mints every oracle tag exactly once, all into the request output | T07, T61, T65–T69 | omit an oracle, add an outsider tag, duplicate a tag, split outputs; queried names do not bind registry identity |
+| A23 | Terminality | actual consuming action burns all oracle tags | T19, T28, T31, T66, T70 | burn only one oracle's tag or retain a consumed output in query results |
+| A24 | Authorization | price mint needs the named oracle's signature | T62, T71, T74, T78 | wrong signer, wrong name, extra mint, no output; oracle need not belong to current registry |
+| A25 | Authorization / effect | update consumes a held notice, requires its oracle signature, retains oracle/token, mints nothing | T72–T73, T75, T78 | forged input, unsigned update, transferred oracle, replaced token, remint; change datum freely |
+| A26 | Non-interference | price transitions affect only notices and have no protocol payments | T13–T15, T39–T40, T42, T45–T46, T76 | alter registry, live requests, judgment holdings/history or seeds; emit a payment |
+| A27 | Nonbinding | notice datum never constrains creation, judgment, fold, account, withdrawal or burn | T74–T77 | enforce advertised fee or require a notice; holding out and ordering are not prevented |
+| A28 | Evidence binding | all hashed names carry role first; names injectively bind their specified fields | T10–T11, T61–T64, T71–T73 | erase oracle, registry, request field, verdict or leading role; no cryptographic/serialization claim |
+
 ## Modelling choices and omissions
 
 A-001 authorizes nonempty duplicate-free oracle lists, independent nonnegative
 fees, full funding at creation, strict time boundaries, fresh state-token
-identity and explicit ledger abstractions. One registry-named tag and arbitrary
-folder order are the selected "Not decided" choices. Names are structured
-collision-free values. Protocol hashes/evidence are opaque and unexamined.
+identity and explicit ledger abstractions. The new Discovery decision replaces
+the former registry-named tag choice. T66–T70 close oracle discovery through
+live request tags in the abstract model, including a query across registries.
+They do not establish an indexer's completeness or concrete chain asset-query
+behavior. Names are collision-free structured values: role then binding fields.
+Protocol hashes/evidence remain opaque and unexamined.
+
+Folder ordering and complementary-oracle hold-up remain accepted. T01–T04,
+T17–T18 and T24 depend explicitly on the supplied ordered list and intermediate
+trees; none promises fairness, first-come-first-served order, a fee cap, oracle
+response or progress. T27/T53/T54 payments depend on declared fees, not order or
+notices. T77 transports the identical transaction, hence identical payments,
+when notices change.
+
+PriceDatum carries a default natural fee and an optional list of per-protocol
+entries. The model does not interpret that list or claim canonical ordering,
+unique entries or price selection; it is advertised data. Notices are a list of
+occurrences; updates erase one input occurrence and prepend one output. No
+one-mint-per-oracle restriction or unique latest notice is imposed by the
+current decisions. A notice observation accompanies each registry-local state;
+no global UTxO synchronization is modeled. Payments are observed on actions,
+not stored as balances; T76 guarantees price actions pay nothing and preserve
+all core state. Release policy identity remains the D11 omission below.
 
 D11 (one request-policy identity per release shared across registries and spend/mint
 roles) and D25 (enumerating approved requests from judgments) are explicit
