@@ -78,11 +78,13 @@ theorem registry_creation (c : CageState) (existing : List CageId) :
 theorem create_tags_existing_cage (tx : CreateTx) (o : RequestOutput) :
     createAllowed tx o → tx.outputs = [o] ∧
       tx.cageRef.id = o.request.cage ∧
-      tx.minted = [tagName o.request.cage] ∧
-      o.tags = [tagName o.request.cage] ∧ o.request.seed ∈ tx.spent ∧
+      tx.minted = tx.cageRef.oracles.map tagName ∧
+      o.tags = tx.cageRef.oracles.map tagName ∧ o.request.seed ∈ tx.spent ∧
       totalFees tx.cageRef o.request ≤ o.value := by
   intro ⟨hs, ho, hm, hc, ht, hf⟩
-  exact ⟨ho, hc.symm, by simpa [hc] using hm, by simpa [hc] using ht, hs, hf⟩
+  exact ⟨ho, hc.symm, hm, ht, hs, hf⟩
+
+
 
 theorem requests_unique_in_history (history : List CreateTx)
     (a b : CreateTx) (oa ob : RequestOutput) :
@@ -108,14 +110,24 @@ theorem judgment_not_replayable (c c' : CageId) (r r' : Request)
     judgmentName c r oracle verdict = judgmentName c' r' oracle' verdict' →
       c = c' ∧ r = r' ∧ r.seed = r'.seed ∧ oracle = oracle' ∧ verdict = verdict' := by
   intro h
-  cases h
-  exact ⟨rfl, rfl, rfl, rfl, rfl⟩
+  cases verdict <;> cases verdict' <;>
+    simp only [judgmentName, tokenName, Bool.false_eq_true, if_false, if_true,
+      TokenName.mk.injEq, NameBinding.judgment.injEq] at h
+  · obtain ⟨_, hc, hr, ho⟩ := h
+    exact ⟨hc, hr, congrArg Request.seed hr, ho, rfl⟩
+  · cases h.1
+  · cases h.1
+  · obtain ⟨_, hc, hr, ho⟩ := h
+    exact ⟨hc, hr, congrArg Request.seed hr, ho, rfl⟩
 
-theorem token_roles_separated (c c' : CageId) (r : Request)
+
+
+theorem token_roles_separated (tagOracle : Signer) (c' : CageId) (r : Request)
     (oracle : Signer) (verdict : Bool) :
-    tagName c ≠ judgmentName c' r oracle verdict := by
-  intro h
-  cases h
+    tagName tagOracle ≠ judgmentName c' r oracle verdict := by
+  cases verdict <;> simp [tagName, judgmentName, tokenName]
+
+
 
 theorem fold_preserves_registry (tx : FoldTx) :
     foldAccepted tx → tx.cageOut.id = tx.cageIn.id ∧
@@ -135,6 +147,9 @@ theorem step_preserves_registry {s s' : State} {action : Action} (h : Step s act
   | withdraw => exact ⟨rfl, rfl, rfl⟩
   | burn => exact ⟨rfl, rfl, rfl⟩
   | fold tx hc _ _ hf => simpa [afterFold, hc] using fold_preserves_registry tx hf
+  | priceMint => exact ⟨rfl, rfl, rfl⟩
+  | priceUpdate => exact ⟨rfl, rfl, rfl⟩
+
 
 
 theorem history_preserves_registry {s s' : State} (h : History s s') :
@@ -158,6 +173,9 @@ theorem only_fold_changes_tree {s s' : State} {action : Action} (h : Step s acti
   | account => exact False.elim (hne rfl)
   | withdraw => exact False.elim (hne rfl)
   | burn => exact False.elim (hne rfl)
+  | priceMint => exact False.elim (hne rfl)
+  | priceUpdate => exact False.elim (hne rfl)
+
 
 
 theorem fold_only_approved_before_deadline (tx : FoldTx) :
@@ -438,6 +456,9 @@ theorem used_seeds_monotone {s s' : State} {action : Action} (h : Step s action 
   | account => exact hm
   | withdraw => exact hm
   | burn => exact hm
+  | priceMint => exact hm
+  | priceUpdate => exact hm
+
 
 
 theorem reachable_requests_have_spent_seeds (s : State) :
@@ -463,6 +484,9 @@ theorem reachable_requests_have_spent_seeds (s : State) :
       exact ih o (List.mem_filter.mp ho).1
     | withdraw =>
       exact ih o (List.mem_filter.mp ho).1
+    | priceMint => exact ih o ho
+    | priceUpdate => exact ih o ho
+
 
 
 theorem spent_seed_cannot_create_again (s : State) (tx : CreateTx) (o : RequestOutput) :
@@ -494,6 +518,9 @@ theorem request_never_reappears (s s' : State) (o : RequestOutput) :
     | fold => exact hgone (List.mem_filter.mp hm).1
     | account => exact hgone (List.mem_filter.mp hm).1
     | withdraw => exact hgone (List.mem_filter.mp hm).1
+    | priceMint => exact hgone hm
+    | priceUpdate => exact hgone hm
+
 
 
 theorem one_oracle_signature_suffices (c : CageState) (r : Request) (oracle : Signer) :
@@ -539,6 +566,9 @@ theorem live_removal_is_legal_exit {s s' : State} {action : Action} (h : Step s 
     by_cases he : tx.input = o
     · exact ⟨.withdrawn tx, rfl, ⟨hw, he⟩, rfl⟩
     · exact False.elim (hgone (List.mem_filter.mpr ⟨hm, by simp only [decide_eq_true_eq, List.mem_singleton]; exact Ne.symm he⟩))
+  | priceMint => exact False.elim (hgone hm)
+  | priceUpdate => exact False.elim (hgone hm)
+
 
 
 theorem new_judgment_is_authorized {s s' : State} {action : Action} (h : Step s action s') (name : TokenName) :
@@ -557,6 +587,9 @@ theorem new_judgment_is_authorized {s s' : State} {action : Action} (h : Step s 
   | account => exact False.elim (hn hm)
   | withdraw => exact False.elim (hn hm)
   | burn => exact False.elim (hn hm)
+  | priceMint => exact False.elim (hn hm)
+  | priceUpdate => exact False.elim (hn hm)
+
 
 
 end RequestApprovalFold

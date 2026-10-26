@@ -13,10 +13,12 @@ deadline ≤ now ≤ deadline + window. Equivocation is permitted. Fees are inde
 amounts, fully escrowed at creation; allocations are per request and per role,
 so coincident addresses do not reuse one payment for two obligations.
 
-Explicit choices under "Not decided": one registry-named tag per request;
-arbitrary folder ordering without an auction; opaque strings for protocol
-hashes and evidence; no wire format or migration model. Judgment names are
-structured tuples: this is a collision-free canonical-encoding abstraction,
+Creation places one oracle-named tag for every registry oracle into the
+request output; every exit burns all these tags. Discovery is modeled as
+filtering live request outputs by the queried tag, including across registries.
+Arbitrary folder ordering has no auction or fairness guarantee. Protocol hashes
+and evidence are opaque strings; no wire format or migration model. Names are
+structured values with a leading role and the bound fields: this is a collision-free canonical-encoding abstraction,
 not a cryptographic injectivity proof. Trie contents abstract sound forestry
 proofs. Signatures, references, token ownership, fresh registry state tokens,
 and scalar-time/validity-interval agreement are ledger boundary assumptions.
@@ -32,10 +34,23 @@ Structured name equality includes the complete request, hence its seed,
 write, conditions, evidence, fees, deadline, window and owner.
 
 D11 (one shared request-policy identity per release in spend and mint roles)
-and D25 (enumerating approved work from the judgment record) are explicit
-omissions: neither deployment identity nor a discovery query is modeled.
+and D25 (enumerating approved work from the judgment record) remain explicit
+omissions. Oracle discovery through request tags is now modeled; deployment
+identity and folder discovery through judgment tokens remain outside the model.
 Judgment lists count token occurrences: one burn erases one occurrence; the
 permanent issued record retains every mint, including repeated verdicts.
+
+Price notices are signed, nonbinding advertisements. A datum contains a
+nonnegative default fee and optional per-protocol entries; these are advertised
+values, never read by request, judgment or exit guards. Notice occurrences are
+held in a list: no unique mint per oracle, canonical fee schedule, or oracle
+liveness is asserted. Updates consume one held occurrence, preserve its oracle
+and token, and require that oracle's signature. Notices may be published by any
+oracle, independently of membership in the local registry. The per-registry
+machine carries a notice observation alongside its protocol state; no global
+UTxO model or cross-registry synchronization of price observations is claimed.
+Payments are transaction allocations, not accumulated account balances: price
+actions have no payment allocation and preserve all protocol state.
 
 The executable oracle driver, JSON codecs and replay corpus are explicitly
 outside this commission. This is a local model candidate, not implementation,
@@ -105,16 +120,29 @@ structure Request where
 def Request.fee (r : Request) (oracle : Signer) : Nat :=
   ((r.fees.find? (fun p => p.1 == oracle)).map Prod.snd).getD 0
 
--- Tags and judgments are separate policy roles, so their names cannot alias.
-inductive TokenName where
-  | tag (cage : CageId)
-  | judgment (cage : CageId) (request : Request) (oracle : Signer) (approve : Bool)
+/-- The first field of a name is its domain-separating role. -/
+inductive TokenRole where
+  | tag | approval | refusal | price
   deriving DecidableEq, Repr
 
-def tagName := TokenName.tag
+inductive NameBinding where
+  | oracle (signer : Signer)
+  | judgment (cage : CageId) (request : Request) (oracle : Signer)
+  deriving DecidableEq, Repr
+
+structure TokenName where
+  role : TokenRole
+  binding : NameBinding
+  deriving DecidableEq, Repr
+
+def tokenName (role : TokenRole) (binding : NameBinding) : TokenName := ⟨role, binding⟩
+
+def tagName (oracle : Signer) : TokenName := tokenName .tag (.oracle oracle)
 
 def judgmentName (c : CageId) (r : Request) (o : Signer) (v : Bool) : TokenName :=
-  .judgment c r o v
+  tokenName (if v then .approval else .refusal) (.judgment c r o)
+
+def priceName (oracle : Signer) : TokenName := tokenName .price (.oracle oracle)
 
 structure RequestOutput where
   request : Request
@@ -128,7 +156,7 @@ def totalFees (c : CageState) (r : Request) : Nat :=
   (c.oracles.map r.fee).sum
 
 def wellFormed (c : CageState) (o : RequestOutput) : Prop :=
-  o.request.cage = c.id ∧ o.tags = [tagName c.id] ∧
+  o.request.cage = c.id ∧ o.tags = c.oracles.map tagName ∧
   totalFees c o.request ≤ o.value
 
 structure CreateTx where
@@ -139,7 +167,7 @@ structure CreateTx where
 
 def createAllowed (tx : CreateTx) (o : RequestOutput) : Prop :=
   o.request.seed ∈ tx.spent ∧ tx.outputs = [o] ∧
-  tx.minted = [tagName tx.cageRef.id] ∧ wellFormed tx.cageRef o
+  tx.minted = tx.cageRef.oracles.map tagName ∧ wellFormed tx.cageRef o
 
 def SpentOnce (history : List CreateTx) : Prop :=
   ∀ a b seed, a ∈ history → b ∈ history →
@@ -292,6 +320,38 @@ def NonEquivocating (names : List TokenName) : Prop :=
   ∀ c r oracle, judgmentName c r oracle true ∈ names →
     judgmentName c r oracle false ∉ names
 
+structure PriceDatum where
+  fee : Nat
+  perProtocol : List (String × Nat)
+  deriving DecidableEq, Repr
+
+structure PriceNotice where
+  oracle : Signer
+  token : TokenName
+  datum : PriceDatum
+  deriving DecidableEq, Repr
+
+structure PriceMintTx where
+  output : PriceNotice
+  signers : List Signer
+  minted : List TokenName
+
+def priceMintAllowed (tx : PriceMintTx) : Prop :=
+  tx.output.oracle ∈ tx.signers ∧
+  tx.output.token = priceName tx.output.oracle ∧ tx.minted = [tx.output.token]
+
+structure PriceUpdateTx where
+  input : PriceNotice
+  output : PriceNotice
+  signers : List Signer
+  minted : List TokenName
+
+def priceUpdateAllowed (tx : PriceUpdateTx) : Prop :=
+  tx.input.oracle ∈ tx.signers ∧
+  tx.input.token = priceName tx.input.oracle ∧
+  tx.output.oracle = tx.input.oracle ∧ tx.output.token = tx.input.token ∧
+  tx.minted = []
+
 structure State where
   cage : CageState
   usedSeeds : List OutputRef
@@ -299,8 +359,9 @@ structure State where
   judgments : List TokenName
   -- A permanent mint record: burning evidence does not erase equivocation.
   issued : List TokenName
+  notices : List PriceNotice
 
-def initial (c : CageState) : State := ⟨c, [], [], [], []⟩
+def initial (c : CageState) : State := ⟨c, [], [], [], [], []⟩
 
 def removeRequests (live spent : List RequestOutput) :=
   live.filter (fun o => o ∉ spent)
@@ -320,6 +381,16 @@ def afterExit (s : State) (o : RequestOutput) : State :=
 def afterBurn (s : State) (name : TokenName) : State :=
   { s with judgments := s.judgments.erase name }
 
+def afterPriceMint (s : State) (tx : PriceMintTx) : State :=
+  { s with notices := tx.output :: s.notices }
+
+def afterPriceUpdate (s : State) (tx : PriceUpdateTx) : State :=
+  { s with notices := tx.output :: s.notices.erase tx.input }
+
+/-- One asset query, independent of registry identity. -/
+def discover (oracle : Signer) (outputs : List RequestOutput) : List RequestOutput :=
+  outputs.filter (fun o => tagName oracle ∈ o.tags)
+
 inductive Action where
   | create (tx : CreateTx) (output : RequestOutput)
   | judge (tx : JudgmentTx)
@@ -327,12 +398,25 @@ inductive Action where
   | account (tx : AccountTx)
   | withdraw (tx : WithdrawTx)
   | burn (name : TokenName)
+  | priceMint (tx : PriceMintTx)
+  | priceUpdate (tx : PriceUpdateTx)
 
 def Action.spend : Action → Option RequestSpend
   | .fold tx => some (.folded tx)
   | .account tx => some (.accounted tx)
   | .withdraw tx => some (.withdrawn tx)
   | _ => none
+
+/-- Observable protocol allocations; funding and chain fees remain external. -/
+def Action.payments : Action → List Payment
+  | .fold tx => tx.allocations.flatMap (fun a => a.oracles ++ [(a.beneficiary, a.remainder)])
+  | .account tx => tx.paid.oracles ++ [(tx.paid.beneficiary, tx.paid.remainder)]
+  | .withdraw tx => [(tx.beneficiary, tx.paid)]
+  | _ => []
+
+def Action.isPrice : Action → Bool
+  | .priceMint _ | .priceUpdate _ => true
+  | _ => false
 
 /-- Protocol steps consume authenticated live/reference inputs. Funding and
     signatures are boundary observations, not generated by this machine. -/
@@ -355,6 +439,12 @@ inductive Step : State → Action → State → Prop where
       tx.input ∈ s.live → withdrawAllowed tx → Step s (.withdraw tx) (afterExit s tx.input)
   | burn (s : State) (name : TokenName) :
       name ∈ s.judgments → Step s (.burn name) (afterBurn s name)
+
+  | priceMint (s : State) (tx : PriceMintTx) :
+      priceMintAllowed tx → Step s (.priceMint tx) (afterPriceMint s tx)
+  | priceUpdate (s : State) (tx : PriceUpdateTx) :
+      tx.input ∈ s.notices → priceUpdateAllowed tx →
+      Step s (.priceUpdate tx) (afterPriceUpdate s tx)
 
 inductive Reachable : State → Prop where
   | registry (c : CageState) (existing : List CageId) :
