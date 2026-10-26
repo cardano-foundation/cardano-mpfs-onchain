@@ -32,20 +32,18 @@ oracle and requesters.
 - [Proof System](architecture/proofs.md) — MPF proof format, verification, and performance
 - [Security Properties](architecture/properties.md) — on-chain invariants and proof links
 - [Haskell Cage Library](haskell-cage.md) — off-chain types, tx builders, test vectors
-- [Permissionless Registries](roadmap/permissionless-registries.md) — roadmap
+- [Permissionless multi-oracle registries](design/registries/index.md) — design: decided, modelled in Lean and audited, not yet implemented
 
 ## Where this is going
 
 Every way a request leaves the cage, other than the requester's own Phase 2
 retraction, needs the state owner's signature. That makes the oracle a
 liveness dependency and stops a cage from serving as a public registry. The
-[permissionless registries roadmap](roadmap/permissionless-registries.md)
-collects the planned work — permissionless Phase 3 sweep
-([#98](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/98)),
-plugin cages
-([#99](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/99)),
-and the keri registry plugin
-([#104](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/104))
-— together with its first consumer, the
-[cardano-keri](https://github.com/lambdasistemi/cardano-keri) AID registry,
-which uses a permissioned cage today.
+[permissionless multi-oracle registries](design/registries/index.md) design
+removes both limits: anyone creates a registry by naming its oracles and
+protocol, one request script per release serves every registry, and anyone
+can fold what the oracles approved. It is decided, modelled in Lean and
+independently audited; its implementation is the milestone
+[Permissionless multi-oracle registries](https://github.com/cardano-foundation/cardano-mpfs-onchain/milestone/3).
+The [cardano-keri](https://github.com/lambdasistemi/cardano-keri) AID
+registry uses a permissioned cage today.

@@ -131,8 +131,8 @@ directly. `staking.ak`, the stub shipped in the blueprint,
 returns `True` unconditionally for any `withdraw`, so a cage booted against it
 gains no extra guarantee. Both facts are tracked as
 [#79](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/79),
-and replacing the conjunction with a real delegated path is the subject of the
-[permissionless registries roadmap](../roadmap/permissionless-registries.md).
+and the permissionless alternative is the
+[permissionless multi-oracle registries](../design/registries/index.md) design.
 
 ## State Spending Validator
 
