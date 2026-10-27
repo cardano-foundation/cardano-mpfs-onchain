@@ -58,7 +58,10 @@ own time window.
    shipped cage as a special case.
 4. [Oracle identities](oracles.md): oracles as keys or groups with shares,
    and how fees reach each key.
-5. [Formal model and audits](formal-model.md): what is proved in Lean, what
+5. [Oracle slots and check protocols](slots.md), a draft: which oracle judges
+   which keys under which published check, worked through on the moog
+   registry.
+6. [Formal model and audits](formal-model.md): what is proved in Lean, what
    the independent audits found, and what is not yet covered.
 
 The authoritative decision record is

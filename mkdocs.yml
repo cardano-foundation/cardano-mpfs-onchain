@@ -70,4 +70,5 @@ nav:
           - Decisions: design/registries/decisions.md
           - Economics: design/registries/economics.md
           - Oracle identities: design/registries/oracles.md
+          - Oracle slots (draft): design/registries/slots.md
           - Formal model and audits: design/registries/formal-model.md
