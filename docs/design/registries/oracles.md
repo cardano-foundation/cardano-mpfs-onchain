@@ -55,7 +55,7 @@ sequenceDiagram
   participant K as Carol
   Q->>C: fold credits a fee of 9 for a judgment signed by Alice and Carol
   Note over C: split among the signers by shares: Alice 6, inner group 3
-  Note over C: inner group: Carol, its only signer, 3; Bob and Dave nothing
+  Note over C: inner group: 3 to Carol, its only signer. Bob and Dave get nothing
   A->>C: Alice's claim, folded when she chooses
   C-->>A: Alice's whole balance, to her payout
   K->>C: Carol's claim, later
