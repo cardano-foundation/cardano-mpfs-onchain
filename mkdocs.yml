@@ -69,4 +69,5 @@ nav:
           - Request lifecycle: design/registries/lifecycle.md
           - Decisions: design/registries/decisions.md
           - Economics: design/registries/economics.md
+          - Oracle identities: design/registries/oracles.md
           - Formal model and audits: design/registries/formal-model.md

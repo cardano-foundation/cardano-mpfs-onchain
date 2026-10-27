@@ -26,7 +26,7 @@ The people involved and what each one gets:
 |---|---|---|---|
 | Registry creator | A registry whose rules are fixed forever | A cage state with an empty tree, its oracles, its protocol and optionally a rule | Creation fails if the registry has neither an oracle nor a rule, or repeats an oracle |
 | Requester | One write applied under conditions they choose | Their write folded into the tree, their fees paid to the oracles, the rest bid to the folder | A refusal, or a fold whose conditions do not hold; after the deadline they settle and recover the rest |
-| Oracle | To be paid for judging, whatever it decides | Its fee at the fold, or at the settlement after the deadline | Nothing to refuse: an oracle that does not serve a registry simply never answers |
+| Oracle | To be paid for judging, whatever it decides | Its fee credited to its balance at the fold, or at the complete account after the deadline, and collected by claim when it chooses | Nothing to refuse: an oracle that does not serve a registry simply never answers |
 | Folder | To earn the remainder of requests it folds | Approved requests applied, the remainder of each request paid to it | A fold with a missing approval, a false condition or a late time is rejected |
 | Reader | The registry's current contents | The tree rebuilt by replaying folds, with every write in a request datum | Nothing hidden: every write and every judgment is on chain |
 
@@ -56,7 +56,9 @@ own time window.
    rejected and why.
 3. [Economics](economics.md): who pays whom, the markets this opens, and the
    shipped cage as a special case.
-4. [Formal model and audits](formal-model.md): what is proved in Lean, what
+4. [Oracle identities](oracles.md): oracles as keys or groups with shares,
+   and how fees reach each key.
+5. [Formal model and audits](formal-model.md): what is proved in Lean, what
    the independent audits found, and what is not yet covered.
 
 The authoritative decision record is

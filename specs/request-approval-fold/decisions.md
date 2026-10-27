@@ -5,12 +5,13 @@ the protocol they judge, so that a registry needs no script, no owner and no
 folding infrastructure of its own, and anyone can fold what its oracles have
 approved.
 
-This records the design decisions taken on 24 and 25 October 2026, after the
+This records the design decisions taken from 24 to 27 October 2026, after the
 Singular investigation in which the request lifecycle belongs to the
 application (lambdasistemi/singular#731, #741). Each decision says what was
-decided and why. The Lean statements in `lean/MpfsCage/RequestApprovalFold.lean`
-state the earlier single-oracle version of this design and are to be rewritten
-against this record.
+decided and why. The Lean model under `lean/MpfsCage/RequestApprovalFold/`
+states this record, except the decisions of 27 October (oracle identities,
+fees accumulated in the cage, complete accounts and claims as fold items),
+which it does not model yet.
 
 ## Roles
 
@@ -63,6 +64,14 @@ against this record.
 - **Oracles need not consent to being listed.** Listing is an offer of
   business; an oracle that does not serve a registry never answers its
   requests.
+- **An oracle is an identity of the oracle standard**
+  (`specs/oracle-identity/decisions.md`): a key, or a group of oracles with a
+  threshold and a share each. The registry names oracles by identity. Wherever
+  this record says an oracle signs, the oracle authorizes under that standard:
+  its key signs, or at least its threshold of members authorize. A registry
+  that names one group oracle survives stolen keys below the group's
+  threshold; a registry that names several oracles already needs every one of
+  them to approve a write.
 - **The protocol is named by hash.** The registry carries the hash of a
   document describing, in CDDL, its keys, values and evidence, and optionally
   which key prefix each oracle judges. Oracles publish off chain which
@@ -73,7 +82,7 @@ against this record.
 
 - **One request script per release** serves every registry. It is the spending
   validator of the request address and the minting policy of the tags,
-  approvals and refusals.
+  approvals, refusals and claim tokens.
 - **A request names its registry by data.**
 - **A request carries one write**: `set key value` or `unset key`. The write is
   on chain in the request datum, paid for by the requester, so readers rebuild
@@ -192,7 +201,8 @@ against this record.
   find every registry naming it.
 - **Every path that consumes a request burns its tags**, so an asset query
   returns only live requests.
-- **Folders find work through request tokens** (see "Request tokens").
+- **Folders find work through request tokens** (see "Request tokens"), and
+  find claims with one query by the claim token of a registry.
 - The address staking-part alternative was declined.
 
 ## Prices, ordering and hold-up
@@ -230,7 +240,8 @@ against this record.
   including definite or indefinite lengths, so that off-chain encoders match
   the chain byte for byte.
 - **A hashed name is blake2b-256 of `serialise_data` of a tuple whose first
-  field is the token's role** (tag, approval, refusal or price), followed by
+  field is the token's role** (tag, approval, refusal, price, request or
+  claim; and `oracle` for an oracle identity), followed by
   the fields it binds. 32 bytes is the asset-name maximum, and the leading
   role keeps every kind of token apart. Hand-built CBOR was rejected: a
   validator would assemble it in script code on every mint and burn.
@@ -243,27 +254,63 @@ against this record.
   oracle, held in the request's value. Approving and refusing pay the same
   fee, so an oracle gains nothing by choosing either verdict and judges
   honestly. A refusal is worth paying for: it is the signed record of why, and
-  the evidence a settlement needs.
+  the evidence a complete account needs.
+- **Fees accumulate in the cage.** Every output on chain must hold the
+  ledger's minimum of ada, so paying each oracle its fee in its own output at
+  every fold would cost a minimum per oracle per request, and a fee below that
+  minimum could not be paid at all. Instead the cage state keeps a balance per
+  key oracle, and the cage's value holds the sum of the balances. Crediting a
+  fee adds it to the cage's value and to the balances of the oracle's keys,
+  split by the oracle standard's shares. The balances are bounded, because the
+  oracle set never changes.
+- **Only a fold spends the cage.** Everything that changes the cage, the tree
+  or the balances, is an item of a fold, so nothing races the fold. A fold
+  processes its items in order, and each item is one of:
+
+  | Item | When | Needs | Effect |
+  |---|---|---|---|
+  | A write request | Before its deadline | An approval from every oracle, every condition true at its turn | Applies the write, credits every oracle's fee, the remainder goes to the folder |
+  | A complete account | From its deadline to its deadline plus its window | A verdict from every oracle, approvals and refusals in any mix | Writes nothing, credits every oracle's fee, the remainder returns to the owner |
+  | A claim | Before its deadline | Created with the claiming key's signature | Pays that key's whole balance, as it stands at the claim's turn, to the destination the claim names |
+
+  A fold's validity interval must satisfy the window of every item in it, so
+  folders group items whose windows overlap.
 - **Each window has exactly one exit, so exits never race.** Several folders
-  may compete for the same cage state and several parties may submit the same
-  settlement, but which exit ends a request never depends on who submits first.
+  may compete for the same cage state, but which exit ends a request never
+  depends on who submits first.
 
   | Window | The only exit |
   |---|---|
-  | Before the deadline | The fold, with an approval from every oracle. |
-  | From the deadline to the deadline plus the window | The complete account. |
-  | After the window | The owner's withdrawal. |
+  | Before the deadline | A fold applying the write, with an approval from every oracle. |
+  | From the deadline to the deadline plus the window | A fold settling the request by complete account. |
+  | After the window | The owner's withdrawal, which does not touch the cage. |
 
-- **The fold pays every oracle its fee.** What remains in the request after
-  the fees is the folder's bid; the fold writes no refund outputs, so batches
-  are larger.
-- **The complete account settles a request after its deadline.** Anyone may
-  consume the request by showing, for every oracle of the registry, its
-  approval or its refusal, in any mix. Each oracle is paid its fee and the rest
-  returns to the owner. The outcome does not depend on which verdicts are
+- **A fold writes no fee outputs.** What remains in a write request after the
+  fees is the folder's bid; the only outputs a fold creates are the cage, the
+  folder's own, a refund per complete account and a payout per claim.
+- **The complete account settles a request after its deadline.** Any fold in
+  the window may include it by showing, for every oracle of the registry, its
+  approval or its refusal, in any mix. Each oracle's fee is credited and the
+  rest returns to the owner. The outcome does not depend on which verdicts are
   shown, so the owner cannot hide an approval to save a fee. A refused request
   therefore waits for its deadline; the requester, who sets the deadline,
-  bounds that wait.
+  bounds that wait. The owner and the oracles, whose fees are waiting, are the
+  ones who want it folded; folding is permissionless, so either can fold it.
+  Creation requires the escrow to exceed the fees by at least the ledger's
+  minimum for an output, so the refund can always be paid.
+- **An oracle collects its fees by claim.** A claim is a request created by a
+  key oracle of the registry with its signature. It carries a claim token
+  named after the registry, minted under the release policy; the destination
+  address and datum for the payout; a deadline; and a tip for the folder. At
+  its turn in a fold it pays the key's whole balance to that destination with
+  exactly that datum, resets the balance to zero and burns the claim token.
+  A balance below the ledger's minimum cannot be paid, so its claim waits.
+  After its deadline the oracle takes the claim back. A folder can leave a
+  claim out, but the oracle can fold its own. Fees are claimed per registry.
+- **Payouts are fixed when the claim is created, never by the folder.** The
+  folder writes the payout output, so the fold checks its address, value and
+  datum exactly: a datum the destination's script rejects would lock the
+  funds.
 - **A refusal is no early exit.** Letting the owner leave before the deadline
   on one refusal would let it hide the approvals of the other oracles, or would
   pay oracles that never judged.
@@ -285,14 +332,16 @@ against this record.
 The current MPFS cage is a registry with one oracle that also folds: its
 `Insert`, `Delete` and `Update` are writes with the matching condition on their
 own key, its tip is the oracle fee, and its processing and retract windows are
-the deadline and the window. The old cage owner's powers to transfer and end a
-cage have no counterpart.
+the deadline and the window. Its fees are credited to its balance in the cage,
+and it collects them by including its own claim in one of its folds when it
+chooses. The old cage owner's powers to transfer and end a cage have no
+counterpart.
 
 ## Not decided
 
 - The migration or coexistence of existing cages.
-- Fold cost: the cost per condition proof and per judgment reference input is
-  to be measured on a devnet.
+- Fold cost: the cost per condition proof, per judgment reference input and
+  per fee split for group oracles is to be measured on a devnet.
 
 ```mermaid
 sequenceDiagram
@@ -304,11 +353,13 @@ sequenceDiagram
   O->>O: judge off chain
   alt every oracle approves
     O->>O: mint approvals by reference to the request
-    F->>C: fold: check approvals and conditions, apply write, pay oracles, burn tag
+    F->>C: fold, before the deadline: check approvals and conditions, apply write, credit fees, burn tag
   else not folded by the deadline, every oracle answered
     O->>O: mint approvals and refusals by reference
-    R->>R: in the window, complete account: pay every oracle, refund the rest, burn tag
+    F->>C: fold, in the window: complete account, credit fees, refund the rest, burn tag
   else some oracle silent
     R->>R: after deadline and window, take everything, burn tag
   end
+  O->>O: create a claim naming a payout
+  F->>C: fold: pay the key's balance to that payout, burn the claim token
 ```

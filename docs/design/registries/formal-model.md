@@ -46,6 +46,12 @@ fees; time is a single observed value whose soundness against transaction
 validity intervals is assumed; names are collision-free structured values,
 standing for the hashes the implementation will use.
 
+!!! note "Decisions not yet in the model"
+    Oracle identities (keys and groups with shares), fees accumulated per key
+    in the cage, and complete accounts and claims as items of the fold were
+    decided after this model was audited. The model still names oracles as
+    single keys and pays each oracle's fee in its own output.
+
 ## What is proved
 
 All 113 theorems are proved; `#print axioms` lists only `propext`,
