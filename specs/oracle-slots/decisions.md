@@ -62,6 +62,12 @@ Nothing here is decided until its open points are settled.
   competing providers of the same check, whose threshold trades liveness
   against how many must agree. A registry whose oracles are gone is dead; its
   users create a new one.
+- **Creating a registry is a challenge to its oracles.** Nothing is negotiated
+  before creation: the creator names providers, checks and parameters, and
+  the providers answer or stay silent. Whether a slot is served is known only
+  when its kinds of request have been judged, so a creator probes each slot
+  with one request of each kind it expects, and abandons the registry, at the
+  cost of its creation, if a slot stays silent.
 
 ## Open
 
@@ -70,7 +76,5 @@ Nothing here is decided until its open points are settled.
 - Whether the request fee is declared per matching slot, and whether a
   judgment's name binds the slot, for an oracle that sits in two slots
   matching the same key.
-- How a registry creator learns, before creation, that a provider accepts the
-  slot's parameters, so that no prefix is stuck from the start.
 - The cost of the prefix comparisons in the fold, and the Lean model's change
   from a fixed oracle set to slots.

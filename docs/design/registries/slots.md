@@ -173,7 +173,7 @@ what can be undone:
 |---|---|---|---|---|
 | Check author | What a check verifies and its parameters | Providers adopt the check | A vague check whose verdicts nobody can audit | Verdicts and, if the protocol stores it, evidence are public |
 | Provider | Which checks to implement and at what price | Fees for every judgment | Stopping, which stalls every prefix it holds alone | The creator can name a group of competing providers with threshold one |
-| Registry creator | Prefixes, checks, parameters, providers, rule | A registry fixed forever | Choosing a provider that never engages | Checking the provider's offer before creating |
+| Registry creator | Prefixes, checks, parameters, providers, rule | A registry fixed forever | Choosing a provider that never engages | Probing each slot with one request of each kind after creating, and abandoning a silent registry |
 | Requester | When to write and what fee to offer | The write applied | Nothing: a write is judged as written | Fees below the price are never judged |
 | Agent named in the rule | What it writes under its own prefix | Trust it already had | False results, permanently signed by it | Its prefix, its group of keys, and conditions on the previous state |
 
@@ -194,13 +194,18 @@ providers of the same check, whose threshold trades liveness against how many
 must agree. A registry whose oracles are gone is dead, and its users create a
 new one.
 
+Creating a registry is a challenge to its oracles. Nothing is negotiated
+before creation: the creator names providers, checks and parameters, and the
+providers answer or stay silent. Whether a slot is served is known only when
+its kinds of request have been judged, so a creator probes each slot with one
+request of each kind it expects, and abandons the registry, at the cost of its
+creation, if a slot stays silent.
+
 ## Open questions
 
 - Whether prices are announced per check protocol, listing every provider of
   a check in one query, instead of per oracle.
 - Whether the fee is declared per matching slot, and whether a judgment's
   name binds the slot.
-- How a creator learns, before creation, that a provider accepts the slot's
-  parameters.
 - The cost of the prefix comparisons in the fold, and the Lean model's change
   from a fixed oracle set to slots.
