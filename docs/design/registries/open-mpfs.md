@@ -27,6 +27,42 @@ The decision records are the authority; this document explains them:
 - [`specs/oracle-slots/decisions.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-slots/decisions.md):
   slots and check protocols, the draft.
 
+## Shared state needs folding
+
+The hard problem here is not the Merkle Patricia Forestry. It is shared
+state on Cardano.
+
+A registry is one piece of state that many people want to change. On Cardano
+that state lives in a single output, and changing it means spending that output
+and creating its successor. Only one transaction can spend an output. If two
+people each build a transaction that updates the registry, the first one in a
+block wins and the other is rejected, because the output it spent no longer
+exists. With many writers, almost every direct update would fail.
+
+So writers do not touch the state. Each writer creates a **request** in an
+output of its own, where it contends with nobody. Then one transaction spends
+the state together with a batch of requests and applies them all, in order,
+producing the next state. That transaction is a **fold**.
+
+```mermaid
+flowchart LR
+  a([Writer A]) -- "own output" --> ra[(Request A)]
+  b([Writer B]) -- "own output" --> rb[(Request B)]
+  c([Writer C]) -- "own output" --> rc[(Request C)]
+  ra & rb & rc --> fold["Fold: one transaction<br/>applies the batch in order"]
+  s0[(State n)] -- "spent once" --> fold
+  fold --> s1[(State n + 1)]
+```
+
+The Merkle Patricia Forestry only makes the state small enough to live in one
+output: the output holds a root hash, and each write in the fold carries a
+short proof against it. Any shared state on Cardano, with or without a tree,
+needs the same pattern.
+
+Folding answers contention and raises two questions in its place: who folds,
+and who decides which requests may be folded. MPFS today answers both with
+one key. Open MPFS answers them with services anyone can run.
+
 ## Why open MPFS
 
 MPFS today is a registry with a keeper. One key owns the cage, judges every
