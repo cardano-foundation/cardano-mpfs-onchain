@@ -173,10 +173,14 @@ which it does not model yet.
   achieve. Without this, an oracle whose rules the request's own conditions did
   not cover could only refuse.
 - **A judgment's name** hashes the registry, the request (including its seed),
-  the oracle, the verdict and, for an approval, the oracle's conditions, so
-  the conditions cannot be detached from the approval or replaced. Judgments do not expire: the request's deadline
-  bounds them, and an oracle that finds a deadline too far for its judgment to
-  stay valid does not answer.
+  the oracle, the verdict, the members of a group oracle that signed it and,
+  for an approval, the oracle's conditions, so neither the conditions nor the
+  signers can be detached or replaced. Only the signers of the judgment that a
+  fold or complete account shows are paid; when a group has judged a request
+  more than once with different signers, the party folding chooses which
+  judgment to show. Judgments do not expire: the request's deadline bounds
+  them, and an oracle that finds a deadline too far for its judgment to stay
+  valid does not answer.
 - **A fold signed by an oracle counts as that oracle's approval** of every
   request in it, so a single oracle that folds itself needs no separate
   approval transaction. Its conditions then travel in the fold's redeemer,

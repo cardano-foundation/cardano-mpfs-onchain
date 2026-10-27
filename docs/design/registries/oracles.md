@@ -53,19 +53,22 @@ sequenceDiagram
   participant C as Cage balances
   participant A as Alice
   participant K as Carol
-  Q->>C: fold credits a fee of 8 to the group
-  Note over C: split by shares: Alice 4, Bob 2, inner group 2
-  Note over C: inner group split: Carol 1, Dave 1
+  Q->>C: fold credits a fee of 9 for a judgment signed by Alice and Carol
+  Note over C: split among the signers by shares: Alice 6, inner group 3
+  Note over C: inner group: Carol, its only signer, 3; Bob and Dave nothing
   A->>C: Alice's claim, folded when she chooses
   C-->>A: Alice's whole balance, to her payout
   K->>C: Carol's claim, later
   C-->>K: Carol's whole balance
 ```
 
-A group's fee is split among its members by their shares at the moment it is
-credited, down to keys, and each key collects its own balance by claim. No
-member can be cut out by the others, because the shares are part of the
-identity. The remainder of integer division goes to the group's first member.
+A judgment records which members signed it, and only they are paid: the fee
+is split among the signers by their shares at the moment it is credited, down
+to keys, and each key collects its own balance by claim. No member can be cut
+out by the others, because the shares are part of the identity, and no member
+is paid for work it did not do, which matters when a group of independent
+providers needs only one of them. The remainder of integer division goes to
+the first member that signed.
 
 No consent is needed on chain to describe a group: a member's key cannot
 authorize anything without its own signature, so a group naming a member that
@@ -78,7 +81,7 @@ never agreed has one silent member. Serving is consent.
 | What an oracle is | A key, or a group with a threshold and a share per member, nested freely | One key per oracle; a script credential | One key is lost with its key. A script can only be seen acting through a zero withdrawal, which needs a staking registration per oracle, or by spending its own output, which adds an input to every judgment |
 | An oracle's identity | The hash of its description, fixed | A mutable identity that its members can update | Whoever may change an identity holds power over every contract that names it |
 | Key rotation | None; a dead group is replaced by a new identity in a new contract | Rotation by the group's threshold | Rotation needs a mutable identity |
-| How fees reach a group's members | Split by declared shares when credited, down to keys; each key claims its own balance | A payout address chosen by the group | Members in the majority could redirect a shared payout and cut out a member that did its work |
+| How fees reach a group's members | Split among the members that signed, by declared shares, down to keys; each key claims its own balance | A payout address chosen by the group; splitting among all members | Members in the majority could redirect a shared payout and cut out a member that did its work; in a group needing only some members, those that did not sign would be paid for others' work |
 | Consent to being in a group | Not needed on chain; serving is consent | Every member signing the group's creation | An unwilling member cannot be made to sign anything, so naming it only adds a silent member |
 | Where price notices live | One per oracle identity, minted and updated with its authorization | Prices fixed in the registry | Prices change; an oracle announces its own |
 

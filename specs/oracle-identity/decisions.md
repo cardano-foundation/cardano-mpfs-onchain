@@ -50,11 +50,17 @@ does not depend on them and may move to its own repository.
 
 ## Fees
 
-- **A group's fee is split among its members by their shares**, recursively
-  down to keys, at the moment the fee is credited. Shares are part of the
-  description, so every member knows its cut before serving and no member can
-  later be cut out by the others. The remainder left by integer division goes
-  to the group's first member.
+- **Only the members who signed are paid.** A judgment records which members
+  authorized it, down to keys, and a contract binds that record to the
+  judgment so that it cannot be replaced. When the judgment's fee is credited,
+  it is split among the members that signed, by their shares, recursively
+  down to keys. Shares are part of the description, so every member knows its
+  cut before serving and no member can later be cut out by the others. The
+  remainder left by integer division goes to the first member that signed.
+- **Paying members that did not sign was rejected.** In a group that needs
+  fewer than all its members, for example two independent providers of the
+  same check where either one suffices, a member that never judged would be
+  paid for the other's work.
 - **Fees reach keys, never groups.** A contract that pays oracles keeps a
   balance per key; each key withdraws its own balance to where it chooses.
 - **A shared payout address chosen by the group was rejected.** Members in
@@ -92,5 +98,7 @@ flowchart TD
 ```
 
 In this group any two of Alice, Bob and the inner group authorize; the inner
-group authorizes when Carol or Dave signs. A fee of 8 credited to the group
-gives Alice 4 and Bob 2, and the inner group's 2 gives Carol 1 and Dave 1.
+group authorizes when Carol or Dave signs. If Alice and Carol sign a judgment
+whose fee is 9, Alice's share 2 and the inner group's share 1 split it into 6
+for Alice and 3 for the inner group, all of which goes to Carol, its only
+signer. Bob and Dave, who did not sign, get nothing.
