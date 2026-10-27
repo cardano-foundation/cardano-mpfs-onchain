@@ -39,7 +39,12 @@ people each build a transaction that updates the registry, the first one in a
 block wins and the other is rejected, because the output it spent no longer
 exists. With many writers, almost every direct update would fail.
 
-So writers do not touch the state. Each writer creates a **request** in an
+With a Merkle Patricia Forestry it is worse. A write carries a proof built
+against the root the writer last saw. When another update lands first, the
+root changes and the proof is stale: the loser must fetch the new tree,
+rebuild its proof and race again, against everyone else doing the same.
+
+So writers do not touch the state, and do not build proofs. Each writer creates a **request** in an
 output of its own, where it contends with nobody. Then one transaction spends
 the state together with a batch of requests and applies them all, in order,
 producing the next state. That transaction is a **fold**.
@@ -54,10 +59,13 @@ flowchart LR
   fold --> s1[(State n + 1)]
 ```
 
-The Merkle Patricia Forestry only makes the state small enough to live in one
-output: the output holds a root hash, and each write in the fold carries a
-short proof against it. Any shared state on Cardano, with or without a tree,
-needs the same pattern.
+The folder builds every proof at fold time, one after another, each against
+the root left by the previous write, so the proofs are right by construction.
+A writer only states its write and the conditions it expects of the tree; the
+folder proves them. The Merkle Patricia Forestry makes the state small enough
+to live in one output, a root hash, and makes each write checkable with a
+short proof; any shared state on Cardano, with or without a tree, needs the
+same folding pattern.
 
 Folding answers contention and raises two questions in its place: who folds,
 and who decides which requests may be folded. MPFS today answers both with
