@@ -27,6 +27,96 @@ The decision records are the authority; this document explains them:
 - [`specs/oracle-slots/decisions.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-slots/decisions.md):
   slots and check protocols, the draft.
 
+## Why open MPFS
+
+MPFS today is a registry with a keeper. One key owns the cage, judges every
+request, and is the only party allowed to fold. The design makes the keeper
+unable to cheat the tree, but not unnecessary: every write waits for it, every
+rule lives in its private code, and running it is a cost its operator carries
+for the sake of its own application. Open MPFS turns that keeper into a set of
+services anyone can offer and be paid for. Two experiences led here.
+
+### What moog taught
+
+Moog runs its registry on the shipped cage. Reading what its oracle actually
+checks shows five things.
+
+```mermaid
+flowchart LR
+  req([Requesters]) -- "requests with a tip" --> op["One operator key:<br/>owner, oracle and folder"]
+  op -- "runs off chain" --> checks["Moog's checks:<br/>signatures, tree facts, GitHub"]
+  op -- "the only one who can fold,<br/>end or sweep the cage" --> cage[(Cage)]
+  agent([Moog agent]) -- "results, trusted by the operator" --> op
+```
+
+- **One key does three jobs.** The owner is the oracle and the only folder; it
+  can also end the cage. If its operator stops, nothing moves, and nobody else
+  may step in.
+- **Every check is off chain, in one program, even those the chain could
+  make.** The oracle checks the requester's signature, that a role or a
+  white-listing exists, that test runs are numbered in order, that results
+  come from the agent. The chain could check all of these with signatures and
+  tree conditions; instead readers trust that one program ran them. Only the
+  GitHub lookups truly need an oracle.
+- **Generic checks are locked inside one application.** "This GitHub user
+  publishes this key" and "this repository's code owners name this user" are
+  useful to many registries, but they exist only as moog's oracle code, run by
+  moog's operator, for moog.
+- **Running the oracle is a cost, not a business.** The requester's tip pays
+  for the folding transaction. The operator runs the oracle because it needs
+  the registry, so nobody outside the application has a reason to run one,
+  and nobody can compete to run it better or cheaper.
+- **Unaccepted requests are never refused.** Moog's oracle has no refusal: a
+  request it will not accept stays in the cage, checked again at every poll,
+  until its owner retracts it, and the requester learns nothing about why.
+
+### What permissionless Singular taught
+
+Singular, a permissionless mint of unique names over a Merkle Patricia
+Forestry registry, went through the same move first.
+
+- **Anyone can fold, from public data alone.** Singular's folds need no signer
+  and no privileged folder; the request's remainder is the folder's bid, so
+  folding is a market instead of a duty.
+- **No one keeps power over a registry after creating it.** Singular has no
+  authority to update parameters or migrate a registry; whoever could would
+  hold power over every name in it.
+- **What a creator declares unchecked becomes an attack.** Singular's creators
+  wrote policy references into the registry that creation did not check, and
+  a forged one let someone mint a live name outside any fold. Everything a
+  creator declares must either be checked or be the registry's identity, named
+  by hash.
+- **Admission belongs to the application, not to the protocol.** Singular's
+  investigation (lambdasistemi/singular#731, #741) moved the request lifecycle
+  out of the protocol and into the application, which keeps the protocol small
+  and provable. In open MPFS the application is the registry's rule and its
+  oracles; the protocol only folds what they admitted. Open MPFS keeps one
+  generic request lifecycle for every registry, because oracles must be paid
+  for judging even when nothing is written.
+- **No state outside the tree.** Per-key tokens held outside Singular's
+  registry were where its forgeries lived; open MPFS keeps everything in the
+  tree.
+
+### From a keeper to services
+
+| | MPFS today | Open MPFS |
+|---|---|---|
+| Who may fold | The owner | Anyone, paid by the request's remainder |
+| Who judges | The owner's oracle | Independent oracles, named per slot, each paid per judgment |
+| Where the rules are | One private program | Signatures in the rule, tree facts in conditions, only outside-world facts in oracles |
+| Who can change or end the registry | The owner | No one |
+| A request that is not accepted | Waits until its owner retracts it | Refused and paid for, with the refusal on chain |
+| Why someone runs an oracle | To have their own registry | To earn fees from every registry that names it |
+| Reusing a check | Copy the code | Name the same check protocol and provider |
+
+The parties who care about a registry each run the piece they are good at,
+in the service of requesters. A team that needs a registry declares its rule
+and picks its providers, once. Whoever can verify something about the world,
+such as a GitHub identity, publishes a check and serves it to every registry
+that wants it, for a fee. Whoever runs an indexer and a node folds, for the
+remainder. Requesters pay each of them for exactly the work done, and no one
+of them can stop, redirect or rewrite the others.
+
 ## The system at a glance
 
 ```mermaid
