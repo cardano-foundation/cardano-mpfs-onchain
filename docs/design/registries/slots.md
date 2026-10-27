@@ -183,6 +183,17 @@ a slot whose oracle is a threshold-one group of providers of the same check
 lets them race for each request; only the signer is paid, and any one of them
 can approve alone.
 
+## Liveness
+
+Liveness is incentivized, not enforced. An oracle that stops answering stalls
+every write under its slots, and nothing on chain replaces it, because a
+fallback judge would reintroduce an owner. Oracles are paid for every
+judgment, approving or refusing, so answering is what earns. A creator
+protects a registry by choosing providers, and by naming a group of competing
+providers of the same check, whose threshold trades liveness against how many
+must agree. A registry whose oracles are gone is dead, and its users create a
+new one.
+
 ## Open questions
 
 - Whether prices are announced per check protocol, listing every provider of
@@ -191,7 +202,5 @@ can approve alone.
   name binds the slot.
 - How a creator learns, before creation, that a provider accepts the slot's
   parameters.
-- What a creator can do about a provider that stops, beyond groups of
-  competing providers.
 - The cost of the prefix comparisons in the fold, and the Lean model's change
   from a fixed oracle set to slots.

@@ -52,6 +52,17 @@ Nothing here is decided until its open points are settled.
   refusal is paid like any judgment.
 - **A new version of a check is a new hash**, and therefore a new registry.
 
+## Liveness (decided)
+
+- **Liveness is incentivized, not enforced.** An oracle that stops answering
+  stalls every write under its slots, and nothing on chain replaces it: a
+  fallback judge would reintroduce an owner. Oracles are paid for every
+  judgment, approving or refusing, so answering is what earns. A creator
+  protects a registry by choosing providers, and by naming a group of
+  competing providers of the same check, whose threshold trades liveness
+  against how many must agree. A registry whose oracles are gone is dead; its
+  users create a new one.
+
 ## Open
 
 - Whether prices are announced per check protocol (an offer token named after
@@ -61,8 +72,5 @@ Nothing here is decided until its open points are settled.
   matching the same key.
 - How a registry creator learns, before creation, that a provider accepts the
   slot's parameters, so that no prefix is stuck from the start.
-- What the creator can do about a provider that stops answering a slot, given
-  that slots never change; a group of competing providers with threshold one
-  is the only remedy so far.
 - The cost of the prefix comparisons in the fold, and the Lean model's change
   from a fixed oracle set to slots.
