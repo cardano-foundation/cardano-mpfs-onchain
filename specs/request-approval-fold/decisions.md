@@ -10,7 +10,7 @@ Singular investigation in which the request lifecycle belongs to the
 application (lambdasistemi/singular#731, #741). Each decision says what was
 decided and why. The Lean model under `lean/MpfsCage/RequestApprovalFold/`
 states this record, except the decisions of 27 October (oracle identities,
-fees accumulated in the cage, complete accounts and claims as fold items),
+fees accumulated in the registry state, complete accounts and claims as fold items),
 which it does not model yet.
 
 ## Roles
@@ -39,8 +39,8 @@ which it does not model yet.
 
 ## Registries
 
-- **Anyone can create a registry.** Creating one mints the cage state with an
-  empty root, the set of oracles, the protocol and optionally a rule. No script
+- **Anyone can create a registry.** Creating one mints the registry state (the output the shipped design calls
+  the cage) with an empty root, the set of oracles, the protocol and optionally a rule. No script
   is applied to a registry.
 - **A registry needs at least one oracle or a rule.** With oracles, writes are
   gated by their judgment; with a rule, by the rule; with both, by both. A
@@ -109,7 +109,7 @@ which it does not model yet.
 
 ## Rules
 
-- **A rule is a compiled minting policy**, named by its hash in the cage
+- **A rule is a compiled minting policy**, named by its hash in the registry state
   state and fixed at creation. It is the minting policy of the registry's
   request token, so it runs exactly when a request is created, on that one
   request, and never at the fold. It validates the request datum (the write,
@@ -199,7 +199,7 @@ which it does not model yet.
   request script's policy, all into the request output. Each tag is named
   after its oracle, so an oracle finds every pending request across every
   registry with one asset query, with no index of the registries that list
-  it. Minting requires the seed spent in the same transaction and the cage
+  it. Minting requires the seed spent in the same transaction and the registry state
   state as a reference input, proving that the registry exists. One tag per
   request named after the registry was rejected: an oracle would first have to
   find every registry naming it.
@@ -259,15 +259,15 @@ which it does not model yet.
   fee, so an oracle gains nothing by choosing either verdict and judges
   honestly. A refusal is worth paying for: it is the signed record of why, and
   the evidence a complete account needs.
-- **Fees accumulate in the cage.** Every output on chain must hold the
+- **Fees accumulate in the registry state.** Every output on chain must hold the
   ledger's minimum of ada, so paying each oracle its fee in its own output at
   every fold would cost a minimum per oracle per request, and a fee below that
-  minimum could not be paid at all. Instead the cage state keeps a balance per
-  key oracle, and the cage's value holds the sum of the balances. Crediting a
-  fee adds it to the cage's value and to the balances of the oracle's keys,
+  minimum could not be paid at all. Instead the registry state keeps a balance per
+  key oracle, and the registry state's value holds the sum of the balances. Crediting a
+  fee adds it to the registry state's value and to the balances of the oracle's keys,
   split by the oracle standard's shares. The balances are bounded, because the
   oracle set never changes.
-- **Only a fold spends the cage.** Everything that changes the cage, the tree
+- **Only a fold spends the registry state.** Everything that changes the registry state, the tree
   or the balances, is an item of a fold, so nothing races the fold. A fold
   processes its items in order, and each item is one of:
 
@@ -280,17 +280,17 @@ which it does not model yet.
   A fold's validity interval must satisfy the window of every item in it, so
   folders group items whose windows overlap.
 - **Each window has exactly one exit, so exits never race.** Several folders
-  may compete for the same cage state, but which exit ends a request never
+  may compete for the same registry state, but which exit ends a request never
   depends on who submits first.
 
   | Window | The only exit |
   |---|---|
   | Before the deadline | A fold applying the write, with an approval from every oracle. |
   | From the deadline to the deadline plus the window | A fold settling the request by complete account. |
-  | After the window | The owner's withdrawal, which does not touch the cage. |
+  | After the window | The owner's withdrawal, which does not touch the registry state. |
 
 - **A fold writes no fee outputs.** What remains in a write request after the
-  fees is the folder's bid; the only outputs a fold creates are the cage, the
+  fees is the folder's bid; the only outputs a fold creates are the registry state, the
   folder's own, a refund per complete account and a payout per claim.
 - **The complete account settles a request after its deadline.** Any fold in
   the window may include it by showing, for every oracle of the registry, its
@@ -336,7 +336,7 @@ which it does not model yet.
 The current MPFS cage is a registry with one oracle that also folds: its
 `Insert`, `Delete` and `Update` are writes with the matching condition on their
 own key, its tip is the oracle fee, and its processing and retract windows are
-the deadline and the window. Its fees are credited to its balance in the cage,
+the deadline and the window. Its fees are credited to its balance in the registry state,
 and it collects them by including its own claim in one of its folds when it
 chooses. The old cage owner's powers to transfer and end a cage have no
 counterpart.
@@ -352,7 +352,7 @@ sequenceDiagram
   participant R as Requester
   participant O as Oracles
   participant F as Folder
-  participant C as Cage state
+  participant C as Registry state
   R->>R: create request, spend seed, mint one tag per oracle, escrow fees
   O->>O: judge off chain
   alt every oracle approves

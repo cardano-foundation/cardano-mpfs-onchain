@@ -164,7 +164,7 @@ its own code.
 ```mermaid
 sequenceDiagram
   participant G as GitHub oracle
-  participant C as Cage state
+  participant C as Registry state
   participant R as Request
   participant H as GitHub
   G->>G: publishes an offer per check it implements, with its price

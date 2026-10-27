@@ -50,7 +50,7 @@ library function does this for every contract that consumes the standard.
 ```mermaid
 sequenceDiagram
   participant Q as Request
-  participant C as Cage balances
+  participant C as Registry balances
   participant A as Alice
   participant K as Carol
   Q->>C: fold credits a fee of 9 for a judgment signed by Alice and Carol

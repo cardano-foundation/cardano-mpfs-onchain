@@ -45,7 +45,7 @@ flowchart LR
 | After the window | Owner's withdrawal | The owner's signature | The owner everything |
 
 The windows are disjoint and together cover all time, so exactly one exit is
-possible at any moment. Several folders may still compete for the same cage
+possible at any moment. Several folders may still compete for the same registry
 state, but the outcome for the request never depends on who submits first: a
 complete account pays the same whichever verdicts it shows.
 
@@ -60,10 +60,10 @@ sequenceDiagram
   participant R as Requester
   participant G as Registry rule (if any)
   participant P as Request script (release-wide)
-  participant C as Cage state
+  participant C as Registry state
   R->>G: mint the request token: the rule checks the write,<br/>conditions and owner of this one request
   R->>P: spend the seed output, mint one tag per oracle, each named after its oracle
-  P->>C: read the cage state by reference (the registry exists)
+  P->>C: read the registry state by reference (the registry exists)
   P-->>R: tags minted only if escrow covers the oracles' fees<br/>plus the minimum for a refund output
   R->>P: request output: registry, owner, seed, one write,<br/>conditions, fee per oracle, deadline, window, evidence
 ```
@@ -95,14 +95,14 @@ per batch, as the shipped cage does.
 ```mermaid
 sequenceDiagram
   participant F as Folder
-  participant C as Cage state
+  participant C as Registry state
   participant Q as Request outputs
   participant J as Judgment tokens
   F->>Q: spend the chosen requests, in the chosen order
   F->>J: read one approval per oracle per request (by reference),<br/>with each oracle's conditions
   F->>C: for each request: prove the requester's and the oracles' conditions<br/>against the current tree, apply its write
   C-->>F: new root, with oracles and protocol unchanged
-  C-->>F: every oracle's fee credited to its keys' balances in the cage
+  C-->>F: every oracle's fee credited to its keys' balances in the registry state
   F->>F: keep the remainders, burn the tags
 ```
 
@@ -116,7 +116,7 @@ consumed, or fold the same request twice.
 sequenceDiagram
   participant F as Any folder
   participant W as Owner
-  participant C as Cage state
+  participant C as Registry state
   participant Q as Request output
   participant J as Judgment tokens
   Note over F,J: from the deadline to the deadline plus the window
@@ -130,7 +130,7 @@ sequenceDiagram
 ```
 
 The complete account is an item of a fold because it credits fees, and only
-a fold changes the cage. It earns the folder nothing, so the parties that want
+a fold changes the registry state. It earns the folder nothing, so the parties that want
 it folded are the owner, waiting for its refund, and the oracles, waiting for
 their fees; folding is permissionless, so either can fold it. A fold may mix
 complete accounts with writes and claims as long as its validity interval
@@ -139,7 +139,7 @@ fits every item's window.
 After the window the chain cannot tell a silent oracle from an approval the
 owner chooses not to show, so the owner takes everything and decides whether
 to pay the oracles that answered. A silent oracle loses its fee; that is the
-price of not answering. The withdrawal does not touch the cage.
+price of not answering. The withdrawal does not touch the registry state.
 
 ## Claiming fees
 
@@ -148,7 +148,7 @@ sequenceDiagram
   participant K as Key oracle
   participant P as Request script (release-wide)
   participant F as Any folder
-  participant C as Cage state
+  participant C as Registry state
   K->>P: create a claim: mint the claim token with the key's signature,<br/>name the payout address and datum, add a tip
   F->>C: fold the claim at its turn
   C-->>K: the key's whole balance, to exactly that address and datum
@@ -165,4 +165,4 @@ deadline goes back to the oracle.
 
 Once a request has been consumed its seed can never occur again, so any
 judgment still naming it is worthless. Its holder may burn it at any time,
-without the request or the cage taking part.
+without the request or the registry state taking part.

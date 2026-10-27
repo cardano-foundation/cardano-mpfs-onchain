@@ -119,9 +119,17 @@ of them can stop, redirect or rewrite the others.
 
 ## The system at a glance
 
+Two words carry the whole design. A **registry** is a key-value database
+together with its rules: what users create, write to and read. Its **registry
+state** is the one output on chain, marked by a unique token, that holds the
+database's root hash, its slots, protocol and rule, and the oracles' fee
+balances. The database itself lives off chain, rebuilt by anyone from the
+writes recorded on chain. The shipped design calls the registry state the
+cage.
+
 ```mermaid
 flowchart LR
-  creator([Registry creator]) -- "mints, naming slots,<br/>protocol and rule" --> state[(Cage state:<br/>root, slots, balances)]
+  creator([Registry creator]) -- "mints, naming slots,<br/>protocol and rule" --> state[(Registry state:<br/>root, slots, balances)]
   requester([Requester]) -- "creates request: write,<br/>conditions, evidence, fees" --> request[(Request output)]
   oracle([Oracle]) -- "judges off chain,<br/>mints approval or refusal" --> judgment[(Judgment token)]
   folder([Folder]) -- "spends requests, reads judgments,<br/>proves conditions" --> state
@@ -147,7 +155,7 @@ service anyone can offer and be paid for.
 
 **Decided.**
 
-- **Anyone can create a registry.** Creation mints the cage state with an
+- **Anyone can create a registry.** Creation mints the registry state with an
   empty root, the oracles, the protocol and optionally a rule. No script is
   applied to a registry.
 - **A registry needs at least one oracle or a rule.** A registry with neither
@@ -184,7 +192,7 @@ Under all four lies immutability: no one can switch them off later.
 - **The `equals` condition ties a signer to the tree.** A rule can demand "the
   user's registered key equals the key that signed", so an earlier
   registration authorizes a later request with no oracle.
-- **Rules are compiled minting policies**, named by hash in the cage state,
+- **Rules are compiled minting policies**, named by hash in the registry state,
   minting the request token, so they run exactly once, at creation, on one
   request. They reach the tree only by demanding conditions.
 - **The condition language is `absent`, `present` and `equals`**, each costing
@@ -253,7 +261,7 @@ stateDiagram-v2
   authorization; and a time before the request's deadline, so that no oracle
   is paid by a complete account for a judgment made too late. Whether the
   oracle belongs to the registry is left to the fold, which matches names
-  against its own slots. A judgment then needs no reference to the cage state,
+  against its own slots. A judgment then needs no reference to the registry state,
   which every fold spends, so judging never races folding.
 
 ```mermaid
@@ -261,7 +269,7 @@ sequenceDiagram
   participant R as Requester
   participant O as Oracle
   participant F as Folder
-  participant C as Cage state
+  participant C as Registry state
   R->>R: create request: write, conditions, evidence, fees, seed
   O->>O: parse under its check, look at the world
   O->>O: mint approval named after the exact request datum
@@ -288,10 +296,10 @@ What the fold checks for each request, in order:
 
 - **The request pays for judgment, not for outcome**, declaring a fee per
   oracle.
-- **Fees accumulate in the cage.** Paying each oracle in its own output would
-  cost the ledger's minimum per oracle per request. The cage keeps a balance
+- **Fees accumulate in the registry state.** Paying each oracle in its own output would
+  cost the ledger's minimum per oracle per request. The registry state keeps a balance
   per key and holds their sum.
-- **Only a fold spends the cage.** Everything that changes it is an item of a
+- **Only a fold spends the registry state.** Everything that changes it is an item of a
   fold, so nothing races the fold:
 
 | Fold item | When | Effect |
@@ -308,7 +316,7 @@ What the fold checks for each request, in order:
 
 ```mermaid
 flowchart LR
-  req([Request escrow]) -- "fee per oracle" --> cage[(Cage: one balance per key)]
+  req([Request escrow]) -- "fee per oracle" --> cage[(Registry state: one balance per key)]
   req -- "remainder" --> folder([Folder, or the owner<br/>on a complete account])
   cage -- "claim: whole balance" --> payout([Payout chosen by the key])
 ```
@@ -409,7 +417,7 @@ protocol is on [Oracle slots and check protocols](slots.md).
 | Changing a registry | Never | Changeable oracles, prices or rules | Whoever may change them holds power over every user |
 | Where the rule runs | Once, at creation, as the request token's minting policy | At every fold | The fold would traverse the whole batch to check what is fixed at creation |
 | How judgments travel | Tokens minted by reference to the request | Off-chain signatures carried in the fold's redeemer (draft) | Tokens make the chain the meeting point, keep refusals on record and give the complete account its evidence |
-| Where fees go | A balance per key in the cage, claimed later | A fee output per oracle per fold | Each output costs the ledger's minimum, and small fees could not be paid at all |
+| Where fees go | A balance per key in the registry state, claimed later | A fee output per oracle per fold | Each output costs the ledger's minimum, and small fees could not be paid at all |
 | Who chooses an oracle's payout | The key, in its claim | The folder; a payout address fixed by a group | The folder could misdirect it; a majority could cut out a member |
 | Who is paid in a group | The members that signed | Every member | A member that never judged would be paid for another's work |
 | Oracle keys | Fixed identities, no rotation | Rotation by the group | Rotation needs a mutable identity, which is a power over every registry |
@@ -422,7 +430,7 @@ protocol is on [Oracle slots and check protocols](slots.md).
 The decisions up to 26 October, the request, judgment and fold design with
 rules and request tokens, are modelled in Lean and audited; see
 [Formal model and audits](formal-model.md). The decisions of 27 October are
-not modelled yet: oracle identities, fees in the cage, complete accounts and
+not modelled yet: oracle identities, fees in the registry state, complete accounts and
 claims as fold items, slots and the trimmed minting checks. Nothing is
 implemented in the validators yet.
 

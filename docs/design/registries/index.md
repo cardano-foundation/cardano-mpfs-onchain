@@ -24,7 +24,7 @@ The people involved and what each one gets:
 
 | Who | Wants | Sees when it works | Sees when it is refused |
 |---|---|---|---|
-| Registry creator | A registry whose rules are fixed forever | A cage state with an empty tree, its oracles, its protocol and optionally a rule | Creation fails if the registry has neither an oracle nor a rule, or repeats an oracle |
+| Registry creator | A registry whose rules are fixed forever | A registry state with an empty tree, its oracles, its protocol and optionally a rule | Creation fails if the registry has neither an oracle nor a rule, or repeats an oracle |
 | Requester | One write applied under conditions they choose | Their write folded into the tree, their fees paid to the oracles, the rest bid to the folder | A refusal, or a fold whose conditions do not hold; after the deadline they settle and recover the rest |
 | Oracle | To be paid for judging, whatever it decides | Its fee credited to its balance at the fold, or at the complete account after the deadline, and collected by claim when it chooses | Nothing to refuse: an oracle that does not serve a registry simply never answers |
 | Folder | To earn the remainder of requests it folds | Approved requests applied, the remainder of each request paid to it | A fold with a missing approval, a false condition or a late time is rejected |
@@ -34,7 +34,7 @@ The people involved and what each one gets:
 
 ```mermaid
 flowchart LR
-  creator([Registry creator]) -- "mints, naming oracles and protocol" --> state[(Cage state:<br/>root, oracles, protocol)]
+  creator([Registry creator]) -- "mints, naming oracles and protocol" --> state[(Registry state:<br/>root, oracles, protocol)]
   requester([Requester]) -- "creates request, mints one tag<br/>per oracle, escrows fees" --> request[(Request output<br/>at the release request address)]
   oracle([Each oracle]) -- "reads request, judges off chain,<br/>mints approval or refusal" --> judgment[(Judgment token<br/>in the oracle's wallet)]
   folder([Folder]) -- "spends requests, reads judgments,<br/>proves conditions" --> state
@@ -43,7 +43,9 @@ flowchart LR
   reader([Reader]) -- "replays folds" --> state
 ```
 
-Every arrow into the cage state goes through the fold. Judgments are minted
+The registry state is the one output on chain that holds a registry's root
+hash, its rules and its fee balances; the shipped design calls it the cage.
+Every arrow into the registry state goes through the fold. Judgments are minted
 by reference to the request, so oracles never compete for the same output.
 The request output is spent exactly once, by one of three exits, each in its
 own time window.

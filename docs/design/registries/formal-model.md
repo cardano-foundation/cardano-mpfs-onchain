@@ -30,7 +30,7 @@ flowchart LR
 | Part | What it captures |
 |---|---|
 | Trie, writes, conditions | The tree as a map from keys to values; `set` and `unset`; `absent`, `present` and `equals`; ordered application within a fold |
-| Cage state | Registry identity, oracle set, protocol hash, optional rule and tree |
+| Registry state | Registry identity, oracle set, protocol hash, optional rule and tree |
 | Request output | Registry, owner, seed, a fresh output reference, one write, conditions, a fee per oracle, deadline, window, evidence, escrow, its request token and one tag per oracle |
 | Judgment | Registry, request, oracle, verdict and, for an approval, the oracle's own conditions, all bound in its name |
 | Price notice | An oracle's price token and its current fee, optionally per protocol |
@@ -48,7 +48,7 @@ standing for the hashes the implementation will use.
 
 !!! note "Decisions not yet in the model"
     Oracle identities (keys and groups with shares), fees accumulated per key
-    in the cage, and complete accounts and claims as items of the fold were
+    in the registry state, and complete accounts and claims as items of the fold were
     decided after this model was audited. The model still names oracles as
     single keys and pays each oracle's fee in its own output.
 
