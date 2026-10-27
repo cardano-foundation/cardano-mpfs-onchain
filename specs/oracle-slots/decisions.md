@@ -51,6 +51,18 @@ Nothing here is decided until its open points are settled.
 - **A key or value that does not parse under the check is refused**, and the
   refusal is paid like any judgment.
 - **A new version of a check is a new hash**, and therefore a new registry.
+- **Under a slot's prefix the registry imports the check's shapes.** The
+  registry protocol does not define keys or values under a slot prefix; it
+  uses the check's `suffix` and `value`, so the two cannot disagree. The rule
+  may only narrow them, and a field that names a key under another slot uses
+  that slot's suffix type.
+- **A registry protocol ships a request zoo**: one sample request of every
+  kind it expects. Before creation, a tool validates each sample against the
+  check of the slot it falls under, the slot's parameters against the
+  check's `params`, and the rule's shapes and demanded conditions; a provider
+  may offer a free dry run of its check. A zoo that passes means the registry
+  engages its checks correctly; the probe after creation only confirms that
+  the providers are live and the fees are right.
 
 ## Liveness (decided)
 

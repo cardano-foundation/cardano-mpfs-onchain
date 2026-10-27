@@ -50,18 +50,20 @@ own time window.
 
 ## Reading route
 
-1. [Request lifecycle](lifecycle.md): the states of a request, its three time
+1. [Open MPFS design document](open-mpfs.md): every decision in one place,
+   with its status.
+2. [Request lifecycle](lifecycle.md): the states of a request, its three time
    windows and a sequence diagram for every exit.
-2. [Decisions](decisions.md): every design choice with the alternatives it
+3. [Decisions](decisions.md): every design choice with the alternatives it
    rejected and why.
-3. [Economics](economics.md): who pays whom, the markets this opens, and the
+4. [Economics](economics.md): who pays whom, the markets this opens, and the
    shipped cage as a special case.
-4. [Oracle identities](oracles.md): oracles as keys or groups with shares,
+5. [Oracle identities](oracles.md): oracles as keys or groups with shares,
    and how fees reach each key.
-5. [Oracle slots and check protocols](slots.md), a draft: which oracle judges
+6. [Oracle slots and check protocols](slots.md), a draft: which oracle judges
    which keys under which published check, worked through on the moog
    registry.
-6. [Formal model and audits](formal-model.md): what is proved in Lean, what
+7. [Formal model and audits](formal-model.md): what is proved in Lean, what
    the independent audits found, and what is not yet covered.
 
 The authoritative decision record is

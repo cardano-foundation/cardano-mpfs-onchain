@@ -1,0 +1,350 @@
+# Open MPFS: design document
+
+**As anyone who wants a shared, verifiable key-value registry on Cardano, I
+want to create one by naming the oracles that judge it and the checks they
+perform, so that the registry needs no owner, no script of its own and no
+folding infrastructure, its rules can never be changed under its users, and
+anyone can fold what its oracles have approved.**
+
+This document gathers the decisions taken from 24 to 27 October 2026 on open
+MPFS: Merkle Patricia Forestry registries without an owner, judged by
+independent oracles and folded by anyone. Each section says what is decided,
+what is a draft whose direction is agreed but whose details are still moving,
+and what is open.
+
+| Status | Meaning |
+|---|---|
+| **Decided** | Recorded in the decision records; the earlier part is modelled in Lean and audited |
+| **Draft** | Direction agreed in discussion; details may still change |
+| **Open** | Not decided |
+
+The decision records are the authority; this document explains them:
+
+- [`specs/request-approval-fold/decisions.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/request-approval-fold/decisions.md):
+  requests, judgments, folds and money;
+- [`specs/oracle-identity/decisions.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-identity/decisions.md):
+  oracle identities and how fees reach keys;
+- [`specs/oracle-slots/decisions.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-slots/decisions.md):
+  slots and check protocols, the draft.
+
+## The system at a glance
+
+```mermaid
+flowchart LR
+  creator([Registry creator]) -- "mints, naming slots,<br/>protocol and rule" --> state[(Cage state:<br/>root, slots, balances)]
+  requester([Requester]) -- "creates request: write,<br/>conditions, evidence, fees" --> request[(Request output)]
+  oracle([Oracle]) -- "judges off chain,<br/>mints approval or refusal" --> judgment[(Judgment token)]
+  folder([Folder]) -- "spends requests, reads judgments,<br/>proves conditions" --> state
+  request -- "spent by exactly one exit" --> folder
+  judgment -. "read by reference" .-> folder
+  reader([Reader]) -- "replays folds" --> state
+```
+
+The shipped cage has one owner that alone folds requests, and one request
+script per cage. Open MPFS removes both. A registry is data naming its
+judges; one request script per release serves every registry; folding is a
+service anyone can offer and be paid for.
+
+| Who | Wants | Does |
+|---|---|---|
+| Registry creator | A registry whose rules are fixed forever | Names the slots, the protocol and the rule, once |
+| Requester | One write applied under conditions they choose | Creates a request carrying the write, the conditions, the evidence and the fees |
+| Oracle | To be paid for judging | Judges off chain, mints an approval or a refusal, collects its fees by claim |
+| Folder | The remainder of the requests it folds | Applies approved requests to the tree, proving their conditions |
+| Reader | The registry's contents | Rebuilds the tree by replaying folds; every write is on chain |
+
+## Registries
+
+**Decided.**
+
+- **Anyone can create a registry.** Creation mints the cage state with an
+  empty root, the oracles, the protocol and optionally a rule. No script is
+  applied to a registry.
+- **A registry needs at least one oracle or a rule.** A registry with neither
+  would accept any write.
+- **Everything is declared at creation and never changes.** Whoever could
+  change a part would hold power over everyone who trusted the registry. The
+  oracles and the protocol are the registry's identity: new judges mean a new,
+  empty registry.
+- **A registry has no owner and no end.** Its oracles are its only judges. A
+  registry whose oracles stop answering stops moving.
+- **Oracles need not consent to being named.** Naming is an offer of business;
+  an oracle that does not want it never answers.
+
+## Who checks what
+
+**Decided**, with the slot row a draft. A registry defends itself in four
+layers, each blind to what another sees:
+
+| Layer | Runs | Defends against | Blind to |
+|---|---|---|---|
+| Rule | Once, when the request is created | The wrong writer (signatures), malformed writes, writes without the conditions they need (it demands them) | The tree and the outside world |
+| Conditions | At the fold, at the request's turn | Stale, out-of-order or duplicated writes | Anything not in the tree |
+| Oracles in slots | Off chain, attested by a judgment | False claims about the outside world | Keys outside their slots |
+| The fold | Every fold | Forged requests, late folds, altered bytes, missing approvals, false conditions | Meaning: it checks bytes, hashes and proofs |
+
+Under all four lies immutability: no one can switch them off later.
+
+- **An oracle is needed only where the chain cannot see the data.** Signatures
+  belong to the rule; facts about earlier writes are conditions; only the
+  outside world needs an oracle.
+- **A service that only reports its own work is a key in the rule, not an
+  oracle.** Its writes are trusted because it signed them; the registry limits
+  where it may write and that it cannot overwrite.
+- **The `equals` condition ties a signer to the tree.** A rule can demand "the
+  user's registered key equals the key that signed", so an earlier
+  registration authorizes a later request with no oracle.
+- **Rules are compiled minting policies**, named by hash in the cage state,
+  minting the request token, so they run exactly once, at creation, on one
+  request. They reach the tree only by demanding conditions.
+- **The condition language is `absent`, `present` and `equals`**, each costing
+  one Merkle Patricia Forestry proof in the fold.
+
+## Requests
+
+**Decided.**
+
+- **A request carries one write**, `set key value` or `unset key`, on chain in
+  its datum, so readers rebuild the tree for free.
+- **A request carries conditions**, checked at the fold against the tree at its
+  turn. Compare-and-swap is a write with a condition on its own key.
+- **A request carries evidence**, opaque to the chain; the protocol decides
+  whether it holds the evidence or its hash.
+- **A request carries a seed**, an output spent by its creation, so no two
+  requests in history are equal and no judgment can be replayed.
+- **A request carries a deadline and a window**, which divide its life into
+  three periods, each with exactly one exit.
+- **A request carries one request token**, minted by the rule or the release
+  policy at creation. It is what makes a request genuine; folders find a
+  registry's live requests with one query by it.
+- **A request carries one tag per oracle**, named after the oracle, so an
+  oracle finds all its work across every registry with one query.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Pending: created, seed spent,<br/>request token and tags minted
+  Pending --> Folded: fold before the deadline,<br/>with every approval it needs
+  Pending --> Settled: complete account in the window,<br/>a verdict from every oracle
+  Pending --> Withdrawn: owner, after the window
+  Folded --> [*]: write applied, fees credited,<br/>remainder to the folder
+  Settled --> [*]: fees credited,<br/>remainder to the owner
+  Withdrawn --> [*]: everything to the owner
+```
+
+| Period | The only exit | Who is paid |
+|---|---|---|
+| Before the deadline | A fold applying the write | Oracles their fees; the folder the remainder |
+| From the deadline to the deadline plus the window | A fold settling it by complete account | Oracles their fees; the owner the remainder |
+| After the window | The owner's withdrawal | The owner everything |
+
+## Judgments
+
+**Decided**, with the trimmed minting checks a draft.
+
+- **An oracle approves or refuses by minting a token** under the release
+  policy, by reference to the request. Nothing is spent, so oracles never
+  contend for an output.
+- **The policy computes the token's name** from the registry, the complete
+  request datum, the oracle, the verdict, the members of a group oracle that
+  signed and, for an approval, the oracle's conditions. The oracle chooses its
+  verdict, its conditions and who signs; it cannot produce a name for content
+  it did not see.
+- **An approval may carry the oracle's conditions**, the assumptions it judged
+  under; the fold proves them at the request's turn.
+- **A fold signed by an oracle counts as its approval**, so an oracle that
+  folds itself needs no separate judgment.
+- **Approving and refusing pay the same**, so an oracle gains nothing by its
+  verdict.
+- **Equivocation is accepted.** An oracle can mint both verdicts; under the
+  periods above it changes nothing, and both stay on chain under its
+  signature.
+- **Draft: minting checks only what the fold cannot.** The policy needs the
+  preimage of the name, to see which oracle it claims; the oracle's
+  authorization; and a time before the request's deadline, so that no oracle
+  is paid by a complete account for a judgment made too late. Whether the
+  oracle belongs to the registry is left to the fold, which matches names
+  against its own slots. A judgment then needs no reference to the cage state,
+  which every fold spends, so judging never races folding.
+
+```mermaid
+sequenceDiagram
+  participant R as Requester
+  participant O as Oracle
+  participant F as Folder
+  participant C as Cage state
+  R->>R: create request: write, conditions, evidence, fees, seed
+  O->>O: parse under its check, look at the world
+  O->>O: mint approval named after the exact request datum
+  F->>C: fold: genuine request, on time, approvals of every matching slot,<br/>conditions proved, write applied, fees credited
+```
+
+What the fold checks for each request, in order:
+
+1. The request carries the registry's request token, and the fold's validity
+   interval falls before its deadline.
+2. Which slots match: each slot whose prefix starts the written key, by byte
+   comparison. No CDDL is read on chain.
+3. For each matching slot, a judgment token whose name the fold recomputes
+   from the request it spends, the slot's oracle and the conditions and
+   signers given in the redeemer; or that oracle's authorization of the fold.
+4. Every condition, the requester's and each approval's, against the tree at
+   this turn, by proof.
+5. The new root after the write.
+6. Each matching slot's fee, credited to the signers of its judgment.
+
+## Money
+
+**Decided.**
+
+- **The request pays for judgment, not for outcome**, declaring a fee per
+  oracle.
+- **Fees accumulate in the cage.** Paying each oracle in its own output would
+  cost the ledger's minimum per oracle per request. The cage keeps a balance
+  per key and holds their sum.
+- **Only a fold spends the cage.** Everything that changes it is an item of a
+  fold, so nothing races the fold:
+
+| Fold item | When | Effect |
+|---|---|---|
+| Write request | Before its deadline | Applies the write, credits the fees, remainder to the folder |
+| Complete account | In its window | Writes nothing, credits the fees, remainder to the owner |
+| Claim | Before its deadline | Pays one key's whole balance to the destination the claim names |
+
+- **An oracle collects its fees by claim**, a request created with its key's
+  signature that names the payout address and datum. The folder cannot choose
+  the payout; the fold checks it exactly.
+- **The escrow exceeds the fees by the ledger's minimum**, so a complete
+  account can always refund the owner.
+
+```mermaid
+flowchart LR
+  req([Request escrow]) -- "fee per oracle" --> cage[(Cage: one balance per key)]
+  req -- "remainder" --> folder([Folder, or the owner<br/>on a complete account])
+  cage -- "claim: whole balance" --> payout([Payout chosen by the key])
+```
+
+## Oracle identities
+
+**Decided.** The oracle identity is a standard of its own, which open MPFS
+consumes and which may move to its own repository.
+
+- **An oracle is a key or a group**: a threshold and members, each a key or a
+  group, each with a share. Groups nest.
+- **Its identity is the hash of its description** and never changes. Keys are
+  not rotated: a group that loses members beyond its threshold is dead, and
+  its users name a new identity in a new registry.
+- **A key authorizes by signing; a group when its threshold of members
+  authorize**, recursively. The description travels in the redeemer; one
+  library function checks it for every contract, rules included.
+- **Only the members that signed are paid**, by their shares, down to keys.
+  The signers are bound in the judgment's name. The integer remainder goes to
+  the first signer.
+- **A key stolen compromises only its oracles, up to their thresholds.** A
+  registry naming several oracles already needs all of them; a single oracle
+  protects itself with a group.
+
+```mermaid
+flowchart TD
+  group["Group oracle, threshold 2"] -- "share 2" --> alice["Key: Alice"]
+  group -- "share 1" --> bob["Key: Bob"]
+  group -- "share 1" --> inner["Group oracle, threshold 1"]
+  inner -- "share 1" --> carol["Key: Carol"]
+  inner -- "share 1" --> dave["Key: Dave"]
+```
+
+If Alice and Carol sign a judgment whose fee is 9, Alice is paid 6 and Carol
+3; Bob and Dave, who did not sign, are paid nothing.
+
+## Slots and check protocols
+
+**Draft**, except where marked decided.
+
+- **A registry names its oracles in slots**: an oracle identity, the hash of a
+  check protocol, a key prefix and parameters.
+- **A write needs approval only from the slots whose prefix matches its key.**
+  Keys under no slot are gated by the rule alone; a registry without a rule
+  refuses them. When several slots match, all must approve.
+- **A check protocol is a document named by hash**, published by whoever
+  writes the checking software: what is checked, the parameters, the shape of
+  the key after the prefix and of the value, in CDDL. A new version is a new
+  hash.
+- **Under a slot's prefix the registry imports the check's shapes**; the rule
+  may only narrow them.
+- **A registry protocol ships a request zoo**, one sample per kind of request,
+  validated before creation against each slot's check, its parameters and the
+  rule. A passing zoo means the registry engages its checks correctly.
+- **An oracle reads slots, not registry documents.** It engages a slot when it
+  implements its check, accepts its parameters and the fee meets its price.
+- **Decided: liveness is incentivized, not enforced.** A silent oracle stalls
+  its slots and nothing replaces it, since a fallback judge would reintroduce
+  an owner. Answering is what earns. A creator protects a registry by choosing
+  providers, or by naming a group of competing providers whose threshold
+  trades liveness against agreement.
+- **Decided: creating a registry is a challenge to its oracles.** Nothing is
+  negotiated beforehand; a slot proves to be served when its kinds of request
+  are judged. A creator probes each slot and abandons a silent registry at the
+  cost of its creation.
+
+With slots, "every oracle" in the sections above reads "every oracle whose
+slot matches the key": tags, approvals, complete accounts and fees follow the
+matching slots.
+
+### Worked example: moog
+
+Moog lets GitHub users request test runs on Antithesis. Its registry splits
+into three GitHub slots and two prefixes gated by its rule alone:
+
+```mermaid
+flowchart LR
+  write([A write]) --> match{"Key prefix"}
+  match -- "user/github/" --> s1["GitHub oracle:<br/>key file check"]
+  match -- "role/github/" --> s2["GitHub oracle:<br/>code owners role check"]
+  match -- "run/github/" --> s3["GitHub oracle:<br/>compose assets check"]
+  match -- "white/github/, state/github/" --> rule["Rule alone:<br/>the agent signs"]
+```
+
+A test run needs the GitHub oracle only to confirm that the commit and its
+compose file exist. That the requester holds the role, that the repository is
+white-listed, that the requester's registered key signed and that runs are
+numbered in order are conditions and rule checks. The agent's acceptances and
+results need no oracle: the rule checks the agent's signature and a condition
+checks the previous state. The CDDL for the slots, the checks and the moog
+protocol is on [Oracle slots and check protocols](slots.md).
+
+## Alternatives rejected
+
+| Decision | Chosen | Rejected | Why |
+|---|---|---|---|
+| Who folds | Anyone | The registry's owner | An owner is a single point of control and failure |
+| Changing a registry | Never | Changeable oracles, prices or rules | Whoever may change them holds power over every user |
+| Where the rule runs | Once, at creation, as the request token's minting policy | At every fold | The fold would traverse the whole batch to check what is fixed at creation |
+| How judgments travel | Tokens minted by reference to the request | Off-chain signatures carried in the fold's redeemer (draft) | Tokens make the chain the meeting point, keep refusals on record and give the complete account its evidence |
+| Where fees go | A balance per key in the cage, claimed later | A fee output per oracle per fold | Each output costs the ledger's minimum, and small fees could not be paid at all |
+| Who chooses an oracle's payout | The key, in its claim | The folder; a payout address fixed by a group | The folder could misdirect it; a majority could cut out a member |
+| Who is paid in a group | The members that signed | Every member | A member that never judged would be paid for another's work |
+| Oracle keys | Fixed identities, no rotation | Rotation by the group | Rotation needs a mutable identity, which is a power over every registry |
+| What an oracle can be | Keys and groups of keys | A script credential | The chain sees a script act only through a zero withdrawal, a staking registration per oracle, or by spending its own output, an extra input per judgment |
+| A silent oracle | Incentives only | A fallback judge after a timeout | A fallback judge is an owner |
+| Equivocation | Accepted, public | A ballot per oracle burned at judgment | Under the three periods it changes nothing |
+
+## Status and open questions
+
+The decisions up to 26 October, the request, judgment and fold design with
+rules and request tokens, are modelled in Lean and audited; see
+[Formal model and audits](formal-model.md). The decisions of 27 October are
+not modelled yet: oracle identities, fees in the cage, complete accounts and
+claims as fold items, slots and the trimmed minting checks. Nothing is
+implemented in the validators yet.
+
+Open:
+
+- Whether prices are announced per check protocol, listing every provider of
+  a check in one query, instead of per oracle.
+- Whether the fee is declared per matching slot, and whether a judgment's
+  name binds the slot, for an oracle in two slots matching one key.
+- Whether oracles attest facts independently of any registry, valid until an
+  expiry, so that one judgment of a world fact serves every registry that uses
+  the same check; this would need its own payment path.
+- The cost of prefix matching, condition proofs and fee splits in the fold, to
+  be measured on a devnet.
+- The migration or coexistence of existing cages.

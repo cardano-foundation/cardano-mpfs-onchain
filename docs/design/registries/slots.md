@@ -138,6 +138,24 @@ The run and its state live under different prefixes on purpose. Creating a
 run needs the GitHub check; moving its state needs only the agent. Under one
 prefix the GitHub oracle would be asked to judge results it cannot see.
 
+### Is the registry engaging its checks correctly?
+
+Both sides are CDDL, so this is checked before anything goes on chain. Under a
+slot's prefix the registry does not define keys or values: it imports the
+check's `suffix` and `value`, and the rule may only narrow them. What is left
+to check:
+
+| Check | Question | How |
+|---|---|---|
+| Parameters | Do the slot's `params` fit the check's `params` rule? | CDDL validation |
+| Rule against check | Could the rule admit a request the check can only refuse? | The rule's shapes must fit inside the check's, or requesters pay for certain refusals |
+| Cross-references | Do the conditions the rule demands name keys in the right shape? | A field naming a key under another slot uses that slot's suffix type: moog's `requester` is a GitHub username, the suffix of the key-file check |
+| Samples | Does every kind of request pass? | The registry protocol ships a request zoo, one sample per kind; a tool runs each through its slot's check, the parameters and the rule, and a provider may offer a free dry run |
+
+A zoo that passes means the registry engages its checks correctly. The probe
+after creation then only confirms that the providers are live and the fees are
+right.
+
 ## How an oracle engages
 
 The oracle never reads the moog document. It reads slots, and the checks are
