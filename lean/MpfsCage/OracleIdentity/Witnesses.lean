@@ -1,4 +1,4 @@
-import MpfsCage.OracleIdentity.Paths
+import MpfsCage.OracleIdentity.ObservationSpec
 
 /-! Concrete reachable calls and their results. This module imports no admitted
     statements: all witnesses are checked by kernel reduction. -/
@@ -138,5 +138,32 @@ def W26 :
     "carol" ∈ memberKeys strictMembers ∧
     "carol" ∈ (["alice", "carol"] : Signers) ∧
     paidTo [⟨"alice", 11⟩] "carol" = 0 := by decide
+
+def repeatedPayments : List Payment := [⟨"alice", 3⟩, ⟨"bob", 0⟩, ⟨"alice", 5⟩]
+
+def W27 : splitFee (identity demo) demo signers 11 = some payments ∧
+    paidTo payments "alice" = 8 ∧ paidTo repeatedPayments "alice" = 8 ∧
+    paidTo repeatedPayments "bob" = 0 ∧ paidTo [] "alice" = 0 := by decide
+
+def W28 :
+    (((payments.map Payment.key).eraseDups).map (paidTo payments)).sum = 11 ∧
+    totalPaid payments = 11 ∧
+    (((repeatedPayments.map Payment.key).eraseDups).map (paidTo repeatedPayments)).sum = 8 ∧
+    totalPaid repeatedPayments = 8 := by decide
+
+def W29 : recordedKeys (.key "alice") = ["alice"] ∧
+    recordedKeys demoRecord = ["alice", "carol", "dave"] ∧
+    recordedKeys (.group .nil) = [] := by decide
+
+def W30 : authorize (identity deepGroup) deepGroup ["alice", "carol"] =
+      some (.group (.cons 1 (.group (.cons 1 (.key "alice") .nil)) .nil)) ∧
+    branchKeys deepGroup ["alice", "carol"] = ["alice"] ∧
+    recordedKeys (.group (.cons 1 (.group (.cons 1 (.key "alice") .nil)) .nil)) =
+      ["alice"] := by decide
+
+def W31 : signingKeys deepGroup ["alice", "alice", "carol", "outsider"] =
+      ["alice", "carol"] ∧
+    branchKeys deepGroup ["alice", "alice", "carol", "outsider"] = ["alice"] ∧
+    signingKeys alice [] = [] := by decide
 
 end OracleIdentity.Witnesses

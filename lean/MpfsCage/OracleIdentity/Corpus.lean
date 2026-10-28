@@ -44,7 +44,16 @@ def witnessCorpus : List Scenario := [
   scenario "W25" "authorize" alice ["alice"],
   scenario "W25-absent" "authorize" alice [],
   scenario "W25-nested" "authorize" demo signers,
-  { scenario "W26" "paidTo" deepGroup ["alice", "carol"] with key := "carol" }]
+  { scenario "W26" "paidTo" deepGroup ["alice", "carol"] with key := "carol" },
+  { scenario "W27" "paidTo" demo signers with key := "alice" },
+  scenario "W28" "totalPaid" demo signers,
+  { scenario "W28-carol" "paidTo" demo signers with key := "carol" },
+  { scenario "W28-dave" "paidTo" demo signers with key := "dave" },
+  scenario "W29" "recordedKeys" alice ["alice"],
+  scenario "W29-group" "recordedKeys" demo signers,
+  scenario "W30" "recordedKeys" deepGroup ["alice", "carol"],
+  scenario "W31" "signingKeys" deepGroup ["alice", "alice", "carol", "outsider"],
+  scenario "W31-absent" "signingKeys" alice []]
 
 /-- Each M row names one proposed source-atom edit, not a claimed mutation run.
     The input is replayed unchanged against the baseline and the edited model. -/
@@ -84,6 +93,11 @@ def mutantCorpus : List Scenario := [
   mutant "M25" "record key: replace key record by singleton group of share one" "authorize" alice ["alice"],
   mutant "M25-nested" "record key: replace key record by singleton group of share one" "authorize" demo signers,
   { mutant "M26" "splitRecorded group: append a one-unit carol payout" "paidTo"
-      deepGroup ["alice", "carol"] with key := "carol" }]
+      deepGroup ["alice", "carol"] with key := "carol" },
+  { mutant "X45-T27" "paidTo: replace key equality by key equality and False" "paidTo" demo signers with key := "alice" },
+  { mutant "X45-T28" "paidTo: replace key equality by key equality and False" "paidTo" alice ["alice"] with key := "alice" },
+  mutant "X47-T29" "recordedKeys key: return empty list" "recordedKeys" alice ["alice"],
+  mutant "X47-T30" "recordedKeys key: return empty list" "recordedKeys" deepGroup ["alice", "carol"],
+  mutant "X48-T31" "signingKeys: omit signer filter" "signingKeys" alice []]
 
 end OracleIdentity.Corpus

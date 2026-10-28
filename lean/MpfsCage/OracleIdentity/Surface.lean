@@ -86,6 +86,7 @@ def runScenario (s : Scenario) : Except String Json := do
   match s.surface with
   | "identity" => return toJson (identity s.description)
   | "valid" => return toJson (valid s.description)
+  | "signingKeys" => return toJson (signingKeys s.description s.signers)
   | "splitFee" =>
       match splitFee s.expected s.description s.signers s.fee with
       | none => .error "authorization refused"

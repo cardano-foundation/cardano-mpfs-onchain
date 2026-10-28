@@ -1,3 +1,4 @@
+import MpfsCage.OracleIdentity.ObservationSpec
 import MpfsCage.OracleIdentity.FormulaProofs
 import MpfsCage.OracleIdentity.ExclusionProofs
 import MpfsCage.OracleIdentity.CountingProofs
@@ -243,5 +244,36 @@ theorem nonauthorizing_subgroup_at_any_depth_receives_nothing
     simp [record, hlt]
   exact unpaid_of_record_absent r fee k
     (record_avoids_path root ss r path (.group t members) k hn hr hp hf hk)
+
+-- T27: exact positive and negative payment observation, including repeated payees.
+theorem paid_to_exact (payments : List Payment) (k : Key) :
+    paidTo payments k =
+      payments.foldr (fun p amount => (if p.key = k then p.amount else 0) + amount) 0 := by
+  sorry
+
+-- T28: counting every payee exactly once recovers all money in the payment list.
+theorem paid_to_partition (payments : List Payment) :
+    (((payments.map Payment.key).eraseDups).map (paidTo payments)).sum =
+      totalPaid payments := by
+  sorry
+
+-- T29: complete constructor equations, fixing every leaf and ordered group traversal.
+theorem recorded_keys_exact (r : SigningRecord) :
+    recordedKeys r = match r with
+      | .key k => [k]
+      | .group ms => ms.toList.flatMap (fun m => recordedKeys m.2) := by
+  sorry
+
+-- T30: exact successful record projection from the original authorizing branches.
+theorem successful_record_keys_exact (expected : Identity) (d : Description)
+    (ss : Signers) (r : SigningRecord) :
+    authorize expected d ss = some r → recordedKeys r = branchKeys d ss := by
+  sorry
+
+-- T31: signer membership, order and deduplication are all fixed, without an
+-- authorization premise; keys in a failed subgroup can still belong here.
+theorem signing_keys_exact (d : Description) (ss : Signers) :
+    signingKeys d ss = ((keys d).filter (fun k => k ∈ ss)).eraseDups := by
+  sorry
 
 end OracleIdentity

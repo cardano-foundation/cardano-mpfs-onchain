@@ -1,16 +1,63 @@
 # Oracle identity theorem and semantic-atom ledgers
 
-This is the **PROOF CANDIDATE** for #126. All 26 accepted theorem statements
-are **PROVED**, with zero admissions and only permitted standard axioms.
-The parent accepted the independent statement audit of
-`82bbfccfe4976f3a72a55a821bc2fd5a921b421a` in NOTE-002; NOTE-003 freezes
-Model.lean byte-for-byte and the 26 theorem names and source types up to `:=`.
-Those frozen bytes are unchanged. Proofs, proof-only helpers and this ledger are
-the only changes. This creator result awaits independent proof assessment;
-it is not self-acceptance, hosted CI or deployment evidence.
-Registry integration and judgment binding belong to #127.
-**Price notices are excluded from #126:** they are tied to registry pricing and
-belong to #127.
+This is the **OBSERVATION STATEMENT REPAIR CANDIDATE** under NOTE-004.
+The independent proof audit of `964eb1a` returned PASS for T01-T26, with
+advisory observation survivors X45, X47 and X48. The operator commissioned
+exact observation laws and their proofs, in two commits: admitted statements
+first, then proofs. T01-T26 remain PROVED and unchanged. New T27-T31 are OPEN
+with intentional admissions in this statement commit; their concrete witnesses
+are proved without importing Statements. Model.lean remains byte-identical.
+The full audit report is retained as `inputs/proof-audit-1.md` in the runtime.
+
+Registry integration, judgment binding and price notices remain outside #126
+and belong to #127. Creator evidence is a CANDIDATE, not independent acceptance.
+
+## Observation repair (NOTE-004)
+
+| Row | Theorem | Exact guarantee | Witness | Mutant | Outcome |
+|---|---|---|---|---|---|
+| T27 | paid_to_exact | Sum every matching payment amount, including repeated recipients; exclude other keys | W27: Alice receives 8, repeated payee receives 3+5, zero and empty cases | X45: paidTo key predicate conjoined with False | OPEN |
+| T28 | paid_to_partition | Sum paidTo once per distinct payment key equals totalPaid for every payment list | W28: nested payout 11; repeated payee and zero-valued Bob total 8 | X45 | OPEN |
+| T29 | recorded_keys_exact | Key record has exactly its key; group flattens every child's keys in order | W29: key, nested group and empty group | X47: recordedKeys key returns [] | OPEN |
+| T30 | successful_record_keys_exact | Successful record keys exactly match original-description authorizing branches | W30: nested successful root with signing Carol in a failed subgroup; only Alice retained | X47 | OPEN |
+| T31 | signing_keys_exact | Exactly the description keys among signers, in description order with duplicates removed | W31: duplicates and outsider removed; signed Carol retained despite failed subgroup; absent key omitted | X48: omit the signer filter | OPEN |
+
+`ObservationSpec.lean` defines `branchKeys`/`memberBranchKeys` as statement
+vocabulary over the original description. A key is included iff it signed;
+a group contributes its recursively collected keys iff its direct authorizing
+count meets the threshold. This vocabulary calls none of the three repaired
+observations. It distinguishes signed keys in failed branches from recorded
+keys. T29 fixes all record constructors, including arbitrary records; T30 binds
+the observation to an actual successful authorization.
+
+New semantic atoms: A28 paidTo's exact positive/zero aggregate (T27/T28);
+A29 recordedKeys leaf and ordered recursive concatenation (T29);
+A30 exact description-to-record key projection through successful branches
+(T30); A31 signingKeys signer filtering, description order and deduplication
+(T31). X45/X47/X48 are expected falsifiers pending the bounded repair probes.
+
+All 31 source signatures are captured before proof edits in
+`evidence/repair-004/statement-signatures.json`; the original 26 match the
+accepted `82bbfcc` signatures. The five additions have these type hashes:
+
+| Row | SHA256 |
+|---|---|
+| T27 | `936c284c2548d9afdae415ca2d060580482d0456275cd3c1f38056c61e748841` |
+| T28 | `4009a9b9f018ce86454f01e55294cc154f193d68795fbf2f0eaaea488caafc84` |
+| T29 | `8b9a4e53d665d4e006264882e70c4e8d2def9c42181613841ac8f44f0b6f7ccd` |
+| T30 | `6c10ba546db045f499b304ae14da685a7d0333bcb0cc35f7a9aaa2e78b9cb3c3` |
+| T31 | `1820ed697ec1bf3f085ecacefe3199a95416df57988d0211bdd1b7b68691e068` |
+
+The generic JSON surface now exposes `signingKeys` directly for any description
+and signers, without requiring authorization. The corpus adds W27-W31 and
+X45/X47/X48 scenarios; no per-theorem driver dispatch was added. Kernel witnesses
+also cover arbitrary repeated payment recipients and arbitrary records, which
+the existing scenario grammar does not accept as inputs.
+
+Statement-phase build: 29 jobs, exit 0, exactly five intentional admissions.
+Evidence: `evidence/repair-004/statements-build.log`. Independent audit of the
+new statement slice is enabled by its separate commit. NOTE-004 also explicitly
+authorizes the following proof commit; no original guarantee is reopened.
 
 ## Prior statement repair and mutation result
 
@@ -303,9 +350,10 @@ The actual `record`, `signedMembers`, `portions`, `splitRecorded`,
 `splitMembers`, `authorize` and `splitFee` definitions remain the law used
 by the proofs; there is no replacement executable model.
 
-## Verification and remaining work
+## Prior proof verification at 964eb1a
 
-Evidence is under
+The following receipts describe the prior 26-theorem proof commit, not this
+observation repair. Evidence is under
 `/code/mpfs-onchain-lean-126-20261028/astra-identities-model/evidence/proofs/`.
 The prescribed command `cd lean && nix develop ..#aiken --quiet -c lake build`
 passes from a deleted, absent `.lake`: **28 jobs**, exit 0, no warnings from
@@ -334,8 +382,9 @@ proof-phase findings.
 
 The exact local commit, Git tree and evidence hashes are bound by
 `evidence/proofs/receipt.json` and `handoffs/proofs.md` in the runtime.
-All 26 semantic outcomes are PROVED; none is REFUTED or OPEN. Independent
-proof/adequacy assessment remains parent-owned. Cryptographic encoding
+All prior 26 semantic outcomes are PROVED; none is REFUTED or OPEN. The
+independent proof/adequacy assessment subsequently returned PASS with the three
+advisory survivors now addressed by NOTE-004. Cryptographic encoding
 correspondence, deployed validator conformance, costs, ledger-bound record
 authenticity, balances, withdrawals and registry integration remain outside
 this result. Nothing is pushed by this worker.
