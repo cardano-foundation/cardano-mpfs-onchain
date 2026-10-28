@@ -1,10 +1,10 @@
 # Fee balances: model and statement candidate (#127)
 
 Status: **CANDIDATE, STATED, NOT PROVED**. All 113 predecessor theorem names
-are retained and restated in Statements.lean; 28 statements add balance/claim
+are retained and restated in Statements.lean; 29 statements add balance/claim
 properties and exact Step/FoldRun inversions. The old proof-bearing extension
 modules are consolidated, not silently imported as guarantees of the new law.
-141 intentional theorem-proof admissions; none in Model or Witnesses.
+142 intentional theorem-proof admissions; none in Model or Witnesses.
 
 Authority: specs/request-approval-fold/decisions.md (27 October),
 specs/oracle-identity/decisions.md and unchanged imported OracleIdentity.Model.
@@ -50,8 +50,9 @@ below. This creator does not assert independent audit readiness or acceptance.
 ## Theorem ledger
 
 Each mutant below is a named single semantic edit, **expected** to falsify its
-row. Two targeted creator checks (A083 and A087) are recorded below; all
-other mutants remain expected falsifiers pending independent re-audit.
+row. The earlier A083/A087 creator checks and the current M-window-overlap check
+are recorded below; other mutants remain expected falsifiers for this candidate
+pending independent re-audit.
 A witness may supply a stronger trace than the raw premise (for example an
 actual Step plus foldAccepted); its concrete fields instantiate the row.
 W60 constructs the existential equivocation conclusion independently of its
@@ -107,7 +108,7 @@ admitted theorem. W136 reaches every Step constructor.
 | T46 | new_judgment_is_authorized | Authoritative machine judgment provenance | Witnesses.W46 | M-burn-issues | STATED |
 | T47 | exit_time_window | Every actual write, account or owner withdrawal fits its window | Witnesses.W47 | M-account-upper | STATED |
 | T48 | exit_windows_cover | The three scalar windows cover all time | Witnesses.W48 | M-window-gap | STATED |
-| T49 | exit_kind_unique | Two allowed spends at the same interval consume a request by the same exit kind | Witnesses.W49 | M-window-overlap | STATED |
+| T49 | exit_kind_unique | Two allowed spends at the same interval consume a request by the same exit kind | Witnesses.W49 | M-write-guard-overlap | STATED |
 | T50 | fold_references_authentic | Fold references genuinely held minted tokens | Witnesses.W50 | M-fake-references | STATED |
 | T51 | account_references_authentic | Account references genuinely held minted tokens | Witnesses.W51 | M-account-evidence | STATED |
 | T52 | creation_references_source | Creation uses registry in the source state | Witnesses.W52 | M-create-source | STATED |
@@ -118,7 +119,7 @@ admitted theorem. W136 reaches every Step constructor.
 | T57 | burn_keeps_history | Burn does not erase permanent mint record | Witnesses.W57 | M-burn-forgets | STATED |
 | T58 | fold_requests_unique | No duplicate request in accepted fold | Witnesses.W58 | M-duplicate-input | STATED |
 | T59 | account_accepts_any_verdicts | Any authorized verdict selection in-window gives an actual account Step | Witnesses.W59 | M-account-approvals-only | STATED |
-| T60 | equivocation_reachable | Both verdicts coexist in reachable holdings and record | Witnesses.W60 | M-no-equivocation | STATED |
+| T60 | equivocation_reachable | A live request of the reachable registry has both verdicts of a registry oracle with one signing record in holdings and issuance | Witnesses.W60 | M-no-equivocation | STATED |
 | T61 | tag_name_injective | Oracle-bound discovery name | Witnesses.W61 | M-tag-oracle | STATED |
 | T62 | price_name_injective | Oracle-bound notice name | Witnesses.W62 | M-price-oracle | STATED |
 | T63 | different_roles_never_coincide | All distinct leading roles are disjoint | Witnesses.W63 | M-role | STATED |
@@ -200,6 +201,7 @@ admitted theorem. W136 reaches every Step constructor.
 | T139 | claim_windows_cover | Point intervals admit claim fold or withdrawal at every time under the non-time guards | Witnesses.W139 | M-claim-withdraw-gap | STATED |
 | T140 | fold_group_credits_only_recorded_signers | All fold fee records are authenticated; a key absent from all selected records cannot gain balance | Witnesses.W140 | M-fold-unsigned-credit | STATED |
 | T141 | trace_reachability | Indexed event histories and Reachable describe exactly the same states | Witnesses.W141 | M-trace-missing-step | STATED |
+| T142 | exit_windows_disjoint | The exitAt window classes never overlap | Witnesses.W142 | M-window-overlap | STATED |
 
 ## Mutation definitions
 
@@ -246,7 +248,8 @@ admitted theorem. W136 reaches every Step constructor.
 | M-burn-issues | afterBurn | Prepend a fabricated name to issued |
 | M-account-upper | accountAllowed | Remove interval upper bound |
 | M-window-gap | exitAt.write | Require upper + 1 < deadline |
-| M-window-overlap | stepValid | Allow upper <= deadline |
+| M-write-guard-overlap | stepValid | Allow upper <= deadline |
+| M-window-overlap | exitAt.write | Allow upper <= deadline instead of upper < deadline |
 | M-fake-references | Step.fold | Remove authentic judgment-reference premise |
 | M-create-source | Step.create | Remove source cage equality |
 | M-creation-minimum | wellFormed | Require only totalFees <= value, omitting minimum |
@@ -468,7 +471,7 @@ of that malformed action is the intended counterexample, not a new initial state
 | A141 | Observation | requestRemainders: Sum only write/account remainders | W117 | fold_request_conservation | M-A141: Include claim escrow in request remainder sum |
 | A142 | Observation | foldPayments: Include every turn's exact outputs (output order is not pinned) | W119 | fold_payments_exact | M-A142: Drop the current turn outputs from concatenation |
 | A143 | Observation | balanceSum: Sum one balance per distinct registry key | W115 | reachable_balances_backed | M-A143: Count shared keys more than once |
-| A144 | Observation | exitAt: Three nonoverlapping window classes, singleton intervals cover all time | W48 | exit_windows_cover | M-A144: Leave deadline minus one uncovered |
+| A144 | Observation | exitAt: Three nonoverlapping window classes, singleton intervals cover all time | W48 / W142 | exit_windows_cover / exit_windows_disjoint | M-A144: Leave deadline minus one uncovered; M-window-overlap: allow write upper <= deadline |
 | A145 | Money | claimWithdrawAllowed: Pay the entire claim escrow amount | W130 | claim_withdrawal_inversion | M-A145: Require paid = 0 instead of input.value |
 | A146 | Money | withdrawAllowed: Pay the entire request escrow amount | W28 | withdraw_only_owner_after_window | M-A146: Require paid = 0 instead of input.value |
 | A147 | Origin | Trace.nil: Empty event history retains its initial state | W141 | trace_reachability | M-A147: Allow an arbitrary target state |
@@ -523,6 +526,27 @@ only to that predecessor and are not carried forward as new-candidate kills.
 
 Witnesses additionally include MixedBatch.conserved (write/account/claim in
 one interval), MixedBatch.straddlingRefused, and SharedKey.summedOnce.
+
+## Repair of statement audit 2
+
+NOTE-002 repairs B3 and V1 from the re-audit of 4749209. That audit found all
+NOTE-001 items resolved. T60 now binds equivocation to a live request of the
+state's registry, one of its oracles, and a shared signing record, with both
+verdict names held and issued. W60 directly witnesses every binding. T142
+separately states exitAt window disjointness; W142 instantiates all three
+classes. A144 names both its coverage and nonoverlap statements and mutants.
+M-window-overlap now names the exitAt write-window mutation; the distinct
+stepValid mutant for actual-spend T49 is named M-write-guard-overlap.
+Model.lean is byte-identical to 4749209. All other theorem types are unchanged.
+General proofs remain admitted; this candidate needs independent re-audit.
+
+A targeted creator check in evidence/repair-2-mutant copies the exact T142
+header and changes only exitAt.write from upper < deadline to upper <= deadline.
+At the point interval [10,10], both write and account then hold for a request
+with deadline 10. The negation of T142 compiles with no axioms. Its unmutated
+control fails when constructing the write-window premise at the deadline.
+This finite check closes the requested M-window-overlap example locally;
+it is not independent audit approval.
 
 ## Targeted creator mutation receipts
 
@@ -1198,13 +1222,16 @@ theorem account_accepts_any_verdicts (s : State) (o : RequestOutput) (e : Select
 
 ### RequestApprovalFold.equivocation_reachable
 
-Type SHA-256: `3093b4d1411b4d340c407024fcfbad7a52ca9d428e942da00bb584c3f5cc27fa`.
+Type SHA-256: `deea27ca3141733a5a25a54e909fdd0e18329d9fe33f045a6a56e70486cc8fea`.
 
 ```lean
-theorem equivocation_reachable : ∃ s c r o rec cs,
- Reachable s ∧ judgmentName c r o true rec cs ∈ s.judgments ∧
- judgmentName c r o false rec [] ∈ s.judgments ∧
- judgmentName c r o true rec cs ∈ s.issued ∧ judgmentName c r o false rec [] ∈ s.issued
+theorem equivocation_reachable : ∃ (s : State) (o : RequestOutput) (oracle : Oracle)
+ (rec : SigningRecord) (cs : List Condition),
+ Reachable s ∧ o ∈ s.live ∧ o.request.cage = s.cage.id ∧ oracle ∈ s.cage.oracles ∧
+ judgmentName s.cage.id o.request oracle true rec cs ∈ s.judgments ∧
+ judgmentName s.cage.id o.request oracle false rec [] ∈ s.judgments ∧
+ judgmentName s.cage.id o.request oracle true rec cs ∈ s.issued ∧
+ judgmentName s.cage.id o.request oracle false rec [] ∈ s.issued
 ```
 
 ### RequestApprovalFold.tag_name_injective
@@ -2042,4 +2069,13 @@ Type SHA-256: `2eab1f59bcc626b164e55a68ba5e8baf2cdcc25d2d3813ba35cadd7005d99963`
 ```lean
 theorem trace_reachability (s : State) : Reachable s ↔
  ∃ c existing events, registryCreated c existing ∧ Trace (initial c) events s
+```
+
+### RequestApprovalFold.exit_windows_disjoint
+
+Type SHA-256: `720e4c63c4a4f5c53be3c1d7ae410b39b93da8022bbaaf5d5e8d968375b0a174`.
+
+```lean
+theorem exit_windows_disjoint (o : RequestOutput) (iv : Interval) (a b : ExitKind) :
+ exitAt o iv a → exitAt o iv b → a = b
 ```

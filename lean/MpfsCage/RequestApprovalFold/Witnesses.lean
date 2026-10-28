@@ -836,8 +836,15 @@ def W58 := writeAntecedent
 def W59 := accountAntecedent false
 
 /-- Reachable antecedent for T60: equivocation_reachable. -/
-def W60 : Reachable s3 ∧ (evidence true).name cage.id request oracle ∈ s3.judgments ∧ (evidence false).name cage.id request oracle ∈ s3.judgments ∧ (evidence true).name cage.id request oracle ∈ s3.issued ∧ (evidence false).name cage.id request oracle ∈ s3.issued :=
- ⟨reachable3, by simp [s3,s2,afterJudgment,judge], by simp [s3,afterJudgment,judge], by simp [s3,s2,afterJudgment,judge], by simp [s3,afterJudgment,judge]⟩
+def W60 : Reachable s3 ∧ output ∈ s3.live ∧ output.request.cage = s3.cage.id ∧
+ oracle ∈ s3.cage.oracles ∧
+ judgmentName s3.cage.id output.request oracle true rec [.absent "y"] ∈ s3.judgments ∧
+ judgmentName s3.cage.id output.request oracle false rec [] ∈ s3.judgments ∧
+ judgmentName s3.cage.id output.request oracle true rec [.absent "y"] ∈ s3.issued ∧
+ judgmentName s3.cage.id output.request oracle false rec [] ∈ s3.issued := by
+ refine ⟨reachable3, ?_, rfl, ?_, ?_, ?_, ?_, ?_⟩
+ all_goals simp [s3, s2, s1, s0, afterJudgment, afterCreate, initial, judge,
+   cage, output, evidence, Evidence.name, judgmentName]
 
 /-- Reachable antecedent for T61: tag_name_injective. -/
 def W61 : Reachable s2 ∧ oracle = OracleIdentity.identity group ∧ TokenRole.approval ≠ TokenRole.refusal ∧ judgmentName cage.id request oracle true rec [.absent "y"] = deadName :=
@@ -1292,5 +1299,14 @@ def W140 := MixedBatch.conserved
 /-- The same reachable state and full event trace witness both sides of T141. -/
 def W141 : Reachable s5 ∧ registryCreated cage [] ∧ Trace (initial cage) claimEvents s5 :=
  ⟨reachable5, registry_ok, claimTrace⟩
+
+/-- T142 has simultaneous non-vacuous antecedents for the same window; the
+three time classes are instantiated on a reachable live request. -/
+def W142 : Reachable s1 ∧ output ∈ s1.live ∧
+ (exitAt output ⟨9,9⟩ .write ∧ exitAt output ⟨9,9⟩ .write) ∧
+ (exitAt output ⟨10,10⟩ .account ∧ exitAt output ⟨10,10⟩ .account) ∧
+ (exitAt output ⟨16,16⟩ .withdraw ∧ exitAt output ⟨16,16⟩ .withdraw) :=
+ ⟨reachable1, by simp [s1, afterCreate], ⟨by finite, by finite⟩,
+   ⟨by finite, by finite⟩, ⟨by finite, by finite⟩⟩
 
 end RequestApprovalFold.Witnesses

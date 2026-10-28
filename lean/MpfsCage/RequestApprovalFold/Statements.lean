@@ -329,10 +329,13 @@ theorem account_accepts_any_verdicts (s : State) (o : RequestOutput) (e : Select
  (afterFold s (singletonFold s iv [] (FoldItem.account o e) who)) := by
   sorry
 
-theorem equivocation_reachable : ∃ s c r o rec cs,
- Reachable s ∧ judgmentName c r o true rec cs ∈ s.judgments ∧
- judgmentName c r o false rec [] ∈ s.judgments ∧
- judgmentName c r o true rec cs ∈ s.issued ∧ judgmentName c r o false rec [] ∈ s.issued := by
+theorem equivocation_reachable : ∃ (s : State) (o : RequestOutput) (oracle : Oracle)
+ (rec : SigningRecord) (cs : List Condition),
+ Reachable s ∧ o ∈ s.live ∧ o.request.cage = s.cage.id ∧ oracle ∈ s.cage.oracles ∧
+ judgmentName s.cage.id o.request oracle true rec cs ∈ s.judgments ∧
+ judgmentName s.cage.id o.request oracle false rec [] ∈ s.judgments ∧
+ judgmentName s.cage.id o.request oracle true rec cs ∈ s.issued ∧
+ judgmentName s.cage.id o.request oracle false rec [] ∈ s.issued := by
   sorry
 
 theorem tag_name_injective (a b : Oracle) : tagName a = tagName b ↔ a = b := by
@@ -772,6 +775,12 @@ theorem fold_group_credits_only_recorded_signers (s s' : State) (tx : FoldTx) :
 /-- The indexed histories used for claim provenance cover exactly Reachable. -/
 theorem trace_reachability (s : State) : Reachable s ↔
  ∃ c existing events, registryCreated c existing ∧ Trace (initial c) events s := by
+  sorry
+
+/-- The boundary observation itself has disjoint windows, independently of
+actual-spend classification. Together with exit_windows_cover this pins A144. -/
+theorem exit_windows_disjoint (o : RequestOutput) (iv : Interval) (a b : ExitKind) :
+ exitAt o iv a → exitAt o iv b → a = b := by
   sorry
 
 end RequestApprovalFold
