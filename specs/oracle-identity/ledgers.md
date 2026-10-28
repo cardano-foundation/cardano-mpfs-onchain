@@ -1,12 +1,14 @@
 # Oracle identity theorem and semantic-atom ledgers
 
-This is the **OBSERVATION STATEMENT REPAIR CANDIDATE** under NOTE-004.
+This is the **OBSERVATION PROOF REPAIR CANDIDATE** under NOTE-004.
 The independent proof audit of `964eb1a` returned PASS for T01-T26, with
 advisory observation survivors X45, X47 and X48. The operator commissioned
 exact observation laws and their proofs, in two commits: admitted statements
-first, then proofs. T01-T26 remain PROVED and unchanged. New T27-T31 are OPEN
-with intentional admissions in this statement commit; their concrete witnesses
-are proved without importing Statements. Model.lean remains byte-identical.
+first, then proofs. All 31 theorems are now PROVED. T01-T26 retain their exact declaration and
+proof text; T27-T31 retain the types committed first in
+`ee92321365293c9f478eec28e5d43863488a5912`. Their concrete witnesses import
+only observation vocabulary and the model, never Statements. Model.lean remains
+byte-identical. Independent assessment of this new repair is pending.
 The full audit report is retained as `inputs/proof-audit-1.md` in the runtime.
 
 Registry integration, judgment binding and price notices remain outside #126
@@ -16,11 +18,11 @@ and belong to #127. Creator evidence is a CANDIDATE, not independent acceptance.
 
 | Row | Theorem | Exact guarantee | Witness | Mutant | Outcome |
 |---|---|---|---|---|---|
-| T27 | paid_to_exact | Sum every matching payment amount, including repeated recipients; exclude other keys | W27: Alice receives 8, repeated payee receives 3+5, zero and empty cases | X45: paidTo key predicate conjoined with False | OPEN |
-| T28 | paid_to_partition | Sum paidTo once per distinct payment key equals totalPaid for every payment list | W28: nested payout 11; repeated payee and zero-valued Bob total 8 | X45 | OPEN |
-| T29 | recorded_keys_exact | Key record has exactly its key; group flattens every child's keys in order | W29: key, nested group and empty group | X47: recordedKeys key returns [] | OPEN |
-| T30 | successful_record_keys_exact | Successful record keys exactly match original-description authorizing branches | W30: nested successful root with signing Carol in a failed subgroup; only Alice retained | X47 | OPEN |
-| T31 | signing_keys_exact | Exactly the description keys among signers, in description order with duplicates removed | W31: duplicates and outsider removed; signed Carol retained despite failed subgroup; absent key omitted | X48: omit the signer filter | OPEN |
+| T27 | paid_to_exact | Sum every matching payment amount, including repeated recipients; exclude other keys | W27: Alice receives 8, repeated payee receives 3+5, zero and empty cases | X45: paidTo key predicate conjoined with False | PROVED |
+| T28 | paid_to_partition | Sum paidTo once per distinct payment key equals totalPaid for every payment list | W28: nested payout 11; repeated payee and zero-valued Bob total 8 | X45 | PROVED |
+| T29 | recorded_keys_exact | Key record has exactly its key; group flattens every child's keys in order | W29: key, nested group and empty group | X47: recordedKeys key returns [] | PROVED |
+| T30 | successful_record_keys_exact | Successful record keys exactly match original-description authorizing branches | W30: nested successful root with signing Carol in a failed subgroup; only Alice retained | X47 | PROVED |
+| T31 | signing_keys_exact | Exactly the description keys among signers, in description order with duplicates removed | W31: duplicates and outsider removed; signed Carol retained despite failed subgroup; absent key omitted | X48: omit the signer filter | PROVED |
 
 `ObservationSpec.lean` defines `branchKeys`/`memberBranchKeys` as statement
 vocabulary over the original description. A key is included iff it signed;
@@ -34,11 +36,11 @@ New semantic atoms: A28 paidTo's exact positive/zero aggregate (T27/T28);
 A29 recordedKeys leaf and ordered recursive concatenation (T29);
 A30 exact description-to-record key projection through successful branches
 (T30); A31 signingKeys signer filtering, description order and deduplication
-(T31). X45/X47/X48 are expected falsifiers pending the bounded repair probes.
+(T31). X45/X47/X48 are KILLED by the bounded creator repair probes below.
 
 All 31 source signatures are captured before proof edits in
 `evidence/repair-004/statement-signatures.json`; the original 26 match the
-accepted `82bbfcc` signatures. The five additions have these type hashes:
+accepted `82bbfcc` signatures. The five additions have these type hashes, unchanged after proof completion:
 
 | Row | SHA256 |
 |---|---|
@@ -58,6 +60,56 @@ Statement-phase build: 29 jobs, exit 0, exactly five intentional admissions.
 Evidence: `evidence/repair-004/statements-build.log`. Independent audit of the
 new statement slice is enabled by its separate commit. NOTE-004 also explicitly
 authorizes the following proof commit; no original guarantee is reopened.
+
+### Observation proof and mutation receipts
+
+The clean absent-`.lake` prescribed build passes **30 jobs**, exit 0, with
+zero admissions. All 31 theorem and 31 witness axiom inventories contain only
+`propext`, `Classical.choice` and `Quot.sound`. The original 26 source
+types still match `82bbfcc`; all 31 match the separate statement commit
+`ee92321`. Model, Paths, Driver and the prior five proof-helper files are
+unchanged from `964eb1a`. ObservationSpec, Witnesses, Surface and Corpus are
+unchanged between this repair's statement and proof commits.
+
+`ObservationProofs.lean` proves payment aggregation by list induction. A
+finite distinct-key cover partitions the payment list; applying that result to
+the deduplicated payee list proves T28 even for repeated recipients and zero
+payments. Mutual recursion proves that a raw record's key projection equals
+the original description's authorizing branches. The public success inversion
+then supplies T30. T29 fixes both constructor equations, while T31 fixes the
+existing filter and deduplication exactly.
+
+| Mutant | Owning new rows | Exact semantic counterexample |
+|---|---|---|
+| X45: conjoin the paidTo key predicate with False | T27, T28 | One Alice payment of 7: paidTo and its distinct-payee partition become 0 |
+| X47: recordedKeys key leaf returns [] | T29, T30 | Alice's key record, including a successful Alice authorization, loses its key |
+| X48: remove signingKeys signer filter | T31 | Unsigned Alice is wrongly included |
+
+`mutation-manifest.json` freezes the exact-once source edits and all 20 probes
+before execution (SHA256 `89fcad9d6e127b1e2aa222d897a0970cb0a1aaf103e2a6b848a7a9da4354723b`).
+Every probe embeds the production Model, Paths and ObservationSpec source in an
+isolated file; only the named single site changes in mutant copies. Production
+Model.lean is never edited. The new theorem type is extracted verbatim from the
+statement-phase manifest, and the manifest is checked against `ee92321`.
+For each of the five rows: the healthy instance proves; the mutant instance is
+semantically false; the mutant's universally quantified statement has a kernel
+refutation; the same refutation fails on the healthy model because its concrete
+negation is false. All 20 expected outcomes pass. All ten successful probes use
+only permitted axioms. A failed proof script alone is never counted as a kill.
+This is a bounded creator regression, not a new independent mutation audit.
+
+The generic driver replays **81 corpus scenarios** with 14 expected authorization
+refusals, plus six malformed/precondition rejection controls. Positive paidTo,
+recordedKeys and signingKeys results are asserted. All 81 codec roundtrips pass.
+`signingKeys` observations have no authorization precondition; the no-signer
+case specifically exercises that boundary.
+
+Evidence is in `evidence/repair-004/` under the runtime root:
+`clean-build.log`, `axiom-inventory.json`, `freeze-check.json`,
+`mutation-results.json`, `replay-results.json`, `codecs.log` and
+`failure-notes.md`. The final receipt binds both local commits, source and
+instrument hashes. No push or hosted CI is claimed. The prior independent audit
+PASS applies to `964eb1a`; independent acceptance of this repair is parent-owned.
 
 ## Prior statement repair and mutation result
 
@@ -215,9 +267,10 @@ Each digest covers the exact `theorem` declaration through its type, excluding
 | T25 | `db56744e749f3c4fe47000396839945be0c098be22393cd329df34cfbec7e9ad` |
 | T26 | `70298781792b276b667907f9d77817912dda6e71d0b55b9cf76adb0cc35d3d99` |
 
-The mutant rows are **expected falsifiers**, except M25's executed creator
-regression above. There is no general mutation campaign or independent adequacy
-verdict. `Corpus.mutantCorpus` supplies inputs and one
+The original M-series rows remain **expected falsifiers**, except M25's
+executed creator regression above. The later independent X-series campaign
+on 964eb1a met its 26-row and blocking-atom floor, with the three advisory
+survivors now addressed by NOTE-004; its report is retained in the runtime. `Corpus.mutantCorpus` supplies inputs and one
 named source edit per row. Some edits deliberately cover several obligations;
 M08/M19 and M18/M20 share an edit while targeting different claims. Multi-input
 rows carry suffixes, e.g. `M07-small` and `M07`, rather than hiding a comparison.
@@ -315,16 +368,18 @@ the corpus; a universal serialization correspondence theorem is not claimed.
 |---|---|
 | Model.lean | `674e33ff3039a722c7ded9444cc7c9f56430d2e362da66b617ae458b343c0a94` |
 | Paths.lean | `8672468338c1fbde002bca4a2eefd3d6bb9d9f4ec2869576c244778b64c37974` |
-| Statements.lean | `d82b902494bb98c4083220a92f7efc268b99a10737ed75a9e3f31814a94b84c1` |
-| Witnesses.lean | `a270c9311d2e5a57f7ec133bed25c92eba211e6d99682e0f70a58a8588ec35fa` |
-| Surface.lean | `fbcb78e764c42008099dc4b3333d6a3809c75a3ba40bd1a43b28d0b631132162` |
-| Corpus.lean | `22ac3e108f6a82187dc5fb66cefc58461e54ccfa0e67f856dd67ad1262f266cd` |
+| Statements.lean | `d196658f30f6dd86c6b8ebba7fb7ea50e7c427f8429c990a016e84357dcd9e52` |
+| Witnesses.lean | `3d6b771f6d7560a848a0cfd1f2799598de87acc61d79b6906b1c61ee85f5fd84` |
+| Surface.lean | `04a10b1fe4be21ae915d5362b5ef4b90d863cedf7e3e0ff72aabba0b429f9483` |
+| Corpus.lean | `30c5ef0c1c507db05112d8a9634bec9ed777c73954bbf3843a778a2df7bc64b8` |
 | Driver.lean | `0de321b7c833888fccb8fc12b2ca83d3cf6cfaa0aae0df5f17a79db47daa6329` |
 | Proofs.lean | `5f9182b8283a8c4baa4590001536d10f414bae6c48e3e18d139317c6f1f4b4a0` |
 | FeeProofs.lean | `453738253724da13a5bbbaa80997e1f0bdc6c4f668c565daacc1a5791c8a5246` |
 | FormulaProofs.lean | `8998df77c6c9a3fd4774d9c99d788b11a8e9bdce232c633ffff862499b1dc6a4` |
 | ExclusionProofs.lean | `0245f2dc2d4a8bfe1543abf1e739b337db3c27f8a7c38ab15de851c1bddebe4d` |
 | CountingProofs.lean | `e5824cfcbce5e65fd01392f37bb775cce93427ec2b7f3390c3c257b1e8cd5df9` |
+| ObservationSpec.lean | `523aec9f03631e840cd37a9612653a81d75ca9171d14bef58f15538ccf572c9a` |
+| ObservationProofs.lean | `285755fb0e1938d181a0f240806c7d4fd0583159342157cbfd90fa50f930cdfb` |
 
 ## Proof structure
 
