@@ -50,8 +50,8 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
   neither the registry's rule nor its oracles, since it writes no value. It
   is folded like a write, and changes the
   key's entry from unwitnessed to witnessed without changing its value or
-  absence. A key already witnessed cannot be witnessed again until its next
-  change.
+  absence. It applies only to an unwitnessed key: on a witnessed key it is
+  not folded, and the key can be witnessed again only after its next change.
 - **Extraction commits to the value it wants witnessed.** The request names
   the value, or the absence, and the fold applies it only when the key holds
   exactly that at the request's turn, as an `equals` or `absent` condition on

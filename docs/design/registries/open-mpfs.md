@@ -482,7 +482,7 @@ Durable witnesses remove that dependence on unrelated writes.
   into a witness. The next `set` or `unset` on the key proves that entry,
   burns the witness and pays the deposit to the refund address.
 - **Extraction commits to the value it wants**, or to absence, and is folded
-  only when the key holds exactly that at its turn.
+  only when the key is unwitnessed and holds exactly that at its turn.
 - **The folder burns, writes and mints in one transaction.** It burns the
   old witness token, changes the tree and, when the request asks, mints the
   new witness token, so a witnessed entry always has exactly one live token.
