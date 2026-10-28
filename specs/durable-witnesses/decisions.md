@@ -46,7 +46,9 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
 - **A witnessed absence reads as absent.** For conditions and readers, a key
   whose entry is an absence witness is absent, exactly like a key with no
   entry.
-- **Extraction is a request.** It is folded like a write, and changes the
+- **Extraction is a request that needs only its deposit.** It passes through
+  neither the registry's rule nor its oracles, since it writes no value. It
+  is folded like a write, and changes the
   key's entry from unwitnessed to witnessed without changing its value or
   absence. A key already witnessed cannot be witnessed again until its next
   change.
@@ -79,5 +81,4 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
 
 ## Not decided
 
-- Whether an extraction request passes through the registry's rule and
-  required judges, or needs only its deposit.
+Nothing on durable witnesses is open; encodings follow the registry's.
