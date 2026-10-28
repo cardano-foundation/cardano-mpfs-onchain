@@ -1,4 +1,4 @@
-import MpfsCage.OracleIdentity.Model
+import MpfsCage.OracleIdentity.Paths
 
 /-! Concrete reachable calls and their results. This module imports no admitted
     statements: all witnesses are checked by kernel reduction. -/
@@ -119,5 +119,24 @@ def W24 : authorize (identity demo) demo signers = some demoRecord ∧
     totalPaid (splitRecorded demoRecord 0) = 0 ∧
     totalPaid (splitRecorded demoRecord 11) = 11 ∧
     totalPaid (splitRecorded demoRecord 17) = 17 := by decide
+
+/-- The failed subgroup is two member edges below the paying root. -/
+def deepGroup : Description := .group 1 (.cons partialGroup 1 .nil)
+def strictMembers : Members := .cons carol 1 (.cons dave 1 .nil)
+
+def W25 :
+    record (.key "alice") ["alice"] = some (.key "alice") ∧
+    authorize (identity alice) alice ["alice"] = some (.key "alice") ∧
+    record (.key "alice") [] = none ∧ authorize (identity alice) alice [] = none ∧
+    authorize (identity demo) demo signers = some demoRecord := by decide
+
+def W26 :
+    splitFee (identity deepGroup) deepGroup ["alice", "carol"] 11 =
+      some [⟨"alice", 11⟩] ∧
+    atPath deepGroup [0, 1] = some (.group 2 strictMembers) ∧
+    authorizingCount strictMembers ["alice", "carol"] < 2 ∧
+    "carol" ∈ memberKeys strictMembers ∧
+    "carol" ∈ (["alice", "carol"] : Signers) ∧
+    paidTo [⟨"alice", 11⟩] "carol" = 0 := by decide
 
 end OracleIdentity.Witnesses

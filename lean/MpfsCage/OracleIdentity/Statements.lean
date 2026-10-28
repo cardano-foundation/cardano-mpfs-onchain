@@ -1,4 +1,4 @@
-import MpfsCage.OracleIdentity.Model
+import MpfsCage.OracleIdentity.Paths
 
 /-! Statement candidate. Admissions are intentional pending independent statement
     audit. No guarantee below is claimed proved. -/
@@ -155,6 +155,24 @@ theorem recorded_split_replay (expected : Identity) (d : Description) (ss : Sign
     (r : SigningRecord) (fee : Nat) : authorize expected d ss = some r →
     splitFee expected d ss fee = some (splitRecorded r fee) ∧
       totalPaid (splitRecorded r fee) = fee := by
+  sorry
+
+-- T25: raw record fixes the leaf constructor at every recursive call; the
+-- public key-oracle result has exactly that same constructor, never a group.
+theorem key_record_exact (k : Key) (ss : Signers) :
+    record (.key k) ss = (if k ∈ ss then some (.key k) else none) ∧
+    authorize (identity (.key k)) (.key k) ss =
+      (if k ∈ ss then some (.key k) else none) := by
+  sorry
+
+-- T26: any finite path in the original description, not just a direct member.
+theorem nonauthorizing_subgroup_at_any_depth_receives_nothing
+    (expected : Identity) (root : Description) (ss : Signers) (fee : Nat)
+    (payments : List Payment) (path : List Nat) (t : Nat) (members : Members) (k : Key) :
+    splitFee expected root ss fee = some payments →
+    atPath root path = some (.group t members) →
+    authorizingCount members ss < t → k ∈ memberKeys members →
+    paidTo payments k = 0 := by
   sorry
 
 end OracleIdentity

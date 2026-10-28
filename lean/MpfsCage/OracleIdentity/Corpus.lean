@@ -40,7 +40,11 @@ def witnessCorpus : List Scenario := [
   scenario "W23-reordered" "authorize" alice ["carol", "alice"],
   scenario "W24-zero" "splitRecorded" demo signers 0,
   scenario "W24" "splitRecorded" demo signers 11,
-  scenario "W24-later" "splitRecorded" demo signers 17]
+  scenario "W24-later" "splitRecorded" demo signers 17,
+  scenario "W25" "authorize" alice ["alice"],
+  scenario "W25-absent" "authorize" alice [],
+  scenario "W25-nested" "authorize" demo signers,
+  { scenario "W26" "paidTo" deepGroup ["alice", "carol"] with key := "carol" }]
 
 /-- Each M row names one proposed source-atom edit, not a claimed mutation run.
     The input is replayed unchanged against the baseline and the edited model. -/
@@ -76,6 +80,10 @@ def mutantCorpus : List Scenario := [
   mutant "M22" "splitFee: return some empty payments on refused authorization" "splitFee" demo [],
   mutant "M23" "record key: test only the first signer" "authorize" alice ["alice", "carol"],
   mutant "M23-reordered" "record key: test only the first signer" "authorize" alice ["carol", "alice"],
-  mutant "M24" "splitFee: replay at fee plus one" "splitFee" demo signers]
+  mutant "M24" "splitFee: replay at fee plus one" "splitFee" demo signers,
+  mutant "M25" "record key: replace key record by singleton group of share one" "authorize" alice ["alice"],
+  mutant "M25-nested" "record key: replace key record by singleton group of share one" "authorize" demo signers,
+  { mutant "M26" "splitRecorded group: append a one-unit carol payout" "paidTo"
+      deepGroup ["alice", "carol"] with key := "carol" }]
 
 end OracleIdentity.Corpus

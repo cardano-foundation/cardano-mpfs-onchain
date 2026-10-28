@@ -1,10 +1,51 @@
 # Candidate theorem and semantic-atom ledgers
 
-This is the **MODEL + STATEMENTS CANDIDATE** for #126. All 24 guarantees below
-have intentional `sorry` proofs; none is claimed proved or independently
-accepted. The 24 concrete witnesses import only the model and have complete
-kernel-checked proofs. PROOFS starts only after the parent accepts the independent
+This is the **STATEMENT REPAIR CANDIDATE** for #126 after NOTE-001 on
+`6333c158`. All 26 guarantees below have intentional `sorry` proofs; none is
+claimed proved or independently accepted. The 26 concrete witnesses import only
+the model and admission-free path vocabulary and have kernel-checked proofs. PROOFS starts only after the parent accepts the independent
 statement audit. Registry integration and judgment binding belong to #127.
+**Price notices are excluded from #126:** they are tied to registry pricing and
+belong to #127.
+
+## Repair scope and mutation result
+
+The independent audit of 6333c158 was NOT-READY: the prior statements allowed a
+key record to be replaced by an invented singleton group while preserving key
+membership and fee behavior. NOTE-001 commissions this repair. The existing
+T01-T24 declarations are byte-identical, including their proof holes, and
+Model.lean is unchanged. T25 fixes both raw and public key records exactly;
+its raw-record equality applies at every recursive key call, while T14 binds
+retained group members to those records. T26 covers failed subgroups at every
+finite member-index path. No theorem proofs have started.
+
+`Paths.lean` defines only statement vocabulary: `atPath root path` selects a
+subdescription by its original member indices. It includes nonauthorizing
+members; it does not traverse the filtered signing record. Empty paths select
+the root, missing indices fail, and keys cannot be descended into. T26 quantifies
+all paths with no depth bound. W26 reaches a successful root split with a failed
+subgroup at path `[0, 1]`; Carol signs inside that subgroup and still receives zero.
+
+M25 is the exact audit survivor: replace the successful key result in
+`record.key` by `.group (.cons 1 (.key k) .nil)`. Four isolated compiler probes
+bind directly to T25's extracted type, without importing admitted statements:
+
+| Probe | Exit | Evidence |
+|---|---|---|
+| Healthy model, T25 instance for Alice | 0 | Kernel proof, only propext |
+| Mutant model, same T25 instance | 1 | Lean decides that the proposition is false |
+| Mutant model, negation of the universally quantified T25 type | 0 | Kernel counterexample proof, only propext |
+| Healthy model, same counterexample | 1 | Lean decides that the alleged counterexample is false |
+
+This is a creator regression result showing M25 is killed by T25, not an
+independent audit or a proof of T25 on the healthy model. Failed elaborations may
+print sorryAx for Lean's error placeholders; only the two exit-zero probes count
+as proofs. Production Model.lean was never mutated. The generated probes,
+single-site edit, digests and outputs are retained under
+`evidence/repair-001/` in the runtime. The first probe needed an explicit unfold
+of its type alias for decidability; that setup failure is retained separately.
+The original 24-row bounded-domain survival result is the independent audit's
+finding, not a campaign rerun or acceptance claim by this creator.
 
 ## Authority and domain
 
@@ -50,9 +91,9 @@ actual call to the authoritative operation, together with kernel proofs of its
 premises and observed result. Refusal arms have actual refusing calls.
 
 The entire statement candidate file is bound by SHA256
-`8710252b57b1390261057c0facaa88d7c35e39258783be7f623f5b40c3eea3b8`.
+`42a491ae5424fc78710d93819ce28ffd92172cf2c40b723bb9fa4e08e426f9b9`.
 This is a candidate digest for the audit, **not** an accepted statement freeze.
-It binds all 24 types and their intentional proof holes together.
+It binds all 26 types and their intentional proof holes together.
 
 | Row | Theorem | Obligation | Reachable witness | Named single-atom mutant expected to falsify it | Outcome |
 |---|---|---|---|---|---|
@@ -80,9 +121,12 @@ It binds all 24 types and their intentional proof holes together.
 | T22 | split_refusal_iff | Splitting refuses exactly when authorization refuses | W22, no signers | M22: return some empty payments on authorization refusal | OPEN |
 | T23 | signer_set_extensional | Order and multiplicity of signer entries do not change authorization or its record | W23, reordered Alice/Carol signers | M23: check only the first signer for a key oracle | OPEN |
 | T24 | recorded_split_replay | Any successful record replays at any later natural fee, agrees with the public split and conserves that fee | W24, one record replayed at fees 0, 11 and 17 | M24: public split replays with fee plus one | OPEN |
+| T25 | key_record_exact | A key raw record and public authorization return exactly its key leaf when signed, and none otherwise, at every recursive key call | W25, key present/absent and the nested demo record | M25: replace every key record by a singleton group of share one; kernel refutation and both-way controls pass | OPEN |
+| T26 | nonauthorizing_subgroup_at_any_depth_receives_nothing | Every key in a subgroup below threshold receives zero from a successful root split, at any finite original-description path | W26, Carol signs in a failed subgroup at path [0, 1] | M26: append a one-unit Carol payout at a group split | OPEN |
 
-The mutant rows are **expected falsifiers**, not an executed mutation campaign or
-an independent adequacy verdict. `Corpus.mutantCorpus` supplies inputs and one
+The mutant rows are **expected falsifiers**, except M25's executed creator
+regression above. There is no general mutation campaign or independent adequacy
+verdict. `Corpus.mutantCorpus` supplies inputs and one
 named source edit per row. Some edits deliberately cover several obligations;
 M08/M19 and M18/M20 share an edit while targeting different claims. Multi-input
 rows carry suffixes, e.g. `M07-small` and `M07`, rather than hiding a comparison.
@@ -104,7 +148,7 @@ splitting is listed separately. Coverage is a creator claim for audit.
 | A07 | Every key occurs once in the whole description, including overlap between branches | valid, keys/memberKeys | T18/T19/T20; W18/W19/W20 | M18/M20 |
 | A08 | Public authorization checks the expected identity | authorize conjunction | T02/T21; W02 mismatch | M02 |
 | A09 | Public authorization rejects all invalid descriptions | authorize conjunction | T03/T21; W03 | M03 |
-| A10 | Key authorizes iff its key belongs to the actual signers | record.key | T05/T15; W05 | M05/M15 |
+| A10 | Key authorizes iff its key belongs to the actual signers, and returns exactly its key leaf | record.key | T05/T15/T25; W05/W25 | M05/M15/M25 |
 | A11 | Group counts recursively authorizing member oracles, not shares or raw leaf signatures | record.group, signedMembers | T06/T08/T19; W06/W08/W19 | M06/M08/M19 |
 | A12 | Authorization uses at least the threshold, and remains true when more sign | record.group comparison | T06/T07/T08; W07 | M07 exact threshold |
 | A13 | Failed member is omitted from the record | signedMembers.none | T12/T13/T14; W12/W13 | M12 |
@@ -117,7 +161,7 @@ splitting is listed separately. Coverage is a creator claim for audit.
 | A20 | Each group allocation is recursively split into that member's keys | splitRecorded.group, splitMembers.cons | T11/T13/T17/T24; W13/W17/W24 | Pass wrong amount or discard child split |
 | A21 | Key leaf pays its whole allocation to that key | splitRecorded.key | T09/T10/T15; W09/W10 | M10 or replace recipient |
 | A22 | No balance or payout target exists for a group | Payment.key, recursive leaf outputs | T10/T13/T17; W13/W17 | Emit a fabricated group-recipient leaf |
-| A23 | Keys of a failed subgroup receive no parent allocation even if they individually signed | signedMembers.none and split traversal | T13; W13 | M13 |
+| A23 | Keys of a failed subgroup at any finite depth receive no root allocation even if they individually signed | signedMembers.none and split traversal; atPath addresses the original description | T13/T26; W13/W26 | M13/M26 |
 | A24 | Public split succeeds only on an actual authorization record and otherwise refuses | splitFee Option.map | T03/T22/T24; W03/W22/W24 | M22/M24 |
 | A25 | Record replay uses only retained members and shares at the supplied credit-time fee | splitRecorded | T17/T24; W24 | Recompute from different signers or M24 |
 | A26 | Public successful splits conserve natural-valued fees exactly, with no fee limit or positivity precondition | splitFee, totalPaid | T11/T24; W11/W24 | M11/M24 |
@@ -133,7 +177,9 @@ binding is deliberately deferred to #127.
 
 The inversion inventory is T04 (valid group), T05 (key authority), T06 (group
 authority), T14 (exact record), T17 (exact group allocation), T21 (authorization
-success), T22 (refusal), plus T10/T24 for leaf payout and recorded replay. No
+success), T22 (refusal), T25 (exact raw/public key result), plus T10/T24 for
+leaf payout and recorded replay. T26 lifts unpaid-subgroup exclusion to arbitrary
+depth through the explicit path vocabulary. No
 inductive transition relation or separate Bool mirror is introduced:
 `Authorizes` is definitionally the success observation of `authorize`.
 
@@ -177,26 +223,30 @@ the corpus; a universal serialization correspondence theorem is not claimed.
 | File under `lean/MpfsCage/OracleIdentity/` | SHA256 |
 |---|---|
 | Model.lean | `674e33ff3039a722c7ded9444cc7c9f56430d2e362da66b617ae458b343c0a94` |
-| Statements.lean | `8710252b57b1390261057c0facaa88d7c35e39258783be7f623f5b40c3eea3b8` |
-| Witnesses.lean | `2800ded99505fc5f19d3080adda682ebc989807d691952c568b3a66c36c062c8` |
+| Paths.lean | `8672468338c1fbde002bca4a2eefd3d6bb9d9f4ec2869576c244778b64c37974` |
+| Statements.lean | `42a491ae5424fc78710d93819ce28ffd92172cf2c40b723bb9fa4e08e426f9b9` |
+| Witnesses.lean | `a270c9311d2e5a57f7ec133bed25c92eba211e6d99682e0f70a58a8588ec35fa` |
 | Surface.lean | `fbcb78e764c42008099dc4b3333d6a3809c75a3ba40bd1a43b28d0b631132162` |
-| Corpus.lean | `6a611bf5430419dd9ef31fbd8b9924902852a55299f3f389fd8b92b6a5d89bb3` |
+| Corpus.lean | `22ac3e108f6a82187dc5fb66cefc58461e54ccfa0e67f856dd67ad1262f266cd` |
 | Driver.lean | `0de321b7c833888fccb8fc12b2ca83d3cf6cfaa0aae0df5f17a79db47daa6329` |
 
 ## Verification and remaining work
 
 Evidence is under
 `/code/mpfs-onchain-lean-126-20261028/astra-identities-model/evidence/`.
-The prescribed full build passes with 22 jobs and exactly the 24 declared theorem
-admissions. Each of W01-W24 was queried by `#print axioms`: only `propext` and
+The prescribed repair build passes with 23 jobs and exactly the 26 declared
+theorem admissions. Each of W01-W26 was queried by `#print axioms`: only `propext` and
 `Quot.sound` occur (some use no axioms); no witness depends on `sorryAx`.
-`Witnesses.lean` imports Model only, never Statements. Captured codec/replay
+`Witnesses.lean` imports only Paths and its Model dependency, never Statements. Captured codec/replay
 failures are retained alongside repaired-run receipts;
 `failure-notes.md` records setup and elaboration failures.
 
-The final evidence receipt records corpus replay, codec checks, file hashes and
-commit binding. Named mutations still require independent audit; no source
-mutation campaign was commissioned here. All 24 theorem proofs, cryptographic
+The 67 corpus inputs replay successfully (14 expected authorization refusals),
+six rejection controls pass, and codec roundtrips pass for all 67 scenarios.
+The repair receipt records corpus replay, codec checks, file hashes, preservation
+of the existing statements, the exact M25 counterexample and commit binding.
+The statement audit is reopened. Named mutations, including the M25 regression,
+remain subject to independent audit. All 26 theorem proofs, cryptographic
 encoding correspondence, deployed validator conformance, costs, ledger-bound
 record authenticity, balances, withdrawals and registry integration remain
 unestablished by this candidate. Nothing is pushed by this worker.
