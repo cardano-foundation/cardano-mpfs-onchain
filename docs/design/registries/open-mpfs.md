@@ -457,7 +457,7 @@ protocol is on [Oracle slots and check protocols](slots.md).
 
 ## Durable witnesses
 
-**Decided**, with the representation open.
+**Decided**, with the entry's contents open.
 
 A consumer proving a fact about one key references the registry state and
 its root. A fold writing any other key spends that output and changes the
@@ -473,6 +473,9 @@ Durable witnesses remove that dependence on unrelated writes.
   next change to a tracked key consumes its witness and refunds the deposit to
   the issuer in the same fold; otherwise the fold is invalid. A value change
   consumes a presence witness even when the key stays present.
+- **A key has at most one witness**, tracked in the trie at its key. An absent
+  witnessed key has an entry marking it absent and witnessed, so a `set` on it
+  must prove that entry and consume the witness.
 - **The deposit is separate** from oracle fees, the folder's remainder and
   the request owner's refund.
 - **A witness attests what the registry records**; its outside-world meaning
@@ -487,9 +490,9 @@ flowchart TB
 ```
 
 This follows Singular's second product milestone, whose presence, absent and
-terminal witnesses introduced proof durability. Open: one outstanding witness
-per key or several; how tracking is represented, including for an absent
-key; and how extraction enters the fold.
+terminal witnesses introduced proof durability. Open: what a witnessed entry
+holds besides the fact, how a key marked only by an absence witness reads as
+absent, and how extraction enters the fold.
 
 ## Alternatives rejected
 

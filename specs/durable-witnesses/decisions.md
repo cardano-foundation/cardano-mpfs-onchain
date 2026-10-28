@@ -36,6 +36,15 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
 - **A value change consumes a presence witness** even when the key stays
   present. Insertion consumes an absence witness; update or deletion consumes
   presence and exact-value witnesses.
+- **A key has at most one witness.** Its next change therefore carries at
+  most one consumption and one refund.
+- **The witness is tracked in the trie, at its key.** The key's entry records
+  that it is witnessed, so the fold proves the obligation with the same tree
+  proofs it already builds, and no tracking lives outside the tree.
+- **An absent witnessed key has an entry too.** Extracting an absence witness
+  writes an entry marking the key as absent and witnessed. A `set` on that key
+  must prove the entry against the root and consume the witness; the proof of
+  the entry is what makes the obligation impossible to skip.
 - **The deposit is a separate obligation** from the request's oracle fees,
   the folder's remainder and any refund to the request owner.
 - **A witness attests what the registry records.** Its meaning in the outside
@@ -45,9 +54,11 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
 
 ## Not decided
 
-- Whether a key may have one outstanding witness or several, and therefore
-  how many consumptions and refunds its next change must carry.
-- How the per-key tracking is represented, including for a key that is
-  absent.
-- How extraction enters the fold: its request form and fold item.
+- What a witnessed entry holds besides the fact: the issuer to refund and the
+  deposit are the obvious candidates.
+- How conditions and readers treat a key whose entry only marks an absence
+  witness. It must read as absent, or an `absent` condition would fail on a
+  key that is absent.
+- How extraction enters the fold: its request form and fold item. Extraction
+  writes the key's entry, so it moves the root like any write.
 - Where witnesses are held and how a consumer references one.
