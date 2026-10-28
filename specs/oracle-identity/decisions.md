@@ -30,6 +30,15 @@ does not depend on them and may move to its own repository.
   threshold is dead; its users name a new identity in a new contract. Rotation
   would need a mutable identity, and whoever may change it would hold power
   over every contract that named it.
+- **A valid group has a threshold between one and its number of members, and
+  every share is positive.** A group with threshold zero would authorize with
+  no key to pay, and zero shares would leave a fee with nobody to divide it
+  among. Invalid descriptions authorize nothing and are paid nothing.
+- **Each key appears at most once in a description**, directly or through any
+  nesting. A description repeating a key is invalid. Otherwise one key could
+  stand for two members of a group, so a threshold of `m` would not mean `m`
+  distinct keys and one stolen key could count twice. The same key may serve
+  in any number of separate oracles.
 
 ## Authorization
 
@@ -57,6 +66,11 @@ does not depend on them and may move to its own repository.
   down to keys. Shares are part of the description, so every member knows its
   cut before serving and no member can later be cut out by the others. The
   remainder left by integer division goes to the first member that signed.
+- **The record of signers is canonical.** It names every member whose
+  authorization succeeds, in the order of the description, recursively; it is
+  computed from the transaction's signers, not chosen by whoever submits it,
+  so no signer can be left out. The keys of a subgroup that does not reach its
+  threshold are not paid, even if some of them signed.
 - **Paying members that did not sign was rejected.** In a group that needs
   fewer than all its members, for example two independent providers of the
   same check where either one suffices, a member that never judged would be

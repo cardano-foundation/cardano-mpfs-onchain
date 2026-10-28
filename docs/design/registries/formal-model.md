@@ -46,11 +46,13 @@ fees; time is a single observed value whose soundness against transaction
 validity intervals is assumed; names are collision-free structured values,
 standing for the hashes the implementation will use.
 
-!!! note "Decisions not yet in the model"
-    Oracle identities (keys and groups with shares), fees accumulated per key
-    in the registry state, and complete accounts and claims as items of the fold were
-    decided after this model was audited. The model still names oracles as
-    single keys and pays each oracle's fee in its own output.
+!!! note "Decisions not yet in the registry model"
+    Fees accumulated per key in the registry state, complete accounts and
+    claims as items of the fold, durable witnesses and slots were decided or
+    drafted after this model was audited. The registry model still names
+    oracles as single keys and pays each oracle's fee in its own output.
+    Oracle identities are modelled on their own, below; wiring them into the
+    registry is [#127](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/127).
 
 ## What is proved
 
@@ -152,6 +154,54 @@ What the mutation audit could not count as killed, none of it a defect:
   earlier theorem (request-token discovery, the burn of tags on every exit,
   the impossibility of a registry with neither oracles nor rule, and the fold
   proving every condition) that the relevant mutant breaks first.
+
+## Oracle identities
+
+The oracle identity standard has its own model, under
+[`lean/MpfsCage/OracleIdentity/`](https://github.com/cardano-foundation/cardano-mpfs-onchain/tree/main/lean/MpfsCage/OracleIdentity),
+independent of any registry. It follows
+[`specs/oracle-identity/decisions.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-identity/decisions.md);
+its theorem and mutant ledger is
+[`specs/oracle-identity/ledgers.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-identity/ledgers.md).
+All 31 theorems are proved with only the standard axioms.
+
+| Guarantee | Proved by |
+|---|---|
+| An identity names exactly one description, and authorization binds the description supplied to the identity expected | `identity_injective`, `authorization_binds_identity`, `authorization_inversion` |
+| A group is valid exactly when its threshold is between one and its number of members, every share is positive, its members are valid and no key appears twice anywhere in it; invalid descriptions authorize nothing and are paid nothing | `group_valid_iff`, `repeated_key_invalid`, `invalid_description_refused`, `split_refusal_iff` |
+| A key authorizes exactly when it signs; a group exactly when its threshold of members authorize; adding signers never revokes authorization, and only the set of signers matters | `key_authorizes_iff`, `group_authorizes_iff`, `below_threshold_refused`, `authorization_monotone`, `signer_set_extensional` |
+| A threshold of `m` needs `m` distinct signing keys, because a key belongs to at most one member of a group | `key_contributes_to_at_most_one_member`, `threshold_needs_distinct_signing_keys` |
+| The record of signers is canonical: every authorizing member, in order, with its share, down to keys; it names only keys that signed, each once | `group_record_exact`, `key_record_exact`, `recorded_keys_are_signers`, `record_keys_unique`, `recorded_keys_exact`, `successful_record_keys_exact`, `signing_keys_exact` |
+| The split pays exactly the fee: each member its floor share, the remainder to the first signed member, recursively; a key oracle receives the whole fee, as a one-member group would | `split_conserves_fee`, `group_split_exact`, `key_receives_whole_fee`, `key_is_single_member_case`, `recorded_split_replay` |
+| Nobody is paid for work it did not do: a key that did not sign, and every key of a member or subgroup below its threshold at any depth, receives nothing | `unsigned_key_receives_nothing`, `nonauthorizing_member_receives_nothing`, `nonauthorizing_subgroup_at_any_depth_receives_nothing` |
+| What a key receives is exactly the sum of its payments, and the amounts received sum to the total paid | `paid_to_exact`, `paid_to_partition` |
+
+```mermaid
+flowchart TB
+  s1["24 statements"] --> a1["Statement audit:<br/>key records not fixed"]
+  a1 --> s2["Repair: 26 statements"]
+  s2 --> a2["Statement audit: passed"]
+  a2 --> p1["Proofs"]
+  p1 --> a3["Proof and mutation audit:<br/>passed, three observation<br/>mutants survived"]
+  a3 --> s3["Repair: 31 theorems"]
+  s3 --> a4["Statement, proof and<br/>mutation audit: passed,<br/>no surviving mutant"]
+```
+
+Every audit ran in a fresh context on a frozen commit, with no contact with
+the author. The first statement audit found that no statement fixed the
+record of a single key: a model recording each key as an invented
+one-member group satisfied all 24 statements. The repair fixed the key
+record exactly and extended the unpaid-subgroup guarantee to any depth. The
+proof audit then found three changes it could not catch, all in the
+functions the theorems use to read payments and signers: the payment to a
+key forced to zero, the keys of a key record emptied, and the signer filter
+removed. Five more theorems pin those functions exactly, and the final audit
+killed all 53 mutants of its operator set, those three included.
+
+What this model does not cover: the hash and encoding of a description, the
+cost of authorization and splitting, and binding the record of signers to a
+judgment, which is
+[#127](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/127).
 
 ## What is not covered
 
