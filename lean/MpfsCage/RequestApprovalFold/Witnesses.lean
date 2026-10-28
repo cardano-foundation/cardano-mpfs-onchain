@@ -779,16 +779,29 @@ def W46 : Reachable s1 ∧ Step s1 (.judge (judge true)) s2 ∧ deadName ∈ s2.
  ⟨reachable1, step_approve, by simp [s2, afterJudgment, judge, deadName], by simp [s1, afterCreate, s0, initial]⟩
 
 /-- Reachable antecedent for T47: exit_time_window. -/
-def W47 : Reachable s3 ∧ foldAccepted writeTx ∧ foldAccepted (accountTx false) :=
- ⟨reachable3, write_ok, account_ok false⟩
+def W47 : Reachable s3 ∧ requestSpendAllowed output (.folded writeTx) ∧
+ (RequestSpend.folded writeTx).exitsAs output .write ∧
+ requestSpendAllowed output (.folded (accountTx false)) ∧
+ (RequestSpend.folded (accountTx false)).exitsAs output .account ∧
+ requestSpendAllowed output (.withdrawn withdraw) ∧
+ (RequestSpend.withdrawn withdraw).exitsAs output .withdraw := by
+ refine ⟨reachable3, ⟨write_ok, ?_⟩, ⟨selected true, ?_⟩,
+   ⟨account_ok false, ?_⟩, ⟨selected false, ?_⟩, ⟨withdraw_ok, rfl⟩, rfl⟩
+ all_goals simp [writeTx, accountTx, singletonFold, FoldTx.requests, FoldItem.request]
 
 /-- Reachable antecedent for T48: exit_windows_cover. -/
 def W48 : Reachable s1 ∧ exitAt output ⟨9,9⟩ .write ∧ exitAt output ⟨10,10⟩ .account ∧ exitAt output ⟨15,15⟩ .account ∧ exitAt output ⟨16,16⟩ .withdraw :=
  ⟨reachable1, by finite, by finite, by finite, by finite⟩
 
 /-- Reachable antecedent for T49: exit_kind_unique. -/
-def W49 : Reachable s1 ∧ exitAt output ⟨10,15⟩ .account ∧ exitAt output ⟨10,15⟩ .account :=
- ⟨reachable1, by finite, by finite⟩
+def W49 : Reachable s3 ∧ requestSpendAllowed output (.folded (accountTx true)) ∧
+ requestSpendAllowed output (.folded (accountTx false)) ∧
+ (RequestSpend.folded (accountTx true)).interval = (RequestSpend.folded (accountTx false)).interval ∧
+ (RequestSpend.folded (accountTx true)).exitsAs output .account ∧
+ (RequestSpend.folded (accountTx false)).exitsAs output .account := by
+ refine ⟨reachable3, ⟨account_ok true, ?_⟩, ⟨account_ok false, ?_⟩,
+   rfl, ⟨selected true, ?_⟩, ⟨selected false, ?_⟩⟩
+ all_goals simp [accountTx, singletonFold, FoldTx.requests, FoldItem.request]
 
 /-- Reachable antecedent for T50: fold_references_authentic. -/
 def W50 := writeAntecedent
@@ -990,8 +1003,10 @@ def W105 : Reachable Stale.state ∧ Stale.tx.items[0]? = some (FoldItem.write o
 def W106 := writeAntecedent
 
 /-- Reachable antecedent for T107: expected_approval_lookup. -/
-def W107 : Reachable s3 ∧ oracle ∈ cage.oracles ∧ (selected true oracle).conditions ≠ [] :=
- ⟨reachable3,by simp [cage],by decide⟩
+def W107 : Reachable s3 ∧ hasApproval cage request s3.judgments [] (selected true) ∧
+ (∀ name ∈ expectedApprovals cage request (selected true), name ∈ s3.judgments) := by
+ refine ⟨reachable3, approval_ok, ?_⟩
+ simp [expectedApprovals, cage, selected, evidence, s3, s2, afterJudgment, judge, Evidence.name]
 
 /-- Reachable antecedent for T108: folder_discovery_exact. -/
 def W108 : Reachable s3 ∧ output ∈ s3.live ∧ stepValid s3.cage ⟨3,4⟩ s3.judgments [] (selected true) output :=
@@ -1055,9 +1070,18 @@ def W122 : Reachable s2 ∧ oracle = OracleIdentity.identity group ∧ TokenRole
 def W123 : Reachable s4 ∧ Step s4 (.claimCreate createClaim) s5 ∧ Reachable s5 ∧ claim ∈ s5.claims :=
  ⟨reachable4,step_claim_create,reachable5,by simp [s5,afterClaimCreate,createClaim]⟩
 
+def claimEvents : List (State × Action × State) :=
+ [(s0, .create create output, s1), (s1, .judge (judge true), s2),
+  (s2, .judge (judge false), s3), (s3, .fold writeTx, s4),
+  (s4, .claimCreate createClaim, s5)]
+def claimTrace : Trace (initial cage) claimEvents s5 :=
+ .cons step_create (.cons step_approve (.cons step_refuse
+   (.cons step_write (.cons step_claim_create (.nil _)))))
+
 /-- Reachable antecedent for T124: reachable_claim_authorization. -/
-def W124 : Reachable s4 ∧ Step s4 (.claimCreate createClaim) s5 ∧ Reachable s5 ∧ claim ∈ s5.claims :=
- ⟨reachable4,step_claim_create,reachable5,by simp [s5,afterClaimCreate,createClaim]⟩
+def W124 : Reachable s5 ∧ registryCreated cage [] ∧
+ Trace (initial cage) claimEvents s5 ∧ claim ∈ s5.claims :=
+ ⟨reachable5, registry_ok, claimTrace, by simp [s5,afterClaimCreate,createClaim]⟩
 
 /-- Reachable antecedent for T125: claim_payout_fixed. -/
 def W125 := claimAntecedent
@@ -1253,5 +1277,20 @@ def summedOnce : Reachable source ∧ Step source (.fold tx) (afterFold source t
  tx.cageOut.balances "alice" = 10 ∧ tx.cageOut.value = 10 ∧ balanceSum tx.cageOut = 10 ∧
  (registryKeys cage).count "alice" = 1 := ⟨reachable, step, by decide, by decide, by decide, by decide⟩
 end SharedKey
+
+/-- Reachable antecedents for T139, and both sides of the boundary. -/
+def W139 : Reachable s5 ∧ claim.cage = s5.cage.id ∧
+ claim.key ∈ registryKeys s5.cage ∧ claim.tokens = [claimName s5.cage.id] ∧
+ s5.cage.minimum ≤ s5.cage.balances claim.key ∧
+ claimAllowed s5.cage ⟨29,29⟩ claim ∧
+ claimWithdrawAllowed ⟨claim, ⟨30,30⟩, [claim.key], claim.tokens, claim.key, claim.value⟩ := by
+ refine ⟨reachable5, rfl, ?_, rfl, ?_, ?_, ?_⟩ <;> finite
+
+/-- A group write/account/claim batch supplies the whole-fold premise of T140. -/
+def W140 := MixedBatch.conserved
+
+/-- The same reachable state and full event trace witness both sides of T141. -/
+def W141 : Reachable s5 ∧ registryCreated cage [] ∧ Trace (initial cage) claimEvents s5 :=
+ ⟨reachable5, registry_ok, claimTrace⟩
 
 end RequestApprovalFold.Witnesses

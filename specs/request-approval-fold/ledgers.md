@@ -1,10 +1,10 @@
 # Fee balances: model and statement candidate (#127)
 
 Status: **CANDIDATE, STATED, NOT PROVED**. All 113 predecessor theorem names
-are retained and restated in Statements.lean; 25 statements add balance/claim
+are retained and restated in Statements.lean; 28 statements add balance/claim
 properties and exact Step/FoldRun inversions. The old proof-bearing extension
 modules are consolidated, not silently imported as guarantees of the new law.
-138 intentional theorem-proof admissions; none in Model or Witnesses.
+141 intentional theorem-proof admissions; none in Model or Witnesses.
 
 Authority: specs/request-approval-fold/decisions.md (27 October),
 specs/oracle-identity/decisions.md and unchanged imported OracleIdentity.Model.
@@ -34,7 +34,7 @@ below. This creator does not assert independent audit readiness or acceptance.
 
 ## Freeze identity
 
-- Model.lean SHA-256: `cd9d01edf6d249c0f1a54f06fb45e3787b04237f867bfb036cb6dfe40632264f`.
+- Model.lean SHA-256: `d2619890886c8aa19a1cce594bf8467548a9b83a1ae18b287c1fda9494789ade`.
 - Full qualified theorem names and source types follow below, with individual
   type digests. These types elaborate in the local build. Proof bytes are
   deliberately excluded from the freeze: PROOFS remains gated on the parent's
@@ -50,15 +50,12 @@ below. This creator does not assert independent audit readiness or acceptance.
 ## Theorem ledger
 
 Each mutant below is a named single semantic edit, **expected** to falsify its
-row after proof work. No mutation execution or kill is claimed in this slice.
+row. Two targeted creator checks (A083 and A087) are recorded below; all
+other mutants remain expected falsifiers pending independent re-audit.
 A witness may supply a stronger trace than the raw premise (for example an
 actual Step plus foldAccepted); its concrete fields instantiate the row.
 W60 constructs the existential equivocation conclusion independently of its
-admitted theorem. W136 reaches every Step constructor. MixedBatch.conserved and
-MixedBatch.overlapping additionally run write, complete account and claim under
-one shared interval; SharedKey.summedOnce credits the same key from two distinct
-oracle identities and checks it is summed once. MixedBatch.straddlingRefused
-checks refusal when that common interval starts too early.
+admitted theorem. W136 reaches every Step constructor.
 
 | Row | Theorem | Obligation | Reachable witness | Named mutant | Status |
 |---|---|---|---|---|---|
@@ -76,14 +73,14 @@ checks refusal when that common interval starts too early.
 | T12 | fold_preserves_registry | Immutable registry identity | Witnesses.W12 | M-fold-protocol | STATED |
 | T13 | step_preserves_registry | Immutable registry on every step | Witnesses.W13 | M-judge-protocol | STATED |
 | T14 | history_preserves_registry | Immutable registry across composition | Witnesses.W14 | M-judge-protocol | STATED |
-| T15 | only_fold_changes_tree | Only fold changes cage | Witnesses.W15 | M-judge-trie | STATED |
+| T15 | only_fold_changes_tree | A trie change identifies an accepted fold, its source and exact successor | Witnesses.W15 | M-judge-trie | STATED |
 | T16 | fold_only_approved_before_deadline | All oracles approve before deadline | Witnesses.W16 | M-skip-item-guard | STATED |
 | T17 | fold_conditions_hold_when_applied | Intermediate-tree conditions | Witnesses.W17 | M-skip-item-guard | STATED |
 | T18 | fold_root_is_folded_writes | Exact writes in exact order | Witnesses.W18 | M-skip-write | STATED |
 | T19 | fold_burns_tags | Burn tags on fold | Witnesses.W19 | M-fold-burns | STATED |
 | T20 | fold_pays_and_keeps_rest | All fees credited and folder remainder | Witnesses.W20 | M-credit-key | STATED |
 | T21 | allocation_conserves_value | Money conservation | Witnesses.W21 | M-remainder | STATED |
-| T22 | blind_write_folds_on_any_tree | Blind-write availability | Witnesses.W22 | M-blind-guard | STATED |
+| T22 | blind_write_folds_on_any_tree | Blind write yields a FoldRun and its result on every trie | Witnesses.W22 | M-blind-guard | STATED |
 | T23 | fold_permissionless | Permissionless submission | Witnesses.W23 | M-submitter | STATED |
 | T24 | absent_inserts_exclusive | Absent-insert exclusivity | Witnesses.W24 | M-request-condition | STATED |
 | T25 | account_complete_and_pays | Complete account, fees, owner rest | Witnesses.W25 | M-account-evidence | STATED |
@@ -106,11 +103,11 @@ checks refusal when that common interval starts too early.
 | T42 | request_never_reappears | Consumed requests never reappear | Witnesses.W42 | M-fresh-output | STATED |
 | T43 | one_oracle_signature_suffices | Single-oracle old-design signature shortcut | Witnesses.W43 | M-no-inline | STATED |
 | T44 | old_operations_correspond | Old Insert/Delete/Update correspondence | Witnesses.W44 | M-old-delete | STATED |
-| T45 | live_removal_is_legal_exit | Authoritative machine exit inversion | Witnesses.W45 | M-burn-consumes | STATED |
+| T45 | live_removal_is_legal_exit | Consumption identifies the allowed spend, source registry, authentic inputs and successor | Witnesses.W45 | M-burn-consumes | STATED |
 | T46 | new_judgment_is_authorized | Authoritative machine judgment provenance | Witnesses.W46 | M-burn-issues | STATED |
-| T47 | exit_time_window | Actual transaction observes its exclusive window | Witnesses.W47 | M-account-upper | STATED |
+| T47 | exit_time_window | Every actual write, account or owner withdrawal fits its window | Witnesses.W47 | M-account-upper | STATED |
 | T48 | exit_windows_cover | The three scalar windows cover all time | Witnesses.W48 | M-window-gap | STATED |
-| T49 | exit_kind_unique | At most one exit kind at any time | Witnesses.W49 | M-window-overlap | STATED |
+| T49 | exit_kind_unique | Two allowed spends at the same interval consume a request by the same exit kind | Witnesses.W49 | M-window-overlap | STATED |
 | T50 | fold_references_authentic | Fold references genuinely held minted tokens | Witnesses.W50 | M-fake-references | STATED |
 | T51 | account_references_authentic | Account references genuinely held minted tokens | Witnesses.W51 | M-account-evidence | STATED |
 | T52 | creation_references_source | Creation uses registry in the source state | Witnesses.W52 | M-create-source | STATED |
@@ -120,7 +117,7 @@ checks refusal when that common interval starts too early.
 | T56 | burn_removes_one | One burn decreases held multiplicity by exactly one | Witnesses.W56 | M-burn-retains | STATED |
 | T57 | burn_keeps_history | Burn does not erase permanent mint record | Witnesses.W57 | M-burn-forgets | STATED |
 | T58 | fold_requests_unique | No duplicate request in accepted fold | Witnesses.W58 | M-duplicate-input | STATED |
-| T59 | account_accepts_any_verdicts | Every judgment mix is usable in window | Witnesses.W59 | M-account-approvals-only | STATED |
+| T59 | account_accepts_any_verdicts | Any authorized verdict selection in-window gives an actual account Step | Witnesses.W59 | M-account-approvals-only | STATED |
 | T60 | equivocation_reachable | Both verdicts coexist in reachable holdings and record | Witnesses.W60 | M-no-equivocation | STATED |
 | T61 | tag_name_injective | Oracle-bound discovery name | Witnesses.W61 | M-tag-oracle | STATED |
 | T62 | price_name_injective | Oracle-bound notice name | Witnesses.W62 | M-price-oracle | STATED |
@@ -160,18 +157,18 @@ checks refusal when that common interval starts too early.
 | T96 | zero_oracle_needs_rule | zero oracle needs rule | Witnesses.W96 | M-registry-guard | STATED |
 | T97 | zero_oracle_evidence_empty | zero oracle evidence empty | Witnesses.W97 | M-zero-evidence | STATED |
 | T98 | zero_oracle_creation_without_seed | zero oracle creation without seed | Witnesses.W98 | M-zero-seed | STATED |
-| T99 | zero_oracle_fold_without_approvals | zero oracle fold without approvals | Witnesses.W99 | M-zero-evidence | STATED |
+| T99 | zero_oracle_fold_without_approvals | Zero-oracle write yields a FoldRun and its result | Witnesses.W99 | M-zero-evidence | STATED |
 | T100 | zero_oracle_account_without_verdicts | zero oracle account without verdicts | Witnesses.W100 | M-zero-account | STATED |
 | T101 | present_condition_semantics | present condition semantics | Witnesses.W101 | M-present-absent | STATED |
 | T102 | foldRun_oracle_conditions | foldRun oracle conditions | Witnesses.W102 | M-skip-item-guard | STATED |
 | T103 | fold_all_conditions_hold | fold all conditions hold | Witnesses.W103 | M-skip-item-guard | STATED |
-| T104 | approval_conditions_cannot_change | approval conditions cannot change | Witnesses.W104 | M-name-conditions | STATED |
+| T104 | approval_conditions_cannot_change | Approval-name equality iff records and conditions agree | Witnesses.W104 | M-name-conditions | STATED |
 | T105 | stale_approval_unusable | stale approval unusable | Witnesses.W105 | M-skip-item-guard | STATED |
 | T106 | fold_evidence_binds_conditions | fold evidence binds conditions | Witnesses.W106 | M-write-approval | STATED |
-| T107 | expected_approval_lookup | expected approval lookup | Witnesses.W107 | M-lookup-empty | STATED |
+| T107 | expected_approval_lookup | Exact iff between no-inline approval and authorized approval evidence plus computed-name membership | Witnesses.W107 | M-lookup-empty | STATED |
 | T108 | folder_discovery_exact | folder discovery exact | Witnesses.W108 | M-folder-no-conditions | STATED |
 | T109 | folder_discovery_executable | folder discovery executable | Witnesses.W109 | M-folder-no-conditions | STATED |
-| T110 | empty_fold_allowed | empty fold allowed | Witnesses.W110 | M-empty-forbidden | STATED |
+| T110 | empty_fold_allowed | An empty fold returns the original State itself | Witnesses.W110 | M-empty-forbidden | STATED |
 | T111 | empty_fold_earns_nothing | empty fold earns nothing | Witnesses.W111 | M-empty-paid | STATED |
 | T112 | creation_rule_input_binding | Actual creation binds Rule.admits to the singleton output request and exact creating signatures | Witnesses.W112 | M-rule-request | STATED |
 | T113 | creation_request_policy | Actual creation uses rule policy and never release if rule exists, release otherwise; both mint and output provenance | Witnesses.W113 | M-release-policy | STATED |
@@ -185,7 +182,7 @@ checks refusal when that common interval starts too early.
 | T121 | group_credits_exact_split | group credits exact split | Witnesses.W121 | M-extra-fee | STATED |
 | T122 | judgment_record_cannot_change | judgment record cannot change | Witnesses.W122 | M-name-record | STATED |
 | T123 | claim_creation_inversion | claim creation inversion | Witnesses.W123 | M-claim-create-signature | STATED |
-| T124 | reachable_claim_authorization | reachable claim authorization | Witnesses.W124 | M-claim-create-signature | STATED |
+| T124 | reachable_claim_authorization | Every live claim matches a key-signed creation event on the given exact history | Witnesses.W124 | M-claim-create-signature | STATED |
 | T125 | claim_payout_fixed | claim payout fixed | Witnesses.W125 | M-claim-redirect | STATED |
 | T126 | claim_payout_in_actual_outputs | claim payout in actual outputs | Witnesses.W126 | M-arbitrary-payments | STATED |
 | T127 | claim_below_minimum_refused | claim below minimum refused | Witnesses.W127 | M-claim-minimum | STATED |
@@ -200,6 +197,9 @@ checks refusal when that common interval starts too early.
 | T136 | step_inversion | step inversion | Witnesses.W136 | M-claim-source | STATED |
 | T137 | foldRun_inversion | foldRun inversion | Witnesses.W137 | M-skip-run-effect | STATED |
 | T138 | claim_item_inversion | claim item inversion | Witnesses.W138 | M-claim-item-cage | STATED |
+| T139 | claim_windows_cover | Point intervals admit claim fold or withdrawal at every time under the non-time guards | Witnesses.W139 | M-claim-withdraw-gap | STATED |
+| T140 | fold_group_credits_only_recorded_signers | All fold fee records are authenticated; a key absent from all selected records cannot gain balance | Witnesses.W140 | M-fold-unsigned-credit | STATED |
+| T141 | trace_reachability | Indexed event histories and Reachable describe exactly the same states | Witnesses.W141 | M-trace-missing-step | STATED |
 
 ## Mutation definitions
 
@@ -246,7 +246,7 @@ checks refusal when that common interval starts too early.
 | M-burn-issues | afterBurn | Prepend a fabricated name to issued |
 | M-account-upper | accountAllowed | Remove interval upper bound |
 | M-window-gap | exitAt.write | Require upper + 1 < deadline |
-| M-window-overlap | exitAt.write | Allow upper <= deadline |
+| M-window-overlap | stepValid | Allow upper <= deadline |
 | M-fake-references | Step.fold | Remove authentic judgment-reference premise |
 | M-create-source | Step.create | Remove source cage equality |
 | M-creation-minimum | wellFormed | Require only totalFees <= value, omitting minimum |
@@ -308,6 +308,10 @@ checks refusal when that common interval starts too early.
 | M-withdraw-state | afterExit | Clear registry balances |
 | M-claim-source | Step.claimCreate | Remove source cage equality |
 | M-claim-item-cage | claimAllowed | Remove claim registry equality |
+| M-claim-history-datum | afterClaimCreate | Store a claim with an altered datum instead of the signed output |
+| M-claim-withdraw-gap | claimWithdrawAllowed | Require strict deadline < lower instead of deadline <= lower |
+| M-fold-unsigned-credit | credit | Credit a key absent from all selected signing records |
+| M-trace-missing-step | Trace.cons | Remove the Step premise from the recorded event |
 
 ## Semantic-atom ledger
 
@@ -368,12 +372,12 @@ of that malformed action is the intended counterexample, not a new initial state
 | A045 | Money | credit: Add each split payment to that key's existing balance | W53 | fold_payments_concrete | M-A045: Replace balances instead of incrementing |
 | A046 | Money | credit: Add exactly the split total to registry fee backing | W115 | reachable_balances_backed | M-A046: Add total + 1 |
 | A047 | Money | remainder: Escrow minus every declared oracle fee | W21 | allocation_conserves_value | M-A047: Return full escrow |
-| A048 | Time | stepValid: Nonempty write interval | W135 | fold_interval_fits_every_item | M-A048: Drop interval.valid |
+| A048 | Time | stepValid: Nonempty write interval | W109 | folder_discovery_executable | M-A048: Drop interval.valid |
 | A049 | Time | stepValid: Write interval entirely before deadline | W135 | fold_interval_fits_every_item | M-A049: Drop upper < deadline |
 | A050 | Binding | stepValid: Write requires well-formed request and token | W86 | fold_requires_request_token | M-A050: Drop wellFormed |
 | A051 | Condition | stepValid: All requester conditions checked at current trie | W17 | fold_conditions_hold_when_applied | M-A051: Check against emptyTrie |
 | A052 | Condition | stepValid: All selected oracle conditions checked at current trie | W103 | fold_all_conditions_hold | M-A052: Omit oracle condition checks |
-| A053 | Time | accountAllowed: Nonempty account interval | W135 | fold_interval_fits_every_item | M-A053: Drop interval.valid |
+| A053 | Time | accountAllowed: Nonempty account interval | W135 | None: equivalent guard removal | M-A053: Drop interval.valid |
 | A054 | Time | accountAllowed: Account starts at or after deadline | W47 | exit_time_window | M-A054: Drop deadline <= lower |
 | A055 | Time | accountAllowed: Account ends no later than deadline plus window | W47 | exit_time_window | M-A055: Drop upper bound |
 | A056 | Binding | accountAllowed: Account requires well-formed request and token | W86 | fold_requires_request_token | M-A056: Drop wellFormed |
@@ -403,15 +407,15 @@ of that malformed action is the intended counterexample, not a new initial state
 | A080 | Binding | Step.claimCreate: Claim creation references actual source registry | W123 | claim_creation_inversion | M-A080: Drop cageRef equality |
 | A081 | Binding | claimCreateAllowed: Claim datum names registry | W123 | claim_creation_inversion | M-A081: Drop output.cage equality |
 | A082 | Authorization | claimCreateAllowed: Claiming key belongs to some registry identity | W123 | claim_creation_inversion | M-A082: Drop registryKeys membership |
-| A083 | Authorization | claimCreateAllowed: Claim creator key signs | W123 | claim_creation_inversion | M-A083: Drop key signature requirement |
+| A083 | Authorization | claimCreateAllowed: Claim creator key signs | W124 | reachable_claim_authorization | M-A083: Drop key signature requirement |
 | A084 | Binding | claimCreateAllowed: Exactly one registry claim token on output | W123 | claim_creation_inversion | M-A084: Allow empty output.tokens |
 | A085 | Binding | claimCreateAllowed: Mint exactly output's claim token | W123 | claim_creation_inversion | M-A085: Allow additional minted names |
 | A086 | Binding | Step.claimCreate: Claim output reference is fresh | W136 | step_inversion | M-A086: Drop ref-not-used premise |
-| A087 | Effect | afterClaimCreate: Insert the whole immutable claim and remember its reference | W136 | step_inversion | M-A087: Change payout datum on insertion |
+| A087 | Effect | afterClaimCreate: Insert the whole immutable claim and remember its reference | W124 | reachable_claim_authorization | M-A087: Change payout datum on insertion |
 | A088 | Binding | claimAllowed: Claim belongs to current registry | W138 | claim_item_inversion | M-A088: Drop cage equality |
 | A089 | Authorization | claimAllowed: Claiming key is a registry key | W138 | claim_item_inversion | M-A089: Drop key membership |
 | A090 | Binding | claimAllowed: Claim token names this registry | W138 | claim_item_inversion | M-A090: Ignore claim tokens |
-| A091 | Time | claimAllowed: Claim interval is nonempty | W135 | fold_interval_fits_every_item | M-A091: Drop interval.valid |
+| A091 | Time | claimAllowed: Claim interval is nonempty | W135 | None: equivalent guard removal | M-A091: Drop interval.valid |
 | A092 | Time | claimAllowed: Entire claim interval precedes deadline | W135 | fold_interval_fits_every_item | M-A092: Allow upper <= deadline |
 | A093 | Refusal | claimAllowed: Balance at turn meets ledger minimum | W127 | claim_below_minimum_refused | M-A093: Remove minimum comparison |
 | A094 | Money | itemPayments.claim: Exactly whole turn-time balance to fixed address | W125 | claim_payout_fixed | M-A094: Pay to folder |
@@ -462,9 +466,79 @@ of that malformed action is the intended counterexample, not a new initial state
 | A139 | Observation | grossCredits: Sum actual fee credits over sequential turns | W117 | fold_request_conservation | M-A139: Return zero on a nonempty batch |
 | A140 | Observation | claimPayouts: Sum whole balances at claim turns | W118 | fold_balance_conservation | M-A140: Use initial rather than current balance |
 | A141 | Observation | requestRemainders: Sum only write/account remainders | W117 | fold_request_conservation | M-A141: Include claim escrow in request remainder sum |
-| A142 | Observation | foldPayments: Concatenate each turn's exact outputs | W119 | fold_payments_exact | M-A142: Reverse the remaining item order |
-| A143 | Observation | balanceSum: Sum one balance per distinct registry key | W115; SharedKey.summedOnce | reachable_balances_backed | M-A143: Count shared keys more than once |
+| A142 | Observation | foldPayments: Include every turn's exact outputs (output order is not pinned) | W119 | fold_payments_exact | M-A142: Drop the current turn outputs from concatenation |
+| A143 | Observation | balanceSum: Sum one balance per distinct registry key | W115 | reachable_balances_backed | M-A143: Count shared keys more than once |
 | A144 | Observation | exitAt: Three nonoverlapping window classes, singleton intervals cover all time | W48 | exit_windows_cover | M-A144: Leave deadline minus one uncovered |
+| A145 | Money | claimWithdrawAllowed: Pay the entire claim escrow amount | W130 | claim_withdrawal_inversion | M-A145: Require paid = 0 instead of input.value |
+| A146 | Money | withdrawAllowed: Pay the entire request escrow amount | W28 | withdraw_only_owner_after_window | M-A146: Require paid = 0 instead of input.value |
+| A147 | Origin | Trace.nil: Empty event history retains its initial state | W141 | trace_reachability | M-A147: Allow an arbitrary target state |
+| A148 | Composition | Trace.cons: Every recorded event is an actual Step | W141 | trace_reachability | M-A148: Drop the Step premise |
+| A149 | Binding | Trace.cons: Recorded action is the actual action, including the exact signed claim | W124 | reachable_claim_authorization | M-A149: Record a claimCreate action with its signers cleared |
+| A150 | Composition | Trace.cons: The next event starts at the preceding target | W124 | reachable_claim_authorization | M-A150: Allow the suffix trace to start from an unrelated state |
+| A151 | Observation | RequestSpend.exitsAs.write: Write classification requires this exact write input | W49 | exit_kind_unique | M-A151: Classify every folded account as a write too |
+| A152 | Observation | RequestSpend.exitsAs.account: Account classification requires this exact account input | W49 | exit_kind_unique | M-A152: Classify every folded write as an account too |
+| A153 | Observation | RequestSpend.exitsAs.withdraw: Withdrawal classification requires the exact withdrawn input | W47 | exit_time_window | M-A153: Classify a folded request as a withdrawal |
+
+| MA1 | Authorization | hasApproval: selected evidence is authorized | W106 | fold_evidence_binds_conditions | M-MA1: drop selected-evidence authorization |
+| MA2 | Authorization | hasAccount: selected evidence is authorized | W25 | account_complete_and_pays | M-MA2: drop selected-evidence authorization |
+| MA3 | Effect | afterFold: registry becomes cageOut | W116 | fold_value_conservation | M-MA3: keep source registry |
+| MA4 | Origin | Step effects: only claimCreate inserts claims | W124 | reachable_claim_authorization | M-MA4: afterJudgment inserts a fabricated claim |
+
+## Repair of statement audit 1
+
+NOTE-001 repairs the NOT-READY findings on predecessor c2e5cb0. The revised
+candidate has not been independently audited. Earlier mutant results apply
+only to that predecessor and are not carried forward as new-candidate kills.
+
+- B1 / T124 uses an explicit Trace indexed by exact source/action/target events.
+  A live claim must equal the output of a key-signed creation event on that
+  given trace. T141 relates these traces to Reachable in both directions.
+  Both A083 (missing signature) and A087 (changed stored datum) falsify
+  this revised history statement in targeted creator checks; a different history cannot
+  supply its existential event. W124 supplies the full actual trace.
+- B2 / T107 again characterizes hasApproval by an iff. Its right side includes
+  identity authorization and approval status, as well as computed-name
+  membership. Arbitrary Evidence can compute a name without being authorized;
+  with authorized approval evidence fixed, this is exactly the original
+  membership-only characterization. Empty fold signers cannot authorize an
+  inline approval under the unchanged imported identity model.
+- The retained guarantees listed in audit section 5 have their successor,
+  source, authentication, funding, Step/FoldRun and iff conclusions restored.
+  T47 and T49 classify actual allowed spends; W47 covers all three exits and
+  W49 uses distinct true/false verdict account spends at the same interval.
+  The approved Reachable premise of request_never_reappears is retained.
+- T139 states actual claim fold/withdrawal point-interval coverage, including
+  the exact deadline; it retains the non-time guards and balance minimum.
+  T140 binds every fee record to shown evidence or an inline signed approval,
+  and states that a key absent from all records cannot gain balance across
+  the whole fold, including mixed write/account/claim batches (W140).
+- A048 now targets folder_discovery_executable. A083 targets revised T124
+  (and also claim_creation_inversion). A087 targets revised T124, not the
+  symbolic successor equality in step_inversion. A142 changes to dropping a
+  turn's outputs, targeting fold_payments_exact; output order remains unpinned.
+- A053 and A091 guard-removal mutants are equivalent under foldAccepted's
+  shared interval.valid guard; these two rows explicitly have no falsifier.
+  MA1-MA4 preserve the auditor's missing-atom identifiers. A145-A153 cover
+  withdrawal amounts and the newly added trace and exit-class observations.
+
+Witnesses additionally include MixedBatch.conserved (write/account/claim in
+one interval), MixedBatch.straddlingRefused, and SharedKey.summedOnce.
+
+## Targeted creator mutation receipts
+
+The runtime evidence/repair-mutants directory contains two isolated model
+mutants and matching unmutated controls, generated from this frozen Model
+and the exact T124 declaration header. A083 drops only the key-signature
+guard; A087 changes only the stored claim datum to the empty string. Each
+Kill file constructs an actual registry-origin Trace and proves the negation
+of T124. Both mutant compilations exit 0, with only propext on the killing
+lemma. Both unchanged-model controls exit 1: respectively at the unsigned
+claim Step guard and at membership of the altered claim in live claims.
+Control errors introduce sorryAx and are expressly excluded from evidence
+of a kill. See results.tsv, KillA083.log, KillA087.log, and the Control logs.
+Initial harness setup/iteration failures remain in that evidence directory.
+These two finite, creator-run checks are not independent approval and do not
+carry the predecessor auditor's 138-row kill results onto this candidate.
 
 ## Limits and reopened surfaces
 
@@ -560,13 +634,14 @@ theorem registry_creation (c : CageState) (existing : List CageId) : registryCre
 
 ### RequestApprovalFold.create_tags_existing_cage
 
-Type SHA-256: `7295799dc598cb1ad2f5945556574b86d585e1e21a5425ae8488f6d51f517969`.
+Type SHA-256: `3eedecdccc98490375956a13483f915de51a8fa9dedf20c7bb2c90508cb32c2a`.
 
 ```lean
 theorem create_tags_existing_cage (tx : CreateTx) (o : RequestOutput) : createAllowed tx o →
  (tx.cageRef.oracles ≠ [] → o.request.seed ∈ tx.spent) ∧ tx.outputs = [o] ∧
  tx.minted = tx.cageRef.oracles.map tagName ++ [requestName tx.cageRef.id] ∧
- o.request.cage = tx.cageRef.id ∧ o.tags = tx.cageRef.oracles.map tagName
+ o.request.cage = tx.cageRef.id ∧ o.tags = tx.cageRef.oracles.map tagName ∧
+ totalFees tx.cageRef o.request + tx.cageRef.minimum ≤ o.value
 ```
 
 ### RequestApprovalFold.requests_unique_in_history
@@ -642,11 +717,12 @@ theorem history_preserves_registry {s s' : State} : History s s' → SameRegistr
 
 ### RequestApprovalFold.only_fold_changes_tree
 
-Type SHA-256: `e758901109603d9ce098a4ef2065df55c092585534a03125e4eda71b5c36c22f`.
+Type SHA-256: `532362e01fc216b79ed1b0bac25fa499309faed7e23f96d737d1b56781c943d8`.
 
 ```lean
 theorem only_fold_changes_tree {s s' : State} {a : Action} : Step s a s' →
- s'.cage.trie ≠ s.cage.trie → ∃ tx, a = .fold tx
+ s'.cage.trie ≠ s.cage.trie → ∃ tx, a = .fold tx ∧ foldAccepted tx ∧
+ tx.cageIn = s.cage ∧ s' = afterFold s tx
 ```
 
 ### RequestApprovalFold.fold_only_approved_before_deadline
@@ -711,14 +787,16 @@ theorem allocation_conserves_value (c : CageState) (iv : Interval) (refs : List 
 
 ### RequestApprovalFold.blind_write_folds_on_any_tree
 
-Type SHA-256: `93446c4bf25331019d73d1089d4f516a8c4b5162a87603c07f2fc01d14cf433a`.
+Type SHA-256: `78369d495630526f316520198b6d88c34f9154e5f5b6e5afd178854eed93ce83`.
 
 ```lean
 theorem blind_write_folds_on_any_tree (c : CageState) (iv : Interval) (refs : List TokenName)
  (sigs : List Signer) (o : RequestOutput) (e : Selection) :
  wellFormed c o → iv.valid → iv.upper < o.request.deadline → hasApproval c o.request refs sigs e →
  o.request.conditions = [] → (∀ oracle ∈ c.oracles, (e oracle).conditions = []) →
- ∀ t, stepValid { c with trie := t } iv refs sigs e o
+ ∀ t, FoldRun iv refs sigs { c with trie := t } [FoldItem.write o e]
+ (itemResult { c with trie := t } (FoldItem.write o e)) ∧
+ (itemResult { c with trie := t } (FoldItem.write o e)).trie = o.request.write.apply t
 ```
 
 ### RequestApprovalFold.fold_permissionless
@@ -960,12 +1038,17 @@ theorem old_operations_correspond (op : OldOperation) (t : Trie) :
 
 ### RequestApprovalFold.live_removal_is_legal_exit
 
-Type SHA-256: `68e2aa04572fb5d66f4b79f3402f27651a3940cdb248956f568a2f82c05a5ab7`.
+Type SHA-256: `f7887e931a61e64d006436fa7350046aa1db5381103ea12eb82a92f53d576abc`.
 
 ```lean
 theorem live_removal_is_legal_exit {s s' : State} {a : Action} (o : RequestOutput) :
  Step s a s' → o ∈ s.live → o ∉ s'.live →
- ∃ spend, a.spend = some spend ∧ requestSpendAllowed o spend
+ ∃ spend, a.spend = some spend ∧ requestSpendAllowed o spend ∧
+ (match spend with
+ | .folded tx => s' = afterFold s tx ∧ tx.cageIn = s.cage ∧
+     (∀ input ∈ tx.requests, input ∈ s.live) ∧ (∀ claim ∈ tx.claims, claim ∈ s.claims) ∧
+     (∀ name ∈ tx.refs, name ∈ s.judgments)
+ | .withdrawn tx => s' = afterExit s tx.input)
 ```
 
 ### RequestApprovalFold.new_judgment_is_authorized
@@ -980,12 +1063,11 @@ theorem new_judgment_is_authorized {s s' : State} {a : Action} (name : TokenName
 
 ### RequestApprovalFold.exit_time_window
 
-Type SHA-256: `c16e59c9989be6cee3f95620da6fa857bc1efe3f82afb8eabb178640e08d892e`.
+Type SHA-256: `650c21a9ae28d2cfbb1b1b114ebc066f224621ca2cc84fb718c4e974cefe5e04`.
 
 ```lean
-theorem exit_time_window (tx : FoldTx) : foldAccepted tx →
- (∀ o e, FoldItem.write o e ∈ tx.items → exitAt o tx.interval .write) ∧
- (∀ o e, FoldItem.account o e ∈ tx.items → exitAt o tx.interval .account)
+theorem exit_time_window (o : RequestOutput) (spend : RequestSpend) :
+ requestSpendAllowed o spend → ∀ kind, spend.exitsAs o kind → exitAt o spend.interval kind
 ```
 
 ### RequestApprovalFold.exit_windows_cover
@@ -999,11 +1081,12 @@ theorem exit_windows_cover (o : RequestOutput) (now : Time) :
 
 ### RequestApprovalFold.exit_kind_unique
 
-Type SHA-256: `927f3b7be88c2c2d5d880ca845390e5f75130e439ca6fb2778b5f1c8233b9b18`.
+Type SHA-256: `fcd3cb0b0d092286d7a5b0b174c410661d12e58b6bcb74d7f75ad131ecee3b47`.
 
 ```lean
-theorem exit_kind_unique (o : RequestOutput) (iv : Interval) (a b : ExitKind) :
- exitAt o iv a → exitAt o iv b → a = b
+theorem exit_kind_unique (o : RequestOutput) (a b : RequestSpend) (ka kb : ExitKind) :
+ requestSpendAllowed o a → requestSpendAllowed o b → a.interval = b.interval →
+ a.exitsAs o ka → b.exitsAs o kb → ka = kb
 ```
 
 ### RequestApprovalFold.fold_references_authentic
@@ -1101,14 +1184,16 @@ theorem fold_requests_unique (tx : FoldTx) : foldAccepted tx →
 
 ### RequestApprovalFold.account_accepts_any_verdicts
 
-Type SHA-256: `78bca6a70d4c7721da33bf45ee4cc78ec4a328a6d7228344d31b0bb999486354`.
+Type SHA-256: `663e3b0418c940497ef72e272625e458c4b192b3dfa9bb4d904d655e9a0853f2`.
 
 ```lean
-theorem account_accepts_any_verdicts (c : CageState) (o : RequestOutput) (e : Selection)
- (iv : Interval) (refs : List TokenName) : wellFormed c o → iv.valid →
+theorem account_accepts_any_verdicts (s : State) (o : RequestOutput) (e : Selection)
+ (iv : Interval) (who : Signer) : o ∈ s.live → wellFormed s.cage o → iv.valid →
  o.request.deadline ≤ iv.lower → iv.upper ≤ o.request.deadline + o.request.window →
- (∀ oracle ∈ c.oracles, (e oracle).authorized oracle ∧ (e oracle).name c.id o.request oracle ∈ refs) →
- accountAllowed c iv refs o e
+ (∀ oracle ∈ s.cage.oracles, (e oracle).authorized oracle ∧
+   (e oracle).name s.cage.id o.request oracle ∈ s.judgments) →
+ Step s (.fold (singletonFold s iv [] (FoldItem.account o e) who))
+ (afterFold s (singletonFold s iv [] (FoldItem.account o e) who))
 ```
 
 ### RequestApprovalFold.equivocation_reachable
@@ -1205,12 +1290,12 @@ theorem discovery_across_registries (states : List State) (oracle : Oracle) (o :
 
 ### RequestApprovalFold.live_removal_burns_oracle_tags
 
-Type SHA-256: `4466987a77309f9d6b05b0f12e2525f07824f1cbf4b43d6fa3db070261596566`.
+Type SHA-256: `37fbd5fa00a1aa31c19497ca535b3d6255210dc142aaf7a689f350f11c33431c`.
 
 ```lean
 theorem live_removal_burns_oracle_tags {s s' : State} {a : Action} (o : RequestOutput) :
  Reachable s → Step s a s' → o ∈ s.live → o ∉ s'.live →
- ∃ spend, a.spend = some spend ∧ ∀ oracle ∈ s.cage.oracles, tagName oracle ∈ spend.burned
+ ∃ spend, a.spend = some spend ∧ requestSpendAllowed o spend ∧ ∀ oracle ∈ s.cage.oracles, tagName oracle ∈ spend.burned
 ```
 
 ### RequestApprovalFold.price_mint_inversion
@@ -1290,25 +1375,28 @@ theorem notices_do_not_bind_protocol {s s' : State} {a : Action} (notices : List
 
 ### RequestApprovalFold.notice_change_authorized
 
-Type SHA-256: `76b2a8ad63523c68c8eaedd97936a09edf5b28d36818e13c28a2634f695f03b6`.
+Type SHA-256: `5ef9c2cae486bf81c47b5bb9d6cebb70d54fcf0162fc14b7237f51e8db4dc120`.
 
 ```lean
 theorem notice_change_authorized {s s' : State} {a : Action} (n : PriceNotice) :
  Step s a s' → n ∈ s'.notices → n ∉ s.notices →
  (∃ tx, a = .priceMint tx ∧ tx.output = n ∧
  (OracleIdentity.authorize n.oracle tx.description tx.signers).isSome = true) ∨
- (∃ tx, a = .priceUpdate tx ∧ tx.output = n ∧ tx.input.oracle = n.oracle ∧
+ (∃ tx, a = .priceUpdate tx ∧ tx.input ∈ s.notices ∧ tx.output = n ∧ tx.input.oracle = n.oracle ∧
  (OracleIdentity.authorize n.oracle tx.description tx.signers).isSome = true)
 ```
 
 ### RequestApprovalFold.creation_rule_and_token
 
-Type SHA-256: `4f71504c8406aa57f91b1397a6e13b05df947de61f60c5fcb6c5e54907da1209`.
+Type SHA-256: `7028afd727473723d37c45222a847bb99bc7382e4f99ba12a3271aa4949ba3bc`.
 
 ```lean
 theorem creation_rule_and_token (tx : CreateTx) (o : RequestOutput) : createAllowed tx o →
- ruleAdmits tx.cageRef o.request tx.signers ∧ o.requestTokens = [requestName tx.cageRef.id] ∧
- o.policy = requestPolicy tx.cageRef ∧ tx.policy = requestPolicy tx.cageRef
+ ruleAdmits tx.cageRef o.request tx.signers ∧ tx.outputs = [o] ∧
+ o.request.cage = tx.cageRef.id ∧ o.requestTokens = [requestName tx.cageRef.id] ∧
+ o.policy = requestPolicy tx.cageRef ∧ tx.policy = requestPolicy tx.cageRef ∧
+ tx.minted = tx.cageRef.oracles.map tagName ++ [requestName tx.cageRef.id] ∧
+ totalFees tx.cageRef o.request + tx.cageRef.minimum ≤ o.value
 ```
 
 ### RequestApprovalFold.step_rule_immutable
@@ -1358,21 +1446,22 @@ theorem every_rule_allows_burn (s : State) (rule : Rule) : s.cage.rule = some ru
 
 ### RequestApprovalFold.creation_rule_input_binding
 
-Type SHA-256: `71d34c1fa1ecb9f7638e5593c77eac155a1ca485c768b6829700d7e1aea70506`.
+Type SHA-256: `1ed2a337f6684be77807a58b2e6f6c3a6b15c61b306129def193e757425eaca3`.
 
 ```lean
 theorem creation_rule_input_binding {s s' : State} {tx : CreateTx} {o : RequestOutput} (rule : Rule) :
  Step s (.create tx o) s' → s.cage.rule = some rule →
- tx.outputs = [o] ∧ rule.admits o.request tx.signers
+ tx.outputs = [o] ∧ o ∈ s'.live ∧ rule.admits o.request tx.signers
 ```
 
 ### RequestApprovalFold.creation_request_policy
 
-Type SHA-256: `1dd4935e1dc15cb2b03ab322f7ff9854778727fdb76086deba732ff75011a2ce`.
+Type SHA-256: `b84d611ce090010ed8a0682cd1103297500e62789262980edfa2d99cec045f3e`.
 
 ```lean
 theorem creation_request_policy {s s' : State} {tx : CreateTx} {o : RequestOutput} :
  Step s (.create tx o) s' → tx.outputs = [o] ∧
+ o.requestTokens = [requestName s.cage.id] ∧
  tx.minted = s.cage.oracles.map tagName ++ [requestName s.cage.id] ∧
  (match s.cage.rule with
  | some rule => tx.policy = .rule rule.hash ∧ o.policy = .rule rule.hash ∧ tx.policy ≠ .release ∧ o.policy ≠ .release
@@ -1419,12 +1508,12 @@ theorem every_exit_burns_request_token (o : RequestOutput) (spend : RequestSpend
 
 ### RequestApprovalFold.live_removal_burns_request_token
 
-Type SHA-256: `56230f7ac831904adead5b1e3e37151b7564bf92f5b0e849abbc9a75535549ec`.
+Type SHA-256: `b212cc811863d8d75a47210a209fb25e3064d8b9e70dbaefea643c8fd85fffca`.
 
 ```lean
 theorem live_removal_burns_request_token {s s' : State} {a : Action} (o : RequestOutput) :
  Reachable s → Step s a s' → o ∈ s.live → o ∉ s'.live →
- ∃ spend, a.spend = some spend ∧ requestName s.cage.id ∈ spend.burned
+ ∃ spend, a.spend = some spend ∧ requestSpendAllowed o spend ∧ requestName s.cage.id ∈ spend.burned
 ```
 
 ### RequestApprovalFold.request_name_injective
@@ -1519,12 +1608,14 @@ theorem zero_oracle_creation_without_seed (c : CageState) (o : RequestOutput) (s
 
 ### RequestApprovalFold.zero_oracle_fold_without_approvals
 
-Type SHA-256: `dfc276162ec91fb2966924d399e02d6032f464a8e29fc2bc607ae06c2aa757a3`.
+Type SHA-256: `cca99800bdd3231dccb597f5d39318acf1042d47311aa3077e9e73162ae67a5f`.
 
 ```lean
 theorem zero_oracle_fold_without_approvals (c : CageState) (o : RequestOutput) (iv : Interval) (e : Selection) :
  c.oracles = [] → wellFormed c o → iv.valid → iv.upper < o.request.deadline →
- (∀ condition ∈ o.request.conditions, condition.holds c.trie) → stepValid c iv [] [] e o
+ (∀ condition ∈ o.request.conditions, condition.holds c.trie) →
+ FoldRun iv [] [] c [FoldItem.write o e] (itemResult c (FoldItem.write o e)) ∧
+ (itemResult c (FoldItem.write o e)).trie = o.request.write.apply c.trie
 ```
 
 ### RequestApprovalFold.zero_oracle_account_without_verdicts
@@ -1571,12 +1662,12 @@ theorem fold_all_conditions_hold (tx : FoldTx) : foldAccepted tx → ∀ n o e,
 
 ### RequestApprovalFold.approval_conditions_cannot_change
 
-Type SHA-256: `107ea728a061aa24fb61d227299ac9d44f36b0e571e2c25e1fdcc903b6481652`.
+Type SHA-256: `0ff108f18496543dc38726875e9a754e591e1e1579bdc71805cc164fddf10e98`.
 
 ```lean
 theorem approval_conditions_cannot_change (c : CageId) (r : Request) (o : Oracle)
  (rec rec' : SigningRecord) (a b : List Condition) :
- judgmentName c r o true rec a = judgmentName c r o true rec' b → rec = rec' ∧ a = b
+ judgmentName c r o true rec a = judgmentName c r o true rec' b ↔ rec = rec' ∧ a = b
 ```
 
 ### RequestApprovalFold.stale_approval_unusable
@@ -1604,11 +1695,13 @@ theorem fold_evidence_binds_conditions {s s' : State} (tx : FoldTx) (n : Nat) (o
 
 ### RequestApprovalFold.expected_approval_lookup
 
-Type SHA-256: `2052432f01e8c572480a80b498711a0f09e22234663221285f10107b64fdd73c`.
+Type SHA-256: `2cfc23bf16457f4cd13bd4d5d9f0af2ca34810042f77c476ac1dbedcfde923b0`.
 
 ```lean
-theorem expected_approval_lookup (c : CageState) (r : Request) (e : Selection) (oracle : Oracle) :
- oracle ∈ c.oracles → judgmentName c.id r oracle true (e oracle).record (e oracle).conditions ∈ expectedApprovals c r e
+theorem expected_approval_lookup (c : CageState) (r : Request) (e : Selection) (refs : List TokenName) :
+ hasApproval c r refs [] e ↔
+ (∀ oracle ∈ c.oracles, (e oracle).authorized oracle ∧ (e oracle).approve = true) ∧
+ (∀ name ∈ expectedApprovals c r e, name ∈ refs)
 ```
 
 ### RequestApprovalFold.folder_discovery_exact
@@ -1633,12 +1726,12 @@ theorem folder_discovery_executable (s : State) (iv : Interval) (sigs : List Sig
 
 ### RequestApprovalFold.empty_fold_allowed
 
-Type SHA-256: `746df159e7deca85b780a268e5b975b62d4e3b13c25ff73a89319bd8588ccbfe`.
+Type SHA-256: `3443eebb93237b6dd7fd2bf2312da37170d857241e9144bddb12bfe2bbae14e6`.
 
 ```lean
 theorem empty_fold_allowed (s : State) (iv : Interval) (who : Signer) : iv.valid →
  let tx : FoldTx := ⟨s.cage, s.cage, [], [], [], iv, who, who, [], []⟩
- Step s (.fold tx) (afterFold s tx)
+ Step s (.fold tx) s
 ```
 
 ### RequestApprovalFold.empty_fold_earns_nothing
@@ -1744,12 +1837,14 @@ theorem claim_creation_inversion {s s' : State} (tx : ClaimCreateTx) : Step s (.
 
 ### RequestApprovalFold.reachable_claim_authorization
 
-Type SHA-256: `00a672603ff70da33b04389f8120507b4e7478aaf05db22c78ff96a91937f7a5`.
+Type SHA-256: `44d4a372347089eac48a99cb3c369dd10aae24608c5261952fb4f74f3a81d97e`.
 
 ```lean
-theorem reachable_claim_authorization (s : State) (o : ClaimOutput) : Reachable s → o ∈ s.claims →
- ∃ before after tx, Reachable before ∧ Step before (.claimCreate tx) after ∧
- tx.output = o ∧ o.key ∈ tx.signers
+theorem reachable_claim_authorization (c : CageState) (existing : List CageId)
+ (events : List (State × Action × State)) (s : State) (o : ClaimOutput) :
+ registryCreated c existing → Trace (initial c) events s → o ∈ s.claims →
+ ∃ before after tx, (before, Action.claimCreate tx, after) ∈ events ∧
+ Step before (.claimCreate tx) after ∧ tx.output = o ∧ o.key ∈ tx.signers
 ```
 
 ### RequestApprovalFold.claim_payout_fixed
@@ -1906,4 +2001,45 @@ theorem claim_item_inversion (tx : FoldTx) (n : Nat) (o : ClaimOutput) :
  foldAccepted tx → tx.items[n]? = some (FoldItem.claim o) →
  o.cage = tx.cageIn.id ∧ o.key ∈ registryKeys tx.cageIn ∧ o.tokens = [claimName tx.cageIn.id] ∧
  tx.interval.valid ∧ tx.interval.upper < o.deadline ∧ tx.cageIn.minimum ≤ (atTurn tx n).balances o.key
+```
+
+### RequestApprovalFold.claim_windows_cover
+
+Type SHA-256: `8ad9f2441367f3e28e3733a3afffbc0fa52239fad36aff997780f50ae9366104`.
+
+```lean
+theorem claim_windows_cover (c : CageState) (o : ClaimOutput) (now : Time) :
+ o.cage = c.id → o.key ∈ registryKeys c → o.tokens = [claimName c.id] →
+ c.minimum ≤ c.balances o.key →
+ claimAllowed c ⟨now, now⟩ o ∨
+ claimWithdrawAllowed ⟨o, ⟨now, now⟩, [o.key], o.tokens, o.key, o.value⟩
+```
+
+### RequestApprovalFold.fold_group_credits_only_recorded_signers
+
+Type SHA-256: `91908c3a0f87cf178b46a008845c773a68b8f1f00771b0884b27abb263d8ca34`.
+
+```lean
+theorem fold_group_credits_only_recorded_signers (s s' : State) (tx : FoldTx) :
+ Step s (.fold tx) s' →
+ (∀ (n : Nat) o e, (tx.items[n]? = some (FoldItem.write o e) ∨
+   tx.items[n]? = some (FoldItem.account o e)) → ∀ oracle ∈ tx.cageIn.oracles,
+   (e oracle).authorized oracle ∧
+   ((e oracle).name tx.cageIn.id o.request oracle ∈ s.judgments ∨
+     ((e oracle).approve = true ∧ (e oracle).signers = tx.signers)) ∧
+   (∀ key, key ∉ OracleIdentity.recordedKeys (e oracle).record →
+     OracleIdentity.paidTo (oracleCredits o.request oracle (e oracle)) key = 0)) ∧
+ (∀ key, (∀ (n : Nat) o e, (tx.items[n]? = some (FoldItem.write o e) ∨
+   tx.items[n]? = some (FoldItem.account o e)) → ∀ oracle ∈ tx.cageIn.oracles,
+   key ∉ OracleIdentity.recordedKeys (e oracle).record) →
+   s'.cage.balances key ≤ s.cage.balances key)
+```
+
+### RequestApprovalFold.trace_reachability
+
+Type SHA-256: `2eab1f59bcc626b164e55a68ba5e8baf2cdcc25d2d3813ba35cadd7005d99963`.
+
+```lean
+theorem trace_reachability (s : State) : Reachable s ↔
+ ∃ c existing events, registryCreated c existing ∧ Trace (initial c) events s
 ```

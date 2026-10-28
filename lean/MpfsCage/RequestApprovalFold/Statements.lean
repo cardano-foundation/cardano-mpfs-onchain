@@ -33,7 +33,8 @@ theorem registry_creation (c : CageState) (existing : List CageId) : registryCre
 theorem create_tags_existing_cage (tx : CreateTx) (o : RequestOutput) : createAllowed tx o →
  (tx.cageRef.oracles ≠ [] → o.request.seed ∈ tx.spent) ∧ tx.outputs = [o] ∧
  tx.minted = tx.cageRef.oracles.map tagName ++ [requestName tx.cageRef.id] ∧
- o.request.cage = tx.cageRef.id ∧ o.tags = tx.cageRef.oracles.map tagName := by
+ o.request.cage = tx.cageRef.id ∧ o.tags = tx.cageRef.oracles.map tagName ∧
+ totalFees tx.cageRef o.request + tx.cageRef.minimum ≤ o.value := by
   sorry
 
 theorem requests_unique_in_history (history : List CreateTx)
@@ -73,7 +74,8 @@ theorem history_preserves_registry {s s' : State} : History s s' → SameRegistr
   sorry
 
 theorem only_fold_changes_tree {s s' : State} {a : Action} : Step s a s' →
- s'.cage.trie ≠ s.cage.trie → ∃ tx, a = .fold tx := by
+ s'.cage.trie ≠ s.cage.trie → ∃ tx, a = .fold tx ∧ foldAccepted tx ∧
+ tx.cageIn = s.cage ∧ s' = afterFold s tx := by
   sorry
 
 theorem fold_only_approved_before_deadline (tx : FoldTx) : foldAccepted tx → ∀ n o e,
@@ -110,7 +112,9 @@ theorem blind_write_folds_on_any_tree (c : CageState) (iv : Interval) (refs : Li
  (sigs : List Signer) (o : RequestOutput) (e : Selection) :
  wellFormed c o → iv.valid → iv.upper < o.request.deadline → hasApproval c o.request refs sigs e →
  o.request.conditions = [] → (∀ oracle ∈ c.oracles, (e oracle).conditions = []) →
- ∀ t, stepValid { c with trie := t } iv refs sigs e o := by
+ ∀ t, FoldRun iv refs sigs { c with trie := t } [FoldItem.write o e]
+ (itemResult { c with trie := t } (FoldItem.write o e)) ∧
+ (itemResult { c with trie := t } (FoldItem.write o e)).trie = o.request.write.apply t := by
   sorry
 
 theorem fold_permissionless (tx : FoldTx) (other : Signer) :
@@ -242,7 +246,12 @@ theorem old_operations_correspond (op : OldOperation) (t : Trie) :
 
 theorem live_removal_is_legal_exit {s s' : State} {a : Action} (o : RequestOutput) :
  Step s a s' → o ∈ s.live → o ∉ s'.live →
- ∃ spend, a.spend = some spend ∧ requestSpendAllowed o spend := by
+ ∃ spend, a.spend = some spend ∧ requestSpendAllowed o spend ∧
+ (match spend with
+ | .folded tx => s' = afterFold s tx ∧ tx.cageIn = s.cage ∧
+     (∀ input ∈ tx.requests, input ∈ s.live) ∧ (∀ claim ∈ tx.claims, claim ∈ s.claims) ∧
+     (∀ name ∈ tx.refs, name ∈ s.judgments)
+ | .withdrawn tx => s' = afterExit s tx.input) := by
   sorry
 
 theorem new_judgment_is_authorized {s s' : State} {a : Action} (name : TokenName) :
@@ -250,17 +259,17 @@ theorem new_judgment_is_authorized {s s' : State} {a : Action} (name : TokenName
  ∃ tx, a = .judge tx ∧ tx.cageRef = s.cage ∧ tx.requestRef ∈ s.live ∧ judgmentAllowed tx ∧ name ∈ tx.minted := by
   sorry
 
-theorem exit_time_window (tx : FoldTx) : foldAccepted tx →
- (∀ o e, FoldItem.write o e ∈ tx.items → exitAt o tx.interval .write) ∧
- (∀ o e, FoldItem.account o e ∈ tx.items → exitAt o tx.interval .account) := by
+theorem exit_time_window (o : RequestOutput) (spend : RequestSpend) :
+ requestSpendAllowed o spend → ∀ kind, spend.exitsAs o kind → exitAt o spend.interval kind := by
   sorry
 
 theorem exit_windows_cover (o : RequestOutput) (now : Time) :
  exitAt o ⟨now, now⟩ .write ∨ exitAt o ⟨now, now⟩ .account ∨ exitAt o ⟨now, now⟩ .withdraw := by
   sorry
 
-theorem exit_kind_unique (o : RequestOutput) (iv : Interval) (a b : ExitKind) :
- exitAt o iv a → exitAt o iv b → a = b := by
+theorem exit_kind_unique (o : RequestOutput) (a b : RequestSpend) (ka kb : ExitKind) :
+ requestSpendAllowed o a → requestSpendAllowed o b → a.interval = b.interval →
+ a.exitsAs o ka → b.exitsAs o kb → ka = kb := by
   sorry
 
 theorem fold_references_authentic {s s' : State} (tx : FoldTx) :
@@ -311,11 +320,13 @@ theorem fold_requests_unique (tx : FoldTx) : foldAccepted tx →
  (tx.requests.map RequestOutput.ref ++ tx.claims.map ClaimOutput.ref).Nodup ∧ tx.requests.Nodup ∧ tx.claims.Nodup := by
   sorry
 
-theorem account_accepts_any_verdicts (c : CageState) (o : RequestOutput) (e : Selection)
- (iv : Interval) (refs : List TokenName) : wellFormed c o → iv.valid →
+theorem account_accepts_any_verdicts (s : State) (o : RequestOutput) (e : Selection)
+ (iv : Interval) (who : Signer) : o ∈ s.live → wellFormed s.cage o → iv.valid →
  o.request.deadline ≤ iv.lower → iv.upper ≤ o.request.deadline + o.request.window →
- (∀ oracle ∈ c.oracles, (e oracle).authorized oracle ∧ (e oracle).name c.id o.request oracle ∈ refs) →
- accountAllowed c iv refs o e := by
+ (∀ oracle ∈ s.cage.oracles, (e oracle).authorized oracle ∧
+   (e oracle).name s.cage.id o.request oracle ∈ s.judgments) →
+ Step s (.fold (singletonFold s iv [] (FoldItem.account o e) who))
+ (afterFold s (singletonFold s iv [] (FoldItem.account o e) who)) := by
   sorry
 
 theorem equivocation_reachable : ∃ s c r o rec cs,
@@ -362,7 +373,7 @@ theorem discovery_across_registries (states : List State) (oracle : Oracle) (o :
 
 theorem live_removal_burns_oracle_tags {s s' : State} {a : Action} (o : RequestOutput) :
  Reachable s → Step s a s' → o ∈ s.live → o ∉ s'.live →
- ∃ spend, a.spend = some spend ∧ ∀ oracle ∈ s.cage.oracles, tagName oracle ∈ spend.burned := by
+ ∃ spend, a.spend = some spend ∧ requestSpendAllowed o spend ∧ ∀ oracle ∈ s.cage.oracles, tagName oracle ∈ spend.burned := by
   sorry
 
 theorem price_mint_inversion {s s' : State} (tx : PriceMintTx) : Step s (.priceMint tx) s' →
@@ -409,13 +420,16 @@ theorem notice_change_authorized {s s' : State} {a : Action} (n : PriceNotice) :
  Step s a s' → n ∈ s'.notices → n ∉ s.notices →
  (∃ tx, a = .priceMint tx ∧ tx.output = n ∧
  (OracleIdentity.authorize n.oracle tx.description tx.signers).isSome = true) ∨
- (∃ tx, a = .priceUpdate tx ∧ tx.output = n ∧ tx.input.oracle = n.oracle ∧
+ (∃ tx, a = .priceUpdate tx ∧ tx.input ∈ s.notices ∧ tx.output = n ∧ tx.input.oracle = n.oracle ∧
  (OracleIdentity.authorize n.oracle tx.description tx.signers).isSome = true) := by
   sorry
 
 theorem creation_rule_and_token (tx : CreateTx) (o : RequestOutput) : createAllowed tx o →
- ruleAdmits tx.cageRef o.request tx.signers ∧ o.requestTokens = [requestName tx.cageRef.id] ∧
- o.policy = requestPolicy tx.cageRef ∧ tx.policy = requestPolicy tx.cageRef := by
+ ruleAdmits tx.cageRef o.request tx.signers ∧ tx.outputs = [o] ∧
+ o.request.cage = tx.cageRef.id ∧ o.requestTokens = [requestName tx.cageRef.id] ∧
+ o.policy = requestPolicy tx.cageRef ∧ tx.policy = requestPolicy tx.cageRef ∧
+ tx.minted = tx.cageRef.oracles.map tagName ++ [requestName tx.cageRef.id] ∧
+ totalFees tx.cageRef o.request + tx.cageRef.minimum ≤ o.value := by
   sorry
 
 theorem step_rule_immutable {s s' : State} {a : Action} : Step s a s' → s'.cage.rule = s.cage.rule := by
@@ -445,11 +459,12 @@ theorem every_rule_allows_burn (s : State) (rule : Rule) : s.cage.rule = some ru
 
 theorem creation_rule_input_binding {s s' : State} {tx : CreateTx} {o : RequestOutput} (rule : Rule) :
  Step s (.create tx o) s' → s.cage.rule = some rule →
- tx.outputs = [o] ∧ rule.admits o.request tx.signers := by
+ tx.outputs = [o] ∧ o ∈ s'.live ∧ rule.admits o.request tx.signers := by
   sorry
 
 theorem creation_request_policy {s s' : State} {tx : CreateTx} {o : RequestOutput} :
  Step s (.create tx o) s' → tx.outputs = [o] ∧
+ o.requestTokens = [requestName s.cage.id] ∧
  tx.minted = s.cage.oracles.map tagName ++ [requestName s.cage.id] ∧
  (match s.cage.rule with
  | some rule => tx.policy = .rule rule.hash ∧ o.policy = .rule rule.hash ∧ tx.policy ≠ .release ∧ o.policy ≠ .release
@@ -476,7 +491,7 @@ theorem every_exit_burns_request_token (o : RequestOutput) (spend : RequestSpend
 
 theorem live_removal_burns_request_token {s s' : State} {a : Action} (o : RequestOutput) :
  Reachable s → Step s a s' → o ∈ s.live → o ∉ s'.live →
- ∃ spend, a.spend = some spend ∧ requestName s.cage.id ∈ spend.burned := by
+ ∃ spend, a.spend = some spend ∧ requestSpendAllowed o spend ∧ requestName s.cage.id ∈ spend.burned := by
   sorry
 
 theorem request_name_injective (a b : CageId) : requestName a = requestName b ↔ a = b := by
@@ -521,7 +536,9 @@ theorem zero_oracle_creation_without_seed (c : CageState) (o : RequestOutput) (s
 
 theorem zero_oracle_fold_without_approvals (c : CageState) (o : RequestOutput) (iv : Interval) (e : Selection) :
  c.oracles = [] → wellFormed c o → iv.valid → iv.upper < o.request.deadline →
- (∀ condition ∈ o.request.conditions, condition.holds c.trie) → stepValid c iv [] [] e o := by
+ (∀ condition ∈ o.request.conditions, condition.holds c.trie) →
+ FoldRun iv [] [] c [FoldItem.write o e] (itemResult c (FoldItem.write o e)) ∧
+ (itemResult c (FoldItem.write o e)).trie = o.request.write.apply c.trie := by
   sorry
 
 theorem zero_oracle_account_without_verdicts (s : State) (o : RequestOutput) (iv : Interval) (e : Selection) :
@@ -548,7 +565,7 @@ theorem fold_all_conditions_hold (tx : FoldTx) : foldAccepted tx → ∀ n o e,
 
 theorem approval_conditions_cannot_change (c : CageId) (r : Request) (o : Oracle)
  (rec rec' : SigningRecord) (a b : List Condition) :
- judgmentName c r o true rec a = judgmentName c r o true rec' b → rec = rec' ∧ a = b := by
+ judgmentName c r o true rec a = judgmentName c r o true rec' b ↔ rec = rec' ∧ a = b := by
   sorry
 
 theorem stale_approval_unusable (tx : FoldTx) (n : Nat) (o : RequestOutput) (e : Selection)
@@ -564,8 +581,10 @@ theorem fold_evidence_binds_conditions {s s' : State} (tx : FoldTx) (n : Nat) (o
  (e oracle).signers = tx.signers) := by
   sorry
 
-theorem expected_approval_lookup (c : CageState) (r : Request) (e : Selection) (oracle : Oracle) :
- oracle ∈ c.oracles → judgmentName c.id r oracle true (e oracle).record (e oracle).conditions ∈ expectedApprovals c r e := by
+theorem expected_approval_lookup (c : CageState) (r : Request) (e : Selection) (refs : List TokenName) :
+ hasApproval c r refs [] e ↔
+ (∀ oracle ∈ c.oracles, (e oracle).authorized oracle ∧ (e oracle).approve = true) ∧
+ (∀ name ∈ expectedApprovals c r e, name ∈ refs) := by
   sorry
 
 theorem folder_discovery_exact (s : State) (iv : Interval) (sigs : List Signer) (e : Selection) (o : RequestOutput) :
@@ -580,7 +599,7 @@ theorem folder_discovery_executable (s : State) (iv : Interval) (sigs : List Sig
 
 theorem empty_fold_allowed (s : State) (iv : Interval) (who : Signer) : iv.valid →
  let tx : FoldTx := ⟨s.cage, s.cage, [], [], [], iv, who, who, [], []⟩
- Step s (.fold tx) (afterFold s tx) := by
+ Step s (.fold tx) s := by
   sorry
 
 theorem empty_fold_earns_nothing (tx : FoldTx) : foldAccepted tx → tx.items = [] →
@@ -629,9 +648,11 @@ theorem claim_creation_inversion {s s' : State} (tx : ClaimCreateTx) : Step s (.
  tx.minted = tx.output.tokens ∧ tx.output.ref ∉ s.usedOutputs ∧ s' = afterClaimCreate s tx := by
   sorry
 
-theorem reachable_claim_authorization (s : State) (o : ClaimOutput) : Reachable s → o ∈ s.claims →
- ∃ before after tx, Reachable before ∧ Step before (.claimCreate tx) after ∧
- tx.output = o ∧ o.key ∈ tx.signers := by
+theorem reachable_claim_authorization (c : CageState) (existing : List CageId)
+ (events : List (State × Action × State)) (s : State) (o : ClaimOutput) :
+ registryCreated c existing → Trace (initial c) events s → o ∈ s.claims →
+ ∃ before after tx, (before, Action.claimCreate tx, after) ∈ events ∧
+ Step before (.claimCreate tx) after ∧ tx.output = o ∧ o.key ∈ tx.signers := by
   sorry
 
 theorem claim_payout_fixed (tx : FoldTx) (n : Nat) (o : ClaimOutput) : foldAccepted tx →
@@ -720,6 +741,37 @@ theorem claim_item_inversion (tx : FoldTx) (n : Nat) (o : ClaimOutput) :
  foldAccepted tx → tx.items[n]? = some (FoldItem.claim o) →
  o.cage = tx.cageIn.id ∧ o.key ∈ registryKeys tx.cageIn ∧ o.tokens = [claimName tx.cageIn.id] ∧
  tx.interval.valid ∧ tx.interval.upper < o.deadline ∧ tx.cageIn.minimum ≤ (atTurn tx n).balances o.key := by
+  sorry
+
+/-- Point intervals cover every time, including the exact claim deadline. All
+non-time claim guards remain explicit; balance sufficiency is not liveness. -/
+theorem claim_windows_cover (c : CageState) (o : ClaimOutput) (now : Time) :
+ o.cage = c.id → o.key ∈ registryKeys c → o.tokens = [claimName c.id] →
+ c.minimum ≤ c.balances o.key →
+ claimAllowed c ⟨now, now⟩ o ∨
+ claimWithdrawAllowed ⟨o, ⟨now, now⟩, [o.key], o.tokens, o.key, o.value⟩ := by
+  sorry
+
+/-- Every selected record is bound to a shown judgment or an inline approval.
+Across all items, a key absent from all such records cannot gain balance. -/
+theorem fold_group_credits_only_recorded_signers (s s' : State) (tx : FoldTx) :
+ Step s (.fold tx) s' →
+ (∀ (n : Nat) o e, (tx.items[n]? = some (FoldItem.write o e) ∨
+   tx.items[n]? = some (FoldItem.account o e)) → ∀ oracle ∈ tx.cageIn.oracles,
+   (e oracle).authorized oracle ∧
+   ((e oracle).name tx.cageIn.id o.request oracle ∈ s.judgments ∨
+     ((e oracle).approve = true ∧ (e oracle).signers = tx.signers)) ∧
+   (∀ key, key ∉ OracleIdentity.recordedKeys (e oracle).record →
+     OracleIdentity.paidTo (oracleCredits o.request oracle (e oracle)) key = 0)) ∧
+ (∀ key, (∀ (n : Nat) o e, (tx.items[n]? = some (FoldItem.write o e) ∨
+   tx.items[n]? = some (FoldItem.account o e)) → ∀ oracle ∈ tx.cageIn.oracles,
+   key ∉ OracleIdentity.recordedKeys (e oracle).record) →
+   s'.cage.balances key ≤ s.cage.balances key) := by
+  sorry
+
+/-- The indexed histories used for claim provenance cover exactly Reachable. -/
+theorem trace_reachability (s : State) : Reachable s ↔
+ ∃ c existing events, registryCreated c existing ∧ Trace (initial c) events s := by
   sorry
 
 end RequestApprovalFold

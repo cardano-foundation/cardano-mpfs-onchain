@@ -547,6 +547,13 @@ inductive History : State → State → Prop where
   | refl (s : State) : History s s
   | next {s t u : State} {action : Action} : Step s action t → History t u → History s u
 
+/-- An actual history indexed by its exact source/action/target events. This
+adds an observation of Step; it does not change any transition or guard. -/
+inductive Trace : State → List (State × Action × State) → State → Prop where
+  | nil (s : State) : Trace s [] s
+  | cons {s t u : State} {a : Action} {events : List (State × Action × State)} :
+      Step s a t → Trace t events u → Trace s ((s, a, t) :: events) u
+
 inductive OldOperation where
   | insert (key : Key) (value : Val)
   | delete (key : Key) (oldValue : Val)
@@ -586,6 +593,18 @@ def claimPayouts (c : CageState) : List FoldItem → Nat
 inductive ExitKind where
   | write | account | withdraw
   deriving DecidableEq, Repr
+
+/-- Classify an actual request consumption without inserting timing premises. -/
+def RequestSpend.exitsAs (spend : RequestSpend) (o : RequestOutput) : ExitKind → Prop
+  | .write => match spend with
+      | .folded tx => ∃ e, FoldItem.write o e ∈ tx.items
+      | .withdrawn _ => False
+  | .account => match spend with
+      | .folded tx => ∃ e, FoldItem.account o e ∈ tx.items
+      | .withdrawn _ => False
+  | .withdraw => match spend with
+      | .folded _ => False
+      | .withdrawn tx => tx.input = o
 
 def exitAt (o : RequestOutput) (interval : Interval) : ExitKind → Prop
   | .write => interval.valid ∧ interval.upper < o.request.deadline
