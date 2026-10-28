@@ -38,13 +38,23 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
   presence and exact-value witnesses.
 - **A key has at most one witness.** Its next change therefore carries at
   most one consumption and one refund.
-- **The witness is tracked in the trie, at its key.** The key's entry records
-  that it is witnessed, so the fold proves the obligation with the same tree
-  proofs it already builds, and no tracking lives outside the tree.
-- **An absent witnessed key has an entry too.** Extracting an absence witness
-  writes an entry marking the key as absent and witnessed. A `set` on that key
-  must prove the entry against the root and consume the witness; the proof of
-  the entry is what makes the obligation impossible to skip.
+- **A key's entry is unwitnessed or witnessed.** An unwitnessed key holds
+  its value, or has no entry at all when it is absent. A witnessed key's entry
+  is the witness: the value it attests, or the absence it attests, and the
+  refund address. No tracking lives outside the tree, and the fold proves the
+  obligation with the tree proofs it already builds.
+- **A witnessed absence reads as absent.** For conditions and readers, a key
+  whose entry is an absence witness is absent, exactly like a key with no
+  entry.
+- **Extraction is a request.** It is folded like a write, and changes the
+  key's entry from unwitnessed to witnessed without changing its value or
+  absence. A key already witnessed cannot be witnessed again until its next
+  change.
+- **The next change consumes the witness.** A `set` or `unset` on a witnessed
+  key must prove its entry against the root, burns the witness, and pays the
+  deposit to the refund address in the entry. The key is then unwitnessed:
+  its new value, or no entry. The proof of the entry is what makes the
+  obligation impossible to skip.
 - **The deposit is a separate obligation** from the request's oracle fees,
   the folder's remainder and any refund to the request owner.
 - **A witness attests what the registry records.** Its meaning in the outside
@@ -54,11 +64,6 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
 
 ## Not decided
 
-- What a witnessed entry holds besides the fact: the issuer to refund and the
-  deposit are the obvious candidates.
-- How conditions and readers treat a key whose entry only marks an absence
-  witness. It must read as absent, or an `absent` condition would fail on a
-  key that is absent.
-- How extraction enters the fold: its request form and fold item. Extraction
-  writes the key's entry, so it moves the root like any write.
-- Where witnesses are held and how a consumer references one.
+- Whether an extraction request passes through the registry's rule and
+  required judges, or needs only its deposit.
+- Where the witness token is held and how a consumer references it.
