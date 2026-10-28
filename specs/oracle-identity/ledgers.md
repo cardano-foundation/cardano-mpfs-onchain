@@ -1,15 +1,13 @@
 # Oracle identity theorem and semantic-atom ledgers
 
-This is the **OBSERVATION PROOF REPAIR CANDIDATE** under NOTE-004.
-The independent proof audit of `964eb1a` returned PASS for T01-T26, with
-advisory observation survivors X45, X47 and X48. The operator commissioned
-exact observation laws and their proofs, in two commits: admitted statements
-first, then proofs. All 31 theorems are now PROVED. T01-T26 retain their exact declaration and
-proof text; T27-T31 retain the types committed first in
-`ee92321365293c9f478eec28e5d43863488a5912`. Their concrete witnesses import
-only observation vocabulary and the model, never Statements. Model.lean remains
-byte-identical. Independent assessment of this new repair is pending.
-The full audit report is retained as `inputs/proof-audit-1.md` in the runtime.
+Status: all 31 theorems PROVED and independently audited on 2026-10-28.
+Statements: two fresh statement audits (the first NOT-READY: key records not
+fixed; repaired with T25 and T26), READY-TO-PROVE at `82bbfcc`. Proofs: a
+fresh proof and mutation audit of `964eb1a` passed with three advisory
+survivors on observation functions (X45, X47, X48); the repair added T27-T31
+at `ee92321`, proved at `4122448`, and a fresh audit of that repair passed
+with READY-TO-PROVE statements, axiom-clean proofs and no surviving mutant
+among 53. Model.lean is byte-identical since `82bbfcc`.
 
 Registry integration, judgment binding and price notices remain outside #126
 and belong to #127. Creator evidence is a CANDIDATE, not independent acceptance.
