@@ -50,6 +50,11 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
   key's entry from unwitnessed to witnessed without changing its value or
   absence. A key already witnessed cannot be witnessed again until its next
   change.
+- **A `set` request can include the witnessing.** The request writes the
+  value and asks for it to be witnessed, funding the deposit and naming the
+  refund address; the key's new entry is the witness of the value written. On
+  a key already witnessed, the same fold consumes the old witness and refunds
+  its issuer, then writes the new one.
 - **The next change consumes the witness.** A `set` or `unset` on a witnessed
   key must prove its entry against the root, burns the witness, and pays the
   deposit to the refund address in the entry. The key is then unwitnessed:
