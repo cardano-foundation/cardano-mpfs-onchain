@@ -52,6 +52,12 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
   key's entry from unwitnessed to witnessed without changing its value or
   absence. A key already witnessed cannot be witnessed again until its next
   change.
+- **Extraction commits to the value it wants witnessed.** The request names
+  the value, or the absence, and the fold applies it only when the key holds
+  exactly that at the request's turn, as an `equals` or `absent` condition on
+  its own key. A folder cannot hand the extractor a witness of a different
+  value; an extraction whose value has changed is not folded, and leaves by
+  the request's later exits.
 - **The fold mints and burns witness tokens atomically with the tree.** For
   each request on a witnessed or witnessing key, the folder's one transaction
   burns the old witness token, changes the tree, and mints the new witness
