@@ -26,6 +26,8 @@ The decision records are the authority; this document explains them:
   oracle identities and how fees reach keys;
 - [`specs/oracle-slots/decisions.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-slots/decisions.md):
   slots and check protocols, the draft.
+- [`specs/durable-witnesses/decisions.md`](https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/durable-witnesses/decisions.md):
+  durable witnesses of registry facts.
 
 ## Shared state needs folding
 
@@ -453,6 +455,42 @@ results need no oracle: the rule checks the agent's signature and a condition
 checks the previous state. The CDDL for the slots, the checks and the moog
 protocol is on [Oracle slots and check protocols](slots.md).
 
+## Durable witnesses
+
+**Decided**, with the representation open.
+
+A consumer proving a fact about one key references the registry state and
+its root. A fold writing any other key spends that output and changes the
+root, so the consumer must rebuild its proof although its fact still holds.
+Durable witnesses remove that dependence on unrelated writes.
+
+- **A witness attests one fact about one key**: absent, present, or holding
+  an exact value.
+- **Anyone extracts one by funding its deposit**, and is its issuer.
+- **It stays usable until the next change to its key.** Writes to other keys
+  leave it usable and its deposit in place.
+- **The registry tracks the obligation per key, and every fold complies.** The
+  next change to a tracked key consumes its witness and refunds the deposit to
+  the issuer in the same fold; otherwise the fold is invalid. A value change
+  consumes a presence witness even when the key stays present.
+- **The deposit is separate** from oracle fees, the folder's remainder and
+  the request owner's refund.
+- **A witness attests what the registry records**; its outside-world meaning
+  still rests on the rule and the oracles.
+
+```mermaid
+flowchart TB
+  issuer([Anyone]) -- "extracts, funds deposit" --> live[Witness outstanding:<br/>key tracks the obligation]
+  live -- "used as evidence" --> consumer([Consumer contract])
+  live -- "next change<br/>to this key" --> fold[One fold: changes the key,<br/>consumes the witness,<br/>refunds the issuer]
+  fold -- "result" --> done[Old witness unusable,<br/>deposit returned]
+```
+
+This follows Singular's second product milestone, whose presence, absent and
+terminal witnesses introduced proof durability. Open: one outstanding witness
+per key or several; how tracking is represented, including for an absent
+key; and how extraction enters the fold.
+
 ## Alternatives rejected
 
 | Decision | Chosen | Rejected | Why |
@@ -475,7 +513,8 @@ The decisions up to 26 October, the request, judgment and fold design with
 rules and request tokens, are modelled in Lean and audited; see
 [Formal model and audits](formal-model.md). The decisions of 27 October are
 not modelled yet: oracle identities, fees in the registry state, complete accounts and
-claims as fold items, slots and the trimmed minting checks. Nothing is
+claims as fold items, durable witnesses, slots and the trimmed minting
+checks. Nothing is
 implemented in the validators yet.
 
 Open:

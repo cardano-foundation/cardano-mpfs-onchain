@@ -163,3 +163,4 @@ What the mutation audit could not count as killed, none of it a defect:
 | Conformance of the Aiken validators with the model | [#114](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/114) |
 | Concrete encodings and hashes of names and datums | [#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116) |
 | Costs and transaction limits | [#115](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/115) |
+| Oracle identities, fee balances, fold items, durable witnesses and slots, decided or drafted after this model was audited | [#126](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/126), [#127](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/127), [#128](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/128), [#129](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/129) |
