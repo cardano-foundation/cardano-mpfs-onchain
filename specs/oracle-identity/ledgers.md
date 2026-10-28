@@ -8,7 +8,9 @@ statement audit. Registry integration and judgment binding belong to #127.
 
 ## Authority and domain
 
-Base: `5ad9589` (main after PR #125).
+Base: `5ad9589` (main after PR #125), followed by the parent's ruling commit
+`a4e0b3b6b4ab6f3d6d8af5295628d3028aa4d0ab`. The model candidate descends
+from that ruling commit.
 
 - `specs/oracle-identity/decisions.md`, SHA256
   `8a66110905fc8c185ebeab66d1f73946b7e6f5cff4ef5cb41403f113247d49bd`.
@@ -17,7 +19,7 @@ Base: `5ad9589` (main after PR #125).
 - Operator ruling `A-001-description-domain.md`, SHA256
   `65eecc2052b6523dcaa028919a3c9c7693f92c2a30bb6f68209de583f12c1ca8`,
   in `/code/mpfs-onchain-lean-126-20261028/astra-identities-model/answers/`.
-  The parent owns adding this ruling to the decision record.
+  The parent incorporated this ruling in the decision record in `a4e0b3b`.
 
 A-001 requires finite ordered descriptions, a positive group threshold no greater
 than its member count, positive shares, recursive validity, and no repeated key
@@ -188,7 +190,8 @@ Evidence is under
 The prescribed full build passes with 22 jobs and exactly the 24 declared theorem
 admissions. Each of W01-W24 was queried by `#print axioms`: only `propext` and
 `Quot.sound` occur (some use no axioms); no witness depends on `sorryAx`.
-`Witnesses.lean` imports Model only, never Statements. Captured codec/replay failures are retained alongside repaired-run receipts;
+`Witnesses.lean` imports Model only, never Statements. Captured codec/replay
+failures are retained alongside repaired-run receipts;
 `failure-notes.md` records setup and elaboration failures.
 
 The final evidence receipt records corpus replay, codec checks, file hashes and
