@@ -30,7 +30,7 @@ flowchart LR
 | Part | What it captures |
 |---|---|
 | Trie, writes, conditions | The tree as a map from keys to values; `set` and `unset`; `absent`, `present` and `equals`; ordered application within a fold |
-| Cage state | Registry identity, oracle set, protocol hash, optional rule and tree |
+| Registry state | Registry identity, oracle set, protocol hash, optional rule and tree |
 | Request output | Registry, owner, seed, a fresh output reference, one write, conditions, a fee per oracle, deadline, window, evidence, escrow, its request token and one tag per oracle |
 | Judgment | Registry, request, oracle, verdict and, for an approval, the oracle's own conditions, all bound in its name |
 | Price notice | An oracle's price token and its current fee, optionally per protocol |
@@ -45,6 +45,12 @@ has its own non-negative fee; creation requires escrow covering the sum of the
 fees; time is a single observed value whose soundness against transaction
 validity intervals is assumed; names are collision-free structured values,
 standing for the hashes the implementation will use.
+
+!!! note "Decisions not yet in the model"
+    Oracle identities (keys and groups with shares), fees accumulated per key
+    in the registry state, and complete accounts and claims as items of the fold were
+    decided after this model was audited. The model still names oracles as
+    single keys and pays each oracle's fee in its own output.
 
 ## What is proved
 
@@ -157,3 +163,4 @@ What the mutation audit could not count as killed, none of it a defect:
 | Conformance of the Aiken validators with the model | [#114](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/114) |
 | Concrete encodings and hashes of names and datums | [#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116) |
 | Costs and transaction limits | [#115](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/115) |
+| Oracle identities, fee balances, fold items, durable witnesses and slots, decided or drafted after this model was audited | [#126](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/126), [#127](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/127), [#128](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/128), [#129](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/129) |

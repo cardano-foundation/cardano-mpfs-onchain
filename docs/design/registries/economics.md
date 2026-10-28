@@ -9,18 +9,27 @@ earns, so that I can tell whether the role is worth taking.**
 ```mermaid
 flowchart LR
   requester([Requester]) -- "escrow: fees for every oracle<br/>plus a bid" --> request[(Request)]
-  request -- "fold: each oracle its fee" --> oracles([Oracles])
+  request -- "fold or complete account:<br/>each oracle's fee" --> cage[(Registry state: one balance per key)]
   request -- "fold: the remainder" --> folder([Folder])
-  request -- "settlement: each oracle its fee" --> oracles
-  request -- "settlement: the remainder" --> owner([Request owner])
+  request -- "complete account: the remainder" --> owner([Request owner])
   request -- "after the window: everything" --> owner
+  cage -- "claim, folded when the key chooses:<br/>its whole balance" --> payout([Payout chosen by the key])
 ```
 
 | Exit | Oracles | Folder | Request owner |
 |---|---|---|---|
-| Fold, before the deadline | Each its declared fee | Everything else | Nothing back; the write is applied |
-| Complete account, in the window | Each its declared fee, whatever its verdict | Nothing | Everything else |
+| Fold, before the deadline | Each its declared fee, credited to its keys' balances | Everything else | Nothing back; the write is applied |
+| Complete account, as a fold item in the window | Each its declared fee, credited, whatever its verdict | Nothing | Everything else |
 | Withdrawal, after the window | Whatever the owner chooses to pay | Nothing | Everything |
+| Claim, as a fold item | The key's whole balance, to the payout it named | The claim's tip | Not involved |
+
+Fees accumulate in the registry state instead of being paid one output at a time. Every
+output on chain must hold the ledger's minimum of ada, so a fee per oracle per
+request in its own output would cost a minimum each time, and a fee below the
+minimum could not be paid at all. A key pays that minimum once per claim,
+when its balance is worth collecting. A group oracle's fee is split among its
+members' keys by the shares in its description, so each member is paid its
+share without trusting the others.
 
 ## Three markets instead of one
 
@@ -50,9 +59,9 @@ design splits that into separate markets:
 | Role | Carries | Bounded by |
 |---|---|---|
 | Requester | Fees paid even when refused; the wait until the deadline if refused or unfoldable | Its own choice of fees, deadline and window |
-| Oracle | Judging work on a request that never folds | Payment at settlement for every verdict; silence is the only unpaid case, and it is the oracle's own |
+| Oracle | Judging work on a request that never folds; a stolen key | Payment at the complete account for every verdict; silence is the only unpaid case, and it is the oracle's own. A group oracle survives stolen keys below its threshold |
 | Good oracle in a registry with a silent oracle | Requests that cannot fold, settled only if the owner pays after the window | Its decision to stop serving that registry |
-| Folder | Losing a race for the cage state to another folder | A transaction whose inputs were already spent is rejected before any script runs, and costs nothing |
+| Folder | Losing a race for the registry state to another folder | A transaction whose inputs were already spent is rejected before any script runs, and costs nothing |
 | Registry creator | Choosing oracles that later go silent | Nothing: trust is placed in the oracles when they are named; a dead registry is replaced by a new one |
 
 ## Several oracles holding up a request
