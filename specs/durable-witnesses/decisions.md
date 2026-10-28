@@ -56,6 +56,10 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
   token when the request asks for one. The tree and the live witness tokens
   therefore never disagree: a witnessed entry has exactly one live token, an
   unwitnessed key has none.
+- **Witness tokens sit at the registry state's address.** Each sits in its
+  own output there, funded by its deposit, so a consumer references it as a
+  reference input without touching the registry state, and only the
+  registry state's script, inside a fold, can spend it to burn it.
 - **A `set` request can include the witnessing.** The request writes the
   value and asks for it to be witnessed, funding the deposit and naming the
   refund address; the key's new entry is the witness of the value written. On
@@ -77,4 +81,3 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
 
 - Whether an extraction request passes through the registry's rule and
   required judges, or needs only its deposit.
-- Where the witness token is held and how a consumer references it.

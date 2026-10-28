@@ -457,7 +457,7 @@ protocol is on [Oracle slots and check protocols](slots.md).
 
 ## Durable witnesses
 
-**Decided**, with custody of the witness token open.
+**Decided**, with the admission of a standalone extraction open.
 
 A consumer proving a fact about one key references the registry state and
 its root. A fold writing any other key spends that output and changes the
@@ -483,6 +483,9 @@ Durable witnesses remove that dependence on unrelated writes.
 - **The folder burns, writes and mints in one transaction.** It burns the
   old witness token, changes the tree and, when the request asks, mints the
   new witness token, so a witnessed entry always has exactly one live token.
+- **Witness tokens sit at the registry state's address**, each in its own
+  output funded by its deposit. A consumer references it; only a fold spends
+  it.
 - **A `set` request can include the witnessing**: it writes the value and
   leaves the key witnessed with it, refunding any earlier witness in the same
   fold.
@@ -500,9 +503,8 @@ flowchart TB
 ```
 
 This follows Singular's second product milestone, whose presence, absent and
-terminal witnesses introduced proof durability. Open: whether extraction
-passes through the rule and the required judges, and where the witness token
-is held.
+terminal witnesses introduced proof durability. Open: whether a standalone
+extraction passes through the rule and the required judges.
 
 ## Alternatives rejected
 
