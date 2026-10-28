@@ -1,17 +1,18 @@
-# Fee balances: proof progress candidate (#127)
+# Registry model with fee balances: theorem and atom ledgers (#127)
 
-Status: **CANDIDATE, PROOFS IN PROGRESS: 130 PROVED, 12 OPEN, 0 REFUTED**.
-The parent accepted the third independent statement audit of c569165 in
-NOTE-003. All 142 accepted names and elaborated types are unchanged, and
-Model.lean and Witnesses.lean are byte-identical to that accepted candidate.
-The 130 PROVED rows and all 20 proof helpers have only permitted standard
-axioms. Twelve OPEN rows retain their original admissions. This is a capacity
-handoff, not PROOF-COMPLETE or independent proof acceptance.
+Status: **142 PROVED, 0 OPEN, 0 REFUTED**, at commit 85f2b3e.
+The statements were accepted at c569165 after three independent statement
+audits; the third returned READY-TO-PROVE with all 142 rows and 155 of 157
+semantic atoms killed by single-atom mutants (two accepted equivalent guard
+removals). An independent proof audit of 85f2b3e returned PASS: all 142
+elaborated types identical to c569165, Model.lean and Witnesses.lean
+byte-identical, no escape hatch, and `#print axioms` on all 142 theorems and
+every helper lists only `propext`, `Classical.choice` and `Quot.sound`.
 
 Authority: specs/request-approval-fold/decisions.md (27 October),
 specs/oracle-identity/decisions.md and unchanged imported OracleIdentity.Model.
-Creator ruling A-001-money-boundaries, 28 October, fixes the four interpretations
-below. This creator does not assert independent audit readiness or acceptance.
+A ruling of 28 October on the money boundaries fixes the interpretations
+below.
 
 ## Account and time boundaries
 
@@ -55,10 +56,9 @@ below. This creator does not assert independent audit readiness or acceptance.
 
 Each mutant below is a named single semantic edit. The third independent
 statement audit found all 142 rows sensitive, with 155 semantic atoms killed
-and two accepted equivalent guard removals. That audit was accepted for
-starting proofs, not for accepting this partial proof candidate. No full
-proof-mutation campaign was run in this tranche; earlier targeted creator
-mutation receipts are preserved below.
+and two accepted equivalent guard removals. The proofs did not change
+any statement, so those kills still apply. Earlier targeted creator mutation
+receipts are preserved below.
 A witness may supply a stronger trace than the raw premise (for example an
 actual Step plus foldAccepted); its concrete fields instantiate the row.
 W60 constructs the existential equivocation conclusion independently of its
@@ -208,26 +208,6 @@ theorem. W136 reaches every Step constructor.
 | T140 | fold_group_credits_only_recorded_signers | All fold fee records are authenticated; a key absent from all selected records cannot gain balance | Witnesses.W140 | M-fold-unsigned-credit | PROVED |
 | T141 | trace_reachability | Indexed event histories and Reachable describe exactly the same states | Witnesses.W141 | M-trace-missing-step | PROVED |
 | T142 | exit_windows_disjoint | The exitAt window classes never overlap | Witnesses.W142 | M-window-overlap | PROVED |
-
-## OPEN proof remainder
-
-The following 12 unchanged statements are OPEN at this capacity handoff.
-No refutation is claimed, and OPEN does not assert that a statement is false
-or unprovable. Runtime question questions/Q-002-proof-remainder.md and
-handoffs/proofs-1.md record the continuation dependencies.
-
-- absent_inserts_exclusive
-- request_never_reappears
-- reachable_output_refs
-- reachable_output_refs_unique
-- reachable_balances_backed
-- fold_value_conservation
-- fold_request_conservation
-- fold_balance_conservation
-- fold_payments_exact
-- claim_withdrawal_inversion
-- claim_discovery_exact
-- fold_group_credits_only_recorded_signers
 
 ## Mutation definitions
 
@@ -598,9 +578,8 @@ carry the predecessor auditor's 138-row kill results onto this candidate.
 
 All 113 old theorem rows have new local statements; prior PROVED and mutation
 receipts apply to the predecessor only. Their fees, exits, evidence, discovery,
-rule burns, conditions, naming and price interfaces have reopened. Statement
-proofs began under NOTE-003; the current theorem table distinguishes the
-130 PROVED guarantees from 12 OPEN statements. Witness proofs remain
+rule burns, conditions, naming and price interfaces have reopened. All 142
+statements are proved. Witness proofs remain
 concrete examples, separate from the universally quantified guarantees.
 
 The authoritative surface is Step, with FoldRun and itemAllowed/itemResult.
@@ -628,7 +607,7 @@ modelled, script acceptance at the destination is not.
 
 Each digest hashes the following exact source declaration header (the text
 inside its code fence, without the trailing newline). The model hash above
-fixes every definition that these types reference. Their current PROVED or OPEN status is recorded in the theorem table;
+fixes every definition that these types reference. Their PROVED status is recorded in the theorem table;
 the frozen declaration headers exclude proof bodies.
 
 ### RequestApprovalFold.applyAll_append
