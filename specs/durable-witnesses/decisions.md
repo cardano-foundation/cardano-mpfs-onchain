@@ -50,6 +50,12 @@ proof durability (https://github.com/lambdasistemi/singular/milestone/5).
   key's entry from unwitnessed to witnessed without changing its value or
   absence. A key already witnessed cannot be witnessed again until its next
   change.
+- **The fold mints and burns witness tokens atomically with the tree.** For
+  each request on a witnessed or witnessing key, the folder's one transaction
+  burns the old witness token, changes the tree, and mints the new witness
+  token when the request asks for one. The tree and the live witness tokens
+  therefore never disagree: a witnessed entry has exactly one live token, an
+  unwitnessed key has none.
 - **A `set` request can include the witnessing.** The request writes the
   value and asks for it to be witnessed, funding the deposit and naming the
   refund address; the key's new entry is the witness of the value written. On

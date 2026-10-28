@@ -480,6 +480,9 @@ Durable witnesses remove that dependence on unrelated writes.
 - **Extraction is a request**, folded like a write, that turns the key's entry
   into a witness. The next `set` or `unset` on the key proves that entry,
   burns the witness and pays the deposit to the refund address.
+- **The folder burns, writes and mints in one transaction.** It burns the
+  old witness token, changes the tree and, when the request asks, mints the
+  new witness token, so a witnessed entry always has exactly one live token.
 - **A `set` request can include the witnessing**: it writes the value and
   leaves the key witnessed with it, refunding any earlier witness in the same
   fold.
