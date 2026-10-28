@@ -1,10 +1,12 @@
-# Fee balances: model and statement candidate (#127)
+# Fee balances: proof progress candidate (#127)
 
-Status: **CANDIDATE, STATED, NOT PROVED**. All 113 predecessor theorem names
-are retained and restated in Statements.lean; 29 statements add balance/claim
-properties and exact Step/FoldRun inversions. The old proof-bearing extension
-modules are consolidated, not silently imported as guarantees of the new law.
-142 intentional theorem-proof admissions; none in Model or Witnesses.
+Status: **CANDIDATE, PROOFS IN PROGRESS: 130 PROVED, 12 OPEN, 0 REFUTED**.
+The parent accepted the third independent statement audit of c569165 in
+NOTE-003. All 142 accepted names and elaborated types are unchanged, and
+Model.lean and Witnesses.lean are byte-identical to that accepted candidate.
+The 130 PROVED rows and all 20 proof helpers have only permitted standard
+axioms. Twelve OPEN rows retain their original admissions. This is a capacity
+handoff, not PROOF-COMPLETE or independent proof acceptance.
 
 Authority: specs/request-approval-fold/decisions.md (27 October),
 specs/oracle-identity/decisions.md and unchanged imported OracleIdentity.Model.
@@ -37,171 +39,195 @@ below. This creator does not assert independent audit readiness or acceptance.
 - Model.lean SHA-256: `d2619890886c8aa19a1cce594bf8467548a9b83a1ae18b287c1fda9494789ade`.
 - Full qualified theorem names and source types follow below, with individual
   type digests. These types elaborate in the local build. Proof bytes are
-  deliberately excluded from the freeze: PROOFS remains gated on the parent's
-  acceptance of an independent statement audit, including blind readback.
+  deliberately excluded from the freeze. The parent accepted the independent
+  statement audit in NOTE-003. Current versus c569165 elaborated Expr.hash
+  and pp.all text match for all 142 theorem types.
 - Witnesses.lean imports Model only. Each W row proves concrete reachable
   premises without importing Statements. All named witness constants, including
   helpers, are checked by #print axioms; only standard axioms are admitted.
 - Local full build and axiom/type receipts reside in the creator runtime's
   evidence/ directory. See the completion receipt for exact command, exit and
-  artifact hashes. These are model compilation and witness results, not
-  hosted CI, implementation conformance or mutation-audit results.
+  artifact hashes. Current proof receipts are in evidence/proofs/: final-build-2.log,
+  axioms.log, accepted-types.tsv, current-types.tsv, outcomes.json and verification.json.
+  These are local proof results, not hosted CI or implementation conformance.
 
 ## Theorem ledger
 
-Each mutant below is a named single semantic edit, **expected** to falsify its
-row. The earlier A083/A087 creator checks and the current M-window-overlap check
-are recorded below; other mutants remain expected falsifiers for this candidate
-pending independent re-audit.
+Each mutant below is a named single semantic edit. The third independent
+statement audit found all 142 rows sensitive, with 155 semantic atoms killed
+and two accepted equivalent guard removals. That audit was accepted for
+starting proofs, not for accepting this partial proof candidate. No full
+proof-mutation campaign was run in this tranche; earlier targeted creator
+mutation receipts are preserved below.
 A witness may supply a stronger trace than the raw premise (for example an
 actual Step plus foldAccepted); its concrete fields instantiate the row.
 W60 constructs the existential equivocation conclusion independently of its
-admitted theorem. W136 reaches every Step constructor.
+theorem. W136 reaches every Step constructor.
 
 | Row | Theorem | Obligation | Reachable witness | Named mutant | Status |
 |---|---|---|---|---|---|
-| T01 | applyAll_append | Fold composition | Witnesses.W01 | M-skip-tail | STATED |
-| T02 | foldRun_step_valid | Fold guards | Witnesses.W02 | M-skip-item-guard | STATED |
-| T03 | foldRun_result | Fold ordered effects | Witnesses.W03 | M-skip-run-effect | STATED |
-| T04 | foldRun_conditions | Conditions at intermediate tree | Witnesses.W04 | M-skip-item-guard | STATED |
-| T05 | applyAll_keeps_present | Present-key preservation | Witnesses.W05 | M-set-deletes | STATED |
-| T06 | registry_creation | Registry creation | Witnesses.W06 | M-registry-guard | STATED |
-| T07 | create_tags_existing_cage | Request creation and tag minting | Witnesses.W07 | M-seed-spend | STATED |
-| T08 | requests_unique_in_history | Historical request uniqueness | Witnesses.W08 | M-seed-spend | STATED |
-| T09 | judgment_authorized_and_bound | Judgment authorization, time, binding | Witnesses.W09 | M-oracle-membership | STATED |
-| T10 | judgment_not_replayable | Judgment replay protection | Witnesses.W10 | M-name-seed | STATED |
-| T11 | token_roles_separated | Tag/judgment domain separation | Witnesses.W11 | M-judgment-is-tag | STATED |
-| T12 | fold_preserves_registry | Immutable registry identity | Witnesses.W12 | M-fold-protocol | STATED |
-| T13 | step_preserves_registry | Immutable registry on every step | Witnesses.W13 | M-judge-protocol | STATED |
-| T14 | history_preserves_registry | Immutable registry across composition | Witnesses.W14 | M-judge-protocol | STATED |
-| T15 | only_fold_changes_tree | A trie change identifies an accepted fold, its source and exact successor | Witnesses.W15 | M-judge-trie | STATED |
-| T16 | fold_only_approved_before_deadline | All oracles approve before deadline | Witnesses.W16 | M-skip-item-guard | STATED |
-| T17 | fold_conditions_hold_when_applied | Intermediate-tree conditions | Witnesses.W17 | M-skip-item-guard | STATED |
-| T18 | fold_root_is_folded_writes | Exact writes in exact order | Witnesses.W18 | M-skip-write | STATED |
-| T19 | fold_burns_tags | Burn tags on fold | Witnesses.W19 | M-fold-burns | STATED |
-| T20 | fold_pays_and_keeps_rest | All fees credited and folder remainder | Witnesses.W20 | M-credit-key | STATED |
-| T21 | allocation_conserves_value | Money conservation | Witnesses.W21 | M-remainder | STATED |
-| T22 | blind_write_folds_on_any_tree | Blind write yields a FoldRun and its result on every trie | Witnesses.W22 | M-blind-guard | STATED |
-| T23 | fold_permissionless | Permissionless submission | Witnesses.W23 | M-submitter | STATED |
-| T24 | absent_inserts_exclusive | Absent-insert exclusivity | Witnesses.W24 | M-request-condition | STATED |
-| T25 | account_complete_and_pays | Complete account, fees, owner rest | Witnesses.W25 | M-account-evidence | STATED |
-| T26 | account_anyone_in_window | Anyone may account within the closed account window | Witnesses.W26 | M-account-window | STATED |
-| T27 | account_fee_neutral | Approval/refusal fee neutrality | Witnesses.W27 | M-verdict-dependent-credit | STATED |
-| T28 | withdraw_only_owner_after_window | Owner-only timed withdrawal | Witnesses.W28 | M-withdraw-signature | STATED |
-| T29 | owner_can_withdraw_everything | Withdrawal availability after window | Witnesses.W29 | M-withdraw-zero | STATED |
-| T30 | request_spent_only_by_lifecycle | No other legal request exit | Witnesses.W30 | M-spend-any | STATED |
-| T31 | every_exit_burns_tag | Every exit burns tags | Witnesses.W31 | M-withdraw-burns | STATED |
-| T32 | early_exit_requires_all_judgments | Early exits show every judgment | Witnesses.W32 | M-withdraw-time | STATED |
-| T33 | early_exit_pays_every_oracle | Early exits pay every oracle | Witnesses.W33 | M-credit-key | STATED |
-| T34 | before_deadline_only_approvals | Before the deadline only approvals or oracle signatures authorize an exit | Witnesses.W34 | M-write-approval | STATED |
-| T35 | dead_judgment_can_burn | Every held dead judgment burns, for every verdict and condition list, preserving cage/live requests | Witnesses.W35 | M-burn-live | STATED |
-| T36 | judgments_do_not_consume | Judgment minting consumes no request | Witnesses.W36 | M-judge-consumes | STATED |
-| T37 | exits_remove_consumed | Exit terminality | Witnesses.W37 | M-exit-retains | STATED |
-| T38 | fold_removes_consumed | Fold terminality | Witnesses.W38 | M-fold-retains | STATED |
-| T39 | used_seeds_monotone | Spent-once composition | Witnesses.W39 | M-exit-seeds | STATED |
-| T40 | reachable_requests_have_spent_seeds | Live oracle-bearing requests have spent seeds | Witnesses.W40 | M-create-seeds | STATED |
-| T41 | spent_seed_cannot_create_again | Seed cannot recur | Witnesses.W41 | M-seed-spend | STATED |
-| T42 | request_never_reappears | Consumed requests never reappear | Witnesses.W42 | M-fresh-output | STATED |
-| T43 | one_oracle_signature_suffices | Single-oracle old-design signature shortcut | Witnesses.W43 | M-no-inline | STATED |
-| T44 | old_operations_correspond | Old Insert/Delete/Update correspondence | Witnesses.W44 | M-old-delete | STATED |
-| T45 | live_removal_is_legal_exit | Consumption identifies the allowed spend, source registry, authentic inputs and successor | Witnesses.W45 | M-burn-consumes | STATED |
-| T46 | new_judgment_is_authorized | Authoritative machine judgment provenance | Witnesses.W46 | M-burn-issues | STATED |
-| T47 | exit_time_window | Every actual write, account or owner withdrawal fits its window | Witnesses.W47 | M-account-upper | STATED |
-| T48 | exit_windows_cover | The three scalar windows cover all time | Witnesses.W48 | M-window-gap | STATED |
-| T49 | exit_kind_unique | Two allowed spends at the same interval consume a request by the same exit kind | Witnesses.W49 | M-write-guard-overlap | STATED |
-| T50 | fold_references_authentic | Fold references genuinely held minted tokens | Witnesses.W50 | M-fake-references | STATED |
-| T51 | account_references_authentic | Account references genuinely held minted tokens | Witnesses.W51 | M-account-evidence | STATED |
-| T52 | creation_references_source | Creation uses registry in the source state | Witnesses.W52 | M-create-source | STATED |
-| T53 | fold_payments_concrete | Exact declared oracle fees and folder remainder | Witnesses.W53 | M-credit-key | STATED |
-| T54 | account_payments_concrete | Exact declared oracle fees and owner remainder | Witnesses.W54 | M-credit-key | STATED |
-| T55 | creation_funds_declared_fees | Creation cannot underfund declared fees | Witnesses.W55 | M-creation-minimum | STATED |
-| T56 | burn_removes_one | One burn decreases held multiplicity by exactly one | Witnesses.W56 | M-burn-retains | STATED |
-| T57 | burn_keeps_history | Burn does not erase permanent mint record | Witnesses.W57 | M-burn-forgets | STATED |
-| T58 | fold_requests_unique | No duplicate request in accepted fold | Witnesses.W58 | M-duplicate-input | STATED |
-| T59 | account_accepts_any_verdicts | Any authorized verdict selection in-window gives an actual account Step | Witnesses.W59 | M-account-approvals-only | STATED |
-| T60 | equivocation_reachable | A live request of the reachable registry has both verdicts of a registry oracle with one signing record in holdings and issuance | Witnesses.W60 | M-no-equivocation | STATED |
-| T61 | tag_name_injective | Oracle-bound discovery name | Witnesses.W61 | M-tag-oracle | STATED |
-| T62 | price_name_injective | Oracle-bound notice name | Witnesses.W62 | M-price-oracle | STATED |
-| T63 | different_roles_never_coincide | All distinct leading roles are disjoint | Witnesses.W63 | M-role | STATED |
-| T64 | names_have_leading_roles | Tag, approval, refusal and price encode their actual roles | Witnesses.W64 | M-role | STATED |
-| T65 | reachable_registry_valid | Reachable registries have oracles or a rule and duplicate-free oracles | Witnesses.W65 | M-registry-guard | STATED |
-| T66 | reachable_live_tags | Exact per-oracle holdings of every live request | Witnesses.W66 | M-missing-tags | STATED |
-| T67 | reachable_tags_unique | Exactly one occurrence per oracle, no duplicate tags | Witnesses.W67 | M-registry-guard | STATED |
-| T68 | discovery_iff | Live request tag query is sound and complete | Witnesses.W68 | M-discovery-all | STATED |
-| T69 | discovery_across_registries | One query spans all reachable registries | Witnesses.W69 | M-discovery-all | STATED |
-| T70 | live_removal_burns_oracle_tags | The actual removing action burns every registry-oracle tag | Witnesses.W70 | M-withdraw-burns | STATED |
-| T71 | price_mint_inversion | Signed mint, bound name, exact issuance and output effect | Witnesses.W71 | M-price-mint-auth | STATED |
-| T72 | price_update_inversion | Held-input authentication, signature, token retention and exact update | Witnesses.W72 | M-price-update-auth | STATED |
-| T73 | reachable_notice_names | All held notices bind their oracle and price role | Witnesses.W73 | M-price-transfer | STATED |
-| T74 | price_mint_available | Any oracle can publish any advertised datum | Witnesses.W74 | M-price-free-only | STATED |
-| T75 | price_update_available | Oracle can change a held notice to any datum | Witnesses.W75 | M-price-unchanged | STATED |
-| T76 | price_notice_noninterference | Price actions preserve registry, requests, judgments, seeds; no credits / outputs or exit | Witnesses.W76 | M-price-clears-judgments | STATED |
-| T77 | notices_do_not_bind_protocol | Same protocol action and credits / outputs with arbitrary notice observations | Witnesses.W77 | M-binding-price | STATED |
-| T78 | notice_change_authorized | New notice values have a signed actual mint/update origin | Witnesses.W78 | M-judge-notice | STATED |
-| T79 | creation_rule_and_token | creation rule and token | Witnesses.W79 | M-creation-rule | STATED |
-| T80 | step_rule_immutable | step rule immutable | Witnesses.W80 | M-fold-rule | STATED |
-| T81 | history_rule_immutable | history rule immutable | Witnesses.W81 | M-judge-rule | STATED |
-| T82 | reachable_rule_admitted | reachable rule admitted | Witnesses.W82 | M-creation-rule | STATED |
-| T83 | every_rule_allows_burn | Actual fold/account/withdraw/burn Steps available under lifecycle requirements for any rule, without re-admission | Witnesses.W83 | M-exit-readmits | STATED |
-| T84 | fold_rule_predicate_independent | fold rule predicate independent | Witnesses.W84 | M-rule-at-turn | STATED |
-| T85 | reachable_request_tokens | reachable request tokens | Witnesses.W85 | M-request-token | STATED |
-| T86 | fold_requires_request_token | fold requires request token | Witnesses.W86 | M-request-token | STATED |
-| T87 | every_exit_burns_request_token | every exit burns request token | Witnesses.W87 | M-withdraw-burns | STATED |
-| T88 | live_removal_burns_request_token | live removal burns request token | Witnesses.W88 | M-withdraw-burns | STATED |
-| T89 | request_name_injective | request name injective | Witnesses.W89 | M-request-name | STATED |
-| T90 | request_token_discovery | request token discovery | Witnesses.W90 | M-request-query | STATED |
-| T91 | request_token_discovery_across_registries | request token discovery across registries | Witnesses.W91 | M-request-query | STATED |
-| T92 | output_refs_monotone | output refs monotone | Witnesses.W92 | M-forget-refs | STATED |
-| T93 | reachable_output_refs | reachable output refs | Witnesses.W93 | M-create-refs | STATED |
-| T94 | reachable_output_refs_unique | reachable output refs unique | Witnesses.W94 | M-fresh-output | STATED |
-| T95 | unguarded_registry_impossible | unguarded registry impossible | Witnesses.W95 | M-registry-guard | STATED |
-| T96 | zero_oracle_needs_rule | zero oracle needs rule | Witnesses.W96 | M-registry-guard | STATED |
-| T97 | zero_oracle_evidence_empty | zero oracle evidence empty | Witnesses.W97 | M-zero-evidence | STATED |
-| T98 | zero_oracle_creation_without_seed | zero oracle creation without seed | Witnesses.W98 | M-zero-seed | STATED |
-| T99 | zero_oracle_fold_without_approvals | Zero-oracle write yields a FoldRun and its result | Witnesses.W99 | M-zero-evidence | STATED |
-| T100 | zero_oracle_account_without_verdicts | zero oracle account without verdicts | Witnesses.W100 | M-zero-account | STATED |
-| T101 | present_condition_semantics | present condition semantics | Witnesses.W101 | M-present-absent | STATED |
-| T102 | foldRun_oracle_conditions | foldRun oracle conditions | Witnesses.W102 | M-skip-item-guard | STATED |
-| T103 | fold_all_conditions_hold | fold all conditions hold | Witnesses.W103 | M-skip-item-guard | STATED |
-| T104 | approval_conditions_cannot_change | Approval-name equality iff records and conditions agree | Witnesses.W104 | M-name-conditions | STATED |
-| T105 | stale_approval_unusable | stale approval unusable | Witnesses.W105 | M-skip-item-guard | STATED |
-| T106 | fold_evidence_binds_conditions | fold evidence binds conditions | Witnesses.W106 | M-write-approval | STATED |
-| T107 | expected_approval_lookup | Exact iff between no-inline approval and authorized approval evidence plus computed-name membership | Witnesses.W107 | M-lookup-empty | STATED |
-| T108 | folder_discovery_exact | folder discovery exact | Witnesses.W108 | M-folder-no-conditions | STATED |
-| T109 | folder_discovery_executable | folder discovery executable | Witnesses.W109 | M-folder-no-conditions | STATED |
-| T110 | empty_fold_allowed | An empty fold returns the original State itself | Witnesses.W110 | M-empty-forbidden | STATED |
-| T111 | empty_fold_earns_nothing | empty fold earns nothing | Witnesses.W111 | M-empty-paid | STATED |
-| T112 | creation_rule_input_binding | Actual creation binds Rule.admits to the singleton output request and exact creating signatures | Witnesses.W112 | M-rule-request | STATED |
-| T113 | creation_request_policy | Actual creation uses rule policy and never release if rule exists, release otherwise; both mint and output provenance | Witnesses.W113 | M-release-policy | STATED |
-| T114 | only_fold_changes_registry | only fold changes registry | Witnesses.W114 | M-creation-state | STATED |
-| T115 | reachable_balances_backed | reachable balances backed | Witnesses.W115 | M-credit-unbacked | STATED |
-| T116 | fold_value_conservation | fold value conservation | Witnesses.W116 | M-claim-value | STATED |
-| T117 | fold_request_conservation | fold request conservation | Witnesses.W117 | M-remainder | STATED |
-| T118 | fold_balance_conservation | fold balance conservation | Witnesses.W118 | M-credit-unbacked | STATED |
-| T119 | fold_payments_exact | fold credits / outputs exact | Witnesses.W119 | M-arbitrary-payments | STATED |
-| T120 | group_credits_only_recorded_signers | group credits only recorded signers | Witnesses.W120 | M-unsigned-fees | STATED |
-| T121 | group_credits_exact_split | group credits exact split | Witnesses.W121 | M-extra-fee | STATED |
-| T122 | judgment_record_cannot_change | judgment record cannot change | Witnesses.W122 | M-name-record | STATED |
-| T123 | claim_creation_inversion | claim creation inversion | Witnesses.W123 | M-claim-create-signature | STATED |
-| T124 | reachable_claim_authorization | Every live claim matches a key-signed creation event on the given exact history | Witnesses.W124 | M-claim-create-signature | STATED |
-| T125 | claim_payout_fixed | claim payout fixed | Witnesses.W125 | M-claim-redirect | STATED |
-| T126 | claim_payout_in_actual_outputs | claim payout in actual outputs | Witnesses.W126 | M-arbitrary-payments | STATED |
-| T127 | claim_below_minimum_refused | claim below minimum refused | Witnesses.W127 | M-claim-minimum | STATED |
-| T128 | claim_turn_balance | claim turn balance | Witnesses.W128 | M-claim-prior-balance | STATED |
-| T129 | claim_consumed_and_burned | claim consumed and burned | Witnesses.W129 | M-claim-retained | STATED |
-| T130 | claim_withdrawal_inversion | claim withdrawal inversion | Witnesses.W130 | M-claim-withdraw-signature | STATED |
-| T131 | claim_withdrawal_available | claim withdrawal available | Witnesses.W131 | M-claim-withdraw-strict | STATED |
-| T132 | claim_windows_disjoint | claim windows disjoint | Witnesses.W132 | M-claim-overlap | STATED |
-| T133 | claim_discovery_exact | claim discovery exact | Witnesses.W133 | M-claim-query | STATED |
-| T134 | request_withdrawal_preserves_registry | request withdrawal preserves registry | Witnesses.W134 | M-withdraw-state | STATED |
-| T135 | fold_interval_fits_every_item | fold interval fits every item | Witnesses.W135 | M-skip-item-guard | STATED |
-| T136 | step_inversion | step inversion | Witnesses.W136 | M-claim-source | STATED |
-| T137 | foldRun_inversion | foldRun inversion | Witnesses.W137 | M-skip-run-effect | STATED |
-| T138 | claim_item_inversion | claim item inversion | Witnesses.W138 | M-claim-item-cage | STATED |
-| T139 | claim_windows_cover | Point intervals admit claim fold or withdrawal at every time under the non-time guards | Witnesses.W139 | M-claim-withdraw-gap | STATED |
-| T140 | fold_group_credits_only_recorded_signers | All fold fee records are authenticated; a key absent from all selected records cannot gain balance | Witnesses.W140 | M-fold-unsigned-credit | STATED |
-| T141 | trace_reachability | Indexed event histories and Reachable describe exactly the same states | Witnesses.W141 | M-trace-missing-step | STATED |
-| T142 | exit_windows_disjoint | The exitAt window classes never overlap | Witnesses.W142 | M-window-overlap | STATED |
+| T01 | applyAll_append | Fold composition | Witnesses.W01 | M-skip-tail | PROVED |
+| T02 | foldRun_step_valid | Fold guards | Witnesses.W02 | M-skip-item-guard | PROVED |
+| T03 | foldRun_result | Fold ordered effects | Witnesses.W03 | M-skip-run-effect | PROVED |
+| T04 | foldRun_conditions | Conditions at intermediate tree | Witnesses.W04 | M-skip-item-guard | PROVED |
+| T05 | applyAll_keeps_present | Present-key preservation | Witnesses.W05 | M-set-deletes | PROVED |
+| T06 | registry_creation | Registry creation | Witnesses.W06 | M-registry-guard | PROVED |
+| T07 | create_tags_existing_cage | Request creation and tag minting | Witnesses.W07 | M-seed-spend | PROVED |
+| T08 | requests_unique_in_history | Historical request uniqueness | Witnesses.W08 | M-seed-spend | PROVED |
+| T09 | judgment_authorized_and_bound | Judgment authorization, time, binding | Witnesses.W09 | M-oracle-membership | PROVED |
+| T10 | judgment_not_replayable | Judgment replay protection | Witnesses.W10 | M-name-seed | PROVED |
+| T11 | token_roles_separated | Tag/judgment domain separation | Witnesses.W11 | M-judgment-is-tag | PROVED |
+| T12 | fold_preserves_registry | Immutable registry identity | Witnesses.W12 | M-fold-protocol | PROVED |
+| T13 | step_preserves_registry | Immutable registry on every step | Witnesses.W13 | M-judge-protocol | PROVED |
+| T14 | history_preserves_registry | Immutable registry across composition | Witnesses.W14 | M-judge-protocol | PROVED |
+| T15 | only_fold_changes_tree | A trie change identifies an accepted fold, its source and exact successor | Witnesses.W15 | M-judge-trie | PROVED |
+| T16 | fold_only_approved_before_deadline | All oracles approve before deadline | Witnesses.W16 | M-skip-item-guard | PROVED |
+| T17 | fold_conditions_hold_when_applied | Intermediate-tree conditions | Witnesses.W17 | M-skip-item-guard | PROVED |
+| T18 | fold_root_is_folded_writes | Exact writes in exact order | Witnesses.W18 | M-skip-write | PROVED |
+| T19 | fold_burns_tags | Burn tags on fold | Witnesses.W19 | M-fold-burns | PROVED |
+| T20 | fold_pays_and_keeps_rest | All fees credited and folder remainder | Witnesses.W20 | M-credit-key | PROVED |
+| T21 | allocation_conserves_value | Money conservation | Witnesses.W21 | M-remainder | PROVED |
+| T22 | blind_write_folds_on_any_tree | Blind write yields a FoldRun and its result on every trie | Witnesses.W22 | M-blind-guard | PROVED |
+| T23 | fold_permissionless | Permissionless submission | Witnesses.W23 | M-submitter | PROVED |
+| T24 | absent_inserts_exclusive | Absent-insert exclusivity | Witnesses.W24 | M-request-condition | OPEN |
+| T25 | account_complete_and_pays | Complete account, fees, owner rest | Witnesses.W25 | M-account-evidence | PROVED |
+| T26 | account_anyone_in_window | Anyone may account within the closed account window | Witnesses.W26 | M-account-window | PROVED |
+| T27 | account_fee_neutral | Approval/refusal fee neutrality | Witnesses.W27 | M-verdict-dependent-credit | PROVED |
+| T28 | withdraw_only_owner_after_window | Owner-only timed withdrawal | Witnesses.W28 | M-withdraw-signature | PROVED |
+| T29 | owner_can_withdraw_everything | Withdrawal availability after window | Witnesses.W29 | M-withdraw-zero | PROVED |
+| T30 | request_spent_only_by_lifecycle | No other legal request exit | Witnesses.W30 | M-spend-any | PROVED |
+| T31 | every_exit_burns_tag | Every exit burns tags | Witnesses.W31 | M-withdraw-burns | PROVED |
+| T32 | early_exit_requires_all_judgments | Early exits show every judgment | Witnesses.W32 | M-withdraw-time | PROVED |
+| T33 | early_exit_pays_every_oracle | Early exits pay every oracle | Witnesses.W33 | M-credit-key | PROVED |
+| T34 | before_deadline_only_approvals | Before the deadline only approvals or oracle signatures authorize an exit | Witnesses.W34 | M-write-approval | PROVED |
+| T35 | dead_judgment_can_burn | Every held dead judgment burns, for every verdict and condition list, preserving cage/live requests | Witnesses.W35 | M-burn-live | PROVED |
+| T36 | judgments_do_not_consume | Judgment minting consumes no request | Witnesses.W36 | M-judge-consumes | PROVED |
+| T37 | exits_remove_consumed | Exit terminality | Witnesses.W37 | M-exit-retains | PROVED |
+| T38 | fold_removes_consumed | Fold terminality | Witnesses.W38 | M-fold-retains | PROVED |
+| T39 | used_seeds_monotone | Spent-once composition | Witnesses.W39 | M-exit-seeds | PROVED |
+| T40 | reachable_requests_have_spent_seeds | Live oracle-bearing requests have spent seeds | Witnesses.W40 | M-create-seeds | PROVED |
+| T41 | spent_seed_cannot_create_again | Seed cannot recur | Witnesses.W41 | M-seed-spend | PROVED |
+| T42 | request_never_reappears | Consumed requests never reappear | Witnesses.W42 | M-fresh-output | OPEN |
+| T43 | one_oracle_signature_suffices | Single-oracle old-design signature shortcut | Witnesses.W43 | M-no-inline | PROVED |
+| T44 | old_operations_correspond | Old Insert/Delete/Update correspondence | Witnesses.W44 | M-old-delete | PROVED |
+| T45 | live_removal_is_legal_exit | Consumption identifies the allowed spend, source registry, authentic inputs and successor | Witnesses.W45 | M-burn-consumes | PROVED |
+| T46 | new_judgment_is_authorized | Authoritative machine judgment provenance | Witnesses.W46 | M-burn-issues | PROVED |
+| T47 | exit_time_window | Every actual write, account or owner withdrawal fits its window | Witnesses.W47 | M-account-upper | PROVED |
+| T48 | exit_windows_cover | The three scalar windows cover all time | Witnesses.W48 | M-window-gap | PROVED |
+| T49 | exit_kind_unique | Two allowed spends at the same interval consume a request by the same exit kind | Witnesses.W49 | M-write-guard-overlap | PROVED |
+| T50 | fold_references_authentic | Fold references genuinely held minted tokens | Witnesses.W50 | M-fake-references | PROVED |
+| T51 | account_references_authentic | Account references genuinely held minted tokens | Witnesses.W51 | M-account-evidence | PROVED |
+| T52 | creation_references_source | Creation uses registry in the source state | Witnesses.W52 | M-create-source | PROVED |
+| T53 | fold_payments_concrete | Exact declared oracle fees and folder remainder | Witnesses.W53 | M-credit-key | PROVED |
+| T54 | account_payments_concrete | Exact declared oracle fees and owner remainder | Witnesses.W54 | M-credit-key | PROVED |
+| T55 | creation_funds_declared_fees | Creation cannot underfund declared fees | Witnesses.W55 | M-creation-minimum | PROVED |
+| T56 | burn_removes_one | One burn decreases held multiplicity by exactly one | Witnesses.W56 | M-burn-retains | PROVED |
+| T57 | burn_keeps_history | Burn does not erase permanent mint record | Witnesses.W57 | M-burn-forgets | PROVED |
+| T58 | fold_requests_unique | No duplicate request in accepted fold | Witnesses.W58 | M-duplicate-input | PROVED |
+| T59 | account_accepts_any_verdicts | Any authorized verdict selection in-window gives an actual account Step | Witnesses.W59 | M-account-approvals-only | PROVED |
+| T60 | equivocation_reachable | A live request of the reachable registry has both verdicts of a registry oracle with one signing record in holdings and issuance | Witnesses.W60 | M-no-equivocation | PROVED |
+| T61 | tag_name_injective | Oracle-bound discovery name | Witnesses.W61 | M-tag-oracle | PROVED |
+| T62 | price_name_injective | Oracle-bound notice name | Witnesses.W62 | M-price-oracle | PROVED |
+| T63 | different_roles_never_coincide | All distinct leading roles are disjoint | Witnesses.W63 | M-role | PROVED |
+| T64 | names_have_leading_roles | Tag, approval, refusal and price encode their actual roles | Witnesses.W64 | M-role | PROVED |
+| T65 | reachable_registry_valid | Reachable registries have oracles or a rule and duplicate-free oracles | Witnesses.W65 | M-registry-guard | PROVED |
+| T66 | reachable_live_tags | Exact per-oracle holdings of every live request | Witnesses.W66 | M-missing-tags | PROVED |
+| T67 | reachable_tags_unique | Exactly one occurrence per oracle, no duplicate tags | Witnesses.W67 | M-registry-guard | PROVED |
+| T68 | discovery_iff | Live request tag query is sound and complete | Witnesses.W68 | M-discovery-all | PROVED |
+| T69 | discovery_across_registries | One query spans all reachable registries | Witnesses.W69 | M-discovery-all | PROVED |
+| T70 | live_removal_burns_oracle_tags | The actual removing action burns every registry-oracle tag | Witnesses.W70 | M-withdraw-burns | PROVED |
+| T71 | price_mint_inversion | Signed mint, bound name, exact issuance and output effect | Witnesses.W71 | M-price-mint-auth | PROVED |
+| T72 | price_update_inversion | Held-input authentication, signature, token retention and exact update | Witnesses.W72 | M-price-update-auth | PROVED |
+| T73 | reachable_notice_names | All held notices bind their oracle and price role | Witnesses.W73 | M-price-transfer | PROVED |
+| T74 | price_mint_available | Any oracle can publish any advertised datum | Witnesses.W74 | M-price-free-only | PROVED |
+| T75 | price_update_available | Oracle can change a held notice to any datum | Witnesses.W75 | M-price-unchanged | PROVED |
+| T76 | price_notice_noninterference | Price actions preserve registry, requests, judgments, seeds; no credits / outputs or exit | Witnesses.W76 | M-price-clears-judgments | PROVED |
+| T77 | notices_do_not_bind_protocol | Same protocol action and credits / outputs with arbitrary notice observations | Witnesses.W77 | M-binding-price | PROVED |
+| T78 | notice_change_authorized | New notice values have a signed actual mint/update origin | Witnesses.W78 | M-judge-notice | PROVED |
+| T79 | creation_rule_and_token | creation rule and token | Witnesses.W79 | M-creation-rule | PROVED |
+| T80 | step_rule_immutable | step rule immutable | Witnesses.W80 | M-fold-rule | PROVED |
+| T81 | history_rule_immutable | history rule immutable | Witnesses.W81 | M-judge-rule | PROVED |
+| T82 | reachable_rule_admitted | reachable rule admitted | Witnesses.W82 | M-creation-rule | PROVED |
+| T83 | every_rule_allows_burn | Actual fold/account/withdraw/burn Steps available under lifecycle requirements for any rule, without re-admission | Witnesses.W83 | M-exit-readmits | PROVED |
+| T84 | fold_rule_predicate_independent | fold rule predicate independent | Witnesses.W84 | M-rule-at-turn | PROVED |
+| T85 | reachable_request_tokens | reachable request tokens | Witnesses.W85 | M-request-token | PROVED |
+| T86 | fold_requires_request_token | fold requires request token | Witnesses.W86 | M-request-token | PROVED |
+| T87 | every_exit_burns_request_token | every exit burns request token | Witnesses.W87 | M-withdraw-burns | PROVED |
+| T88 | live_removal_burns_request_token | live removal burns request token | Witnesses.W88 | M-withdraw-burns | PROVED |
+| T89 | request_name_injective | request name injective | Witnesses.W89 | M-request-name | PROVED |
+| T90 | request_token_discovery | request token discovery | Witnesses.W90 | M-request-query | PROVED |
+| T91 | request_token_discovery_across_registries | request token discovery across registries | Witnesses.W91 | M-request-query | PROVED |
+| T92 | output_refs_monotone | output refs monotone | Witnesses.W92 | M-forget-refs | PROVED |
+| T93 | reachable_output_refs | reachable output refs | Witnesses.W93 | M-create-refs | OPEN |
+| T94 | reachable_output_refs_unique | reachable output refs unique | Witnesses.W94 | M-fresh-output | OPEN |
+| T95 | unguarded_registry_impossible | unguarded registry impossible | Witnesses.W95 | M-registry-guard | PROVED |
+| T96 | zero_oracle_needs_rule | zero oracle needs rule | Witnesses.W96 | M-registry-guard | PROVED |
+| T97 | zero_oracle_evidence_empty | zero oracle evidence empty | Witnesses.W97 | M-zero-evidence | PROVED |
+| T98 | zero_oracle_creation_without_seed | zero oracle creation without seed | Witnesses.W98 | M-zero-seed | PROVED |
+| T99 | zero_oracle_fold_without_approvals | Zero-oracle write yields a FoldRun and its result | Witnesses.W99 | M-zero-evidence | PROVED |
+| T100 | zero_oracle_account_without_verdicts | zero oracle account without verdicts | Witnesses.W100 | M-zero-account | PROVED |
+| T101 | present_condition_semantics | present condition semantics | Witnesses.W101 | M-present-absent | PROVED |
+| T102 | foldRun_oracle_conditions | foldRun oracle conditions | Witnesses.W102 | M-skip-item-guard | PROVED |
+| T103 | fold_all_conditions_hold | fold all conditions hold | Witnesses.W103 | M-skip-item-guard | PROVED |
+| T104 | approval_conditions_cannot_change | Approval-name equality iff records and conditions agree | Witnesses.W104 | M-name-conditions | PROVED |
+| T105 | stale_approval_unusable | stale approval unusable | Witnesses.W105 | M-skip-item-guard | PROVED |
+| T106 | fold_evidence_binds_conditions | fold evidence binds conditions | Witnesses.W106 | M-write-approval | PROVED |
+| T107 | expected_approval_lookup | Exact iff between no-inline approval and authorized approval evidence plus computed-name membership | Witnesses.W107 | M-lookup-empty | PROVED |
+| T108 | folder_discovery_exact | folder discovery exact | Witnesses.W108 | M-folder-no-conditions | PROVED |
+| T109 | folder_discovery_executable | folder discovery executable | Witnesses.W109 | M-folder-no-conditions | PROVED |
+| T110 | empty_fold_allowed | An empty fold returns the original State itself | Witnesses.W110 | M-empty-forbidden | PROVED |
+| T111 | empty_fold_earns_nothing | empty fold earns nothing | Witnesses.W111 | M-empty-paid | PROVED |
+| T112 | creation_rule_input_binding | Actual creation binds Rule.admits to the singleton output request and exact creating signatures | Witnesses.W112 | M-rule-request | PROVED |
+| T113 | creation_request_policy | Actual creation uses rule policy and never release if rule exists, release otherwise; both mint and output provenance | Witnesses.W113 | M-release-policy | PROVED |
+| T114 | only_fold_changes_registry | only fold changes registry | Witnesses.W114 | M-creation-state | PROVED |
+| T115 | reachable_balances_backed | reachable balances backed | Witnesses.W115 | M-credit-unbacked | OPEN |
+| T116 | fold_value_conservation | fold value conservation | Witnesses.W116 | M-claim-value | OPEN |
+| T117 | fold_request_conservation | fold request conservation | Witnesses.W117 | M-remainder | OPEN |
+| T118 | fold_balance_conservation | fold balance conservation | Witnesses.W118 | M-credit-unbacked | OPEN |
+| T119 | fold_payments_exact | fold credits / outputs exact | Witnesses.W119 | M-arbitrary-payments | OPEN |
+| T120 | group_credits_only_recorded_signers | group credits only recorded signers | Witnesses.W120 | M-unsigned-fees | PROVED |
+| T121 | group_credits_exact_split | group credits exact split | Witnesses.W121 | M-extra-fee | PROVED |
+| T122 | judgment_record_cannot_change | judgment record cannot change | Witnesses.W122 | M-name-record | PROVED |
+| T123 | claim_creation_inversion | claim creation inversion | Witnesses.W123 | M-claim-create-signature | PROVED |
+| T124 | reachable_claim_authorization | Every live claim matches a key-signed creation event on the given exact history | Witnesses.W124 | M-claim-create-signature | PROVED |
+| T125 | claim_payout_fixed | claim payout fixed | Witnesses.W125 | M-claim-redirect | PROVED |
+| T126 | claim_payout_in_actual_outputs | claim payout in actual outputs | Witnesses.W126 | M-arbitrary-payments | PROVED |
+| T127 | claim_below_minimum_refused | claim below minimum refused | Witnesses.W127 | M-claim-minimum | PROVED |
+| T128 | claim_turn_balance | claim turn balance | Witnesses.W128 | M-claim-prior-balance | PROVED |
+| T129 | claim_consumed_and_burned | claim consumed and burned | Witnesses.W129 | M-claim-retained | PROVED |
+| T130 | claim_withdrawal_inversion | claim withdrawal inversion | Witnesses.W130 | M-claim-withdraw-signature | OPEN |
+| T131 | claim_withdrawal_available | claim withdrawal available | Witnesses.W131 | M-claim-withdraw-strict | PROVED |
+| T132 | claim_windows_disjoint | claim windows disjoint | Witnesses.W132 | M-claim-overlap | PROVED |
+| T133 | claim_discovery_exact | claim discovery exact | Witnesses.W133 | M-claim-query | OPEN |
+| T134 | request_withdrawal_preserves_registry | request withdrawal preserves registry | Witnesses.W134 | M-withdraw-state | PROVED |
+| T135 | fold_interval_fits_every_item | fold interval fits every item | Witnesses.W135 | M-skip-item-guard | PROVED |
+| T136 | step_inversion | step inversion | Witnesses.W136 | M-claim-source | PROVED |
+| T137 | foldRun_inversion | foldRun inversion | Witnesses.W137 | M-skip-run-effect | PROVED |
+| T138 | claim_item_inversion | claim item inversion | Witnesses.W138 | M-claim-item-cage | PROVED |
+| T139 | claim_windows_cover | Point intervals admit claim fold or withdrawal at every time under the non-time guards | Witnesses.W139 | M-claim-withdraw-gap | PROVED |
+| T140 | fold_group_credits_only_recorded_signers | All fold fee records are authenticated; a key absent from all selected records cannot gain balance | Witnesses.W140 | M-fold-unsigned-credit | OPEN |
+| T141 | trace_reachability | Indexed event histories and Reachable describe exactly the same states | Witnesses.W141 | M-trace-missing-step | PROVED |
+| T142 | exit_windows_disjoint | The exitAt window classes never overlap | Witnesses.W142 | M-window-overlap | PROVED |
+
+## OPEN proof remainder
+
+The following 12 unchanged statements are OPEN at this capacity handoff.
+No refutation is claimed, and OPEN does not assert that a statement is false
+or unprovable. Runtime question questions/Q-002-proof-remainder.md and
+handoffs/proofs-1.md record the continuation dependencies.
+
+- absent_inserts_exclusive
+- request_never_reappears
+- reachable_output_refs
+- reachable_output_refs_unique
+- reachable_balances_backed
+- fold_value_conservation
+- fold_request_conservation
+- fold_balance_conservation
+- fold_payments_exact
+- claim_withdrawal_inversion
+- claim_discovery_exact
+- fold_group_credits_only_recorded_signers
 
 ## Mutation definitions
 
@@ -487,6 +513,10 @@ of that malformed action is the intended counterexample, not a new initial state
 | MA3 | Effect | afterFold: registry becomes cageOut | W116 | fold_value_conservation | M-MA3: keep source registry |
 | MA4 | Origin | Step effects: only claimCreate inserts claims | W124 | reachable_claim_authorization | M-MA4: afterJudgment inserts a fabricated claim |
 
+The repair summaries below describe the statement phase before NOTE-003.
+Their earlier admission/readiness wording is historical; current proof
+outcomes are given above.
+
 ## Repair of statement audit 1
 
 NOTE-001 repairs the NOT-READY findings on predecessor c2e5cb0. The revised
@@ -569,8 +599,9 @@ carry the predecessor auditor's 138-row kill results onto this candidate.
 All 113 old theorem rows have new local statements; prior PROVED and mutation
 receipts apply to the predecessor only. Their fees, exits, evidence, discovery,
 rule burns, conditions, naming and price interfaces have reopened. Statement
-proofs have intentionally not begun. Witness proofs are concrete examples,
-not proofs of the universally quantified guarantees.
+proofs began under NOTE-003; the current theorem table distinguishes the
+130 PROVED guarantees from 12 OPEN statements. Witness proofs remain
+concrete examples, separate from the universally quantified guarantees.
 
 The authoritative surface is Step, with FoldRun and itemAllowed/itemResult.
 Boundary observations are Action.payments, foldPayments, totalPaid, credits,
@@ -597,8 +628,8 @@ modelled, script acceptance at the destination is not.
 
 Each digest hashes the following exact source declaration header (the text
 inside its code fence, without the trailing newline). The model hash above
-fixes every definition that these types reference. They are declarations
-with intentional admitted proof bodies, not proven contracts.
+fixes every definition that these types reference. Their current PROVED or OPEN status is recorded in the theorem table;
+the frozen declaration headers exclude proof bodies.
 
 ### RequestApprovalFold.applyAll_append
 
