@@ -89,7 +89,7 @@ theorem. W136 reaches every Step constructor.
 | T21 | allocation_conserves_value | Money conservation | Witnesses.W21 | M-remainder | PROVED |
 | T22 | blind_write_folds_on_any_tree | Blind write yields a FoldRun and its result on every trie | Witnesses.W22 | M-blind-guard | PROVED |
 | T23 | fold_permissionless | Permissionless submission | Witnesses.W23 | M-submitter | PROVED |
-| T24 | absent_inserts_exclusive | Absent-insert exclusivity | Witnesses.W24 | M-request-condition | OPEN |
+| T24 | absent_inserts_exclusive | Absent-insert exclusivity | Witnesses.W24 | M-request-condition | PROVED |
 | T25 | account_complete_and_pays | Complete account, fees, owner rest | Witnesses.W25 | M-account-evidence | PROVED |
 | T26 | account_anyone_in_window | Anyone may account within the closed account window | Witnesses.W26 | M-account-window | PROVED |
 | T27 | account_fee_neutral | Approval/refusal fee neutrality | Witnesses.W27 | M-verdict-dependent-credit | PROVED |
@@ -107,7 +107,7 @@ theorem. W136 reaches every Step constructor.
 | T39 | used_seeds_monotone | Spent-once composition | Witnesses.W39 | M-exit-seeds | PROVED |
 | T40 | reachable_requests_have_spent_seeds | Live oracle-bearing requests have spent seeds | Witnesses.W40 | M-create-seeds | PROVED |
 | T41 | spent_seed_cannot_create_again | Seed cannot recur | Witnesses.W41 | M-seed-spend | PROVED |
-| T42 | request_never_reappears | Consumed requests never reappear | Witnesses.W42 | M-fresh-output | OPEN |
+| T42 | request_never_reappears | Consumed requests never reappear | Witnesses.W42 | M-fresh-output | PROVED |
 | T43 | one_oracle_signature_suffices | Single-oracle old-design signature shortcut | Witnesses.W43 | M-no-inline | PROVED |
 | T44 | old_operations_correspond | Old Insert/Delete/Update correspondence | Witnesses.W44 | M-old-delete | PROVED |
 | T45 | live_removal_is_legal_exit | Consumption identifies the allowed spend, source registry, authentic inputs and successor | Witnesses.W45 | M-burn-consumes | PROVED |
@@ -158,8 +158,8 @@ theorem. W136 reaches every Step constructor.
 | T90 | request_token_discovery | request token discovery | Witnesses.W90 | M-request-query | PROVED |
 | T91 | request_token_discovery_across_registries | request token discovery across registries | Witnesses.W91 | M-request-query | PROVED |
 | T92 | output_refs_monotone | output refs monotone | Witnesses.W92 | M-forget-refs | PROVED |
-| T93 | reachable_output_refs | reachable output refs | Witnesses.W93 | M-create-refs | OPEN |
-| T94 | reachable_output_refs_unique | reachable output refs unique | Witnesses.W94 | M-fresh-output | OPEN |
+| T93 | reachable_output_refs | reachable output refs | Witnesses.W93 | M-create-refs | PROVED |
+| T94 | reachable_output_refs_unique | reachable output refs unique | Witnesses.W94 | M-fresh-output | PROVED |
 | T95 | unguarded_registry_impossible | unguarded registry impossible | Witnesses.W95 | M-registry-guard | PROVED |
 | T96 | zero_oracle_needs_rule | zero oracle needs rule | Witnesses.W96 | M-registry-guard | PROVED |
 | T97 | zero_oracle_evidence_empty | zero oracle evidence empty | Witnesses.W97 | M-zero-evidence | PROVED |
@@ -180,11 +180,11 @@ theorem. W136 reaches every Step constructor.
 | T112 | creation_rule_input_binding | Actual creation binds Rule.admits to the singleton output request and exact creating signatures | Witnesses.W112 | M-rule-request | PROVED |
 | T113 | creation_request_policy | Actual creation uses rule policy and never release if rule exists, release otherwise; both mint and output provenance | Witnesses.W113 | M-release-policy | PROVED |
 | T114 | only_fold_changes_registry | only fold changes registry | Witnesses.W114 | M-creation-state | PROVED |
-| T115 | reachable_balances_backed | reachable balances backed | Witnesses.W115 | M-credit-unbacked | OPEN |
-| T116 | fold_value_conservation | fold value conservation | Witnesses.W116 | M-claim-value | OPEN |
-| T117 | fold_request_conservation | fold request conservation | Witnesses.W117 | M-remainder | OPEN |
-| T118 | fold_balance_conservation | fold balance conservation | Witnesses.W118 | M-credit-unbacked | OPEN |
-| T119 | fold_payments_exact | fold credits / outputs exact | Witnesses.W119 | M-arbitrary-payments | OPEN |
+| T115 | reachable_balances_backed | reachable balances backed | Witnesses.W115 | M-credit-unbacked | PROVED |
+| T116 | fold_value_conservation | fold value conservation | Witnesses.W116 | M-claim-value | PROVED |
+| T117 | fold_request_conservation | fold request conservation | Witnesses.W117 | M-remainder | PROVED |
+| T118 | fold_balance_conservation | fold balance conservation | Witnesses.W118 | M-credit-unbacked | PROVED |
+| T119 | fold_payments_exact | fold credits / outputs exact | Witnesses.W119 | M-arbitrary-payments | PROVED |
 | T120 | group_credits_only_recorded_signers | group credits only recorded signers | Witnesses.W120 | M-unsigned-fees | PROVED |
 | T121 | group_credits_exact_split | group credits exact split | Witnesses.W121 | M-extra-fee | PROVED |
 | T122 | judgment_record_cannot_change | judgment record cannot change | Witnesses.W122 | M-name-record | PROVED |
@@ -195,17 +195,17 @@ theorem. W136 reaches every Step constructor.
 | T127 | claim_below_minimum_refused | claim below minimum refused | Witnesses.W127 | M-claim-minimum | PROVED |
 | T128 | claim_turn_balance | claim turn balance | Witnesses.W128 | M-claim-prior-balance | PROVED |
 | T129 | claim_consumed_and_burned | claim consumed and burned | Witnesses.W129 | M-claim-retained | PROVED |
-| T130 | claim_withdrawal_inversion | claim withdrawal inversion | Witnesses.W130 | M-claim-withdraw-signature | OPEN |
+| T130 | claim_withdrawal_inversion | claim withdrawal inversion | Witnesses.W130 | M-claim-withdraw-signature | PROVED |
 | T131 | claim_withdrawal_available | claim withdrawal available | Witnesses.W131 | M-claim-withdraw-strict | PROVED |
 | T132 | claim_windows_disjoint | claim windows disjoint | Witnesses.W132 | M-claim-overlap | PROVED |
-| T133 | claim_discovery_exact | claim discovery exact | Witnesses.W133 | M-claim-query | OPEN |
+| T133 | claim_discovery_exact | claim discovery exact | Witnesses.W133 | M-claim-query | PROVED |
 | T134 | request_withdrawal_preserves_registry | request withdrawal preserves registry | Witnesses.W134 | M-withdraw-state | PROVED |
 | T135 | fold_interval_fits_every_item | fold interval fits every item | Witnesses.W135 | M-skip-item-guard | PROVED |
 | T136 | step_inversion | step inversion | Witnesses.W136 | M-claim-source | PROVED |
 | T137 | foldRun_inversion | foldRun inversion | Witnesses.W137 | M-skip-run-effect | PROVED |
 | T138 | claim_item_inversion | claim item inversion | Witnesses.W138 | M-claim-item-cage | PROVED |
 | T139 | claim_windows_cover | Point intervals admit claim fold or withdrawal at every time under the non-time guards | Witnesses.W139 | M-claim-withdraw-gap | PROVED |
-| T140 | fold_group_credits_only_recorded_signers | All fold fee records are authenticated; a key absent from all selected records cannot gain balance | Witnesses.W140 | M-fold-unsigned-credit | OPEN |
+| T140 | fold_group_credits_only_recorded_signers | All fold fee records are authenticated; a key absent from all selected records cannot gain balance | Witnesses.W140 | M-fold-unsigned-credit | PROVED |
 | T141 | trace_reachability | Indexed event histories and Reachable describe exactly the same states | Witnesses.W141 | M-trace-missing-step | PROVED |
 | T142 | exit_windows_disjoint | The exitAt window classes never overlap | Witnesses.W142 | M-window-overlap | PROVED |
 

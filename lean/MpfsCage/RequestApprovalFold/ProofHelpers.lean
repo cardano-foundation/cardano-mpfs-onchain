@@ -153,4 +153,195 @@ theorem authorized_nonempty (o : Oracle) (e : Evidence) (ha : e.authorized o) : 
  rw [hn] at hp
  exact Nat.not_lt_zero _ hp
 
+theorem claim_tokens (s : State) (h : Reachable s) :
+ ∀ o ∈ s.claims, o.tokens = [claimName s.cage.id] := by
+ induction h with
+ | registry c ex hc => simp [initial]
+ | @next s s' a hr hs ih =>
+   intro o ho
+   have hc := step_registry hs
+   cases hs <;> try exact ih o ho
+   case fold tx _ _ _ _ _ =>
+     simpa only [hc.1] using ih o (List.mem_filter.mp ho).1
+   case claimCreate tx he ha hf =>
+     rcases List.mem_cons.mp ho with he' | he'
+     · subst o; exact he ▸ ha.2.2.2.1
+     · exact ih o he'
+   case claimWithdraw tx _ _ => exact ih o (List.mem_of_mem_erase ho)
+
+theorem run_request_conservation {iv refs sigs c items out}
+ (h : FoldRun iv refs sigs c items out) :
+ requestEscrows items = grossCredits c items + requestRemainders c items := by
+ induction h with
+ | nil => simp [requestEscrows, grossCredits, requestRemainders]
+ | cons c i items out ha hr ih =>
+   cases i with
+   | write o e =>
+     have ht := credits_total c o.request e (fun x hx => (ha.2.2.2.1 x hx).1)
+     have hf := ha.1.2.2.1
+     simp only [requestEscrows, List.filterMap_cons, FoldItem.request, List.map_cons,
+       List.sum_cons, grossCredits, itemCredits, requestRemainders] at *
+     unfold remainder
+     omega
+   | account o e =>
+     have ht := credits_total c o.request e (fun x hx => (ha.2.2.2.2 x hx).1)
+     have hf := ha.1.2.2.1
+     simp only [requestEscrows, List.filterMap_cons, FoldItem.request, List.map_cons,
+       List.sum_cons, grossCredits, itemCredits, requestRemainders] at *
+     unfold remainder
+     omega
+   | claim o =>
+     simpa [requestEscrows, grossCredits, requestRemainders, FoldItem.request,
+       itemCredits, OracleIdentity.totalPaid] using ih
+
+theorem payments_total (c : CageState) (folder : Signer) (items : List FoldItem) :
+ totalPaid (foldPayments c folder items) =
+ requestRemainders c items + claimPayouts c items + claimEscrows items := by
+ induction items generalizing c with
+ | nil => simp [foldPayments, totalPaid, requestRemainders, claimPayouts, claimEscrows]
+ | cons i items ih =>
+   have h := ih (itemResult c i)
+   cases i <;>
+     simp_all [foldPayments, totalPaid, itemPayments, requestRemainders, claimPayouts,
+       claimEscrows, FoldItem.request, FoldItem.claimInput, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm]
+
+theorem credits_cover (c : CageState) (r : Request) (e : Selection)
+ (ha : ∀ o ∈ c.oracles, (e o).authorized o) :
+ ∀ p ∈ credits c r e, p.key ∈ registryKeys c := by
+ intro p hp
+ obtain ⟨o, ho, hp⟩ := List.mem_flatMap.mp hp
+ have he := ha o ho
+ change OracleIdentity.authorize o (e o).description (e o).signers = some (e o).record at he
+ have hs : oracleCredits r o (e o) = OracleIdentity.splitRecorded (e o).record (r.fee o) := by
+   simp [oracleCredits, OracleIdentity.splitFee, he]
+ rw [hs] at hp
+ have hk := (OracleIdentity.recorded_keys_are_signers o (e o).description (e o).signers
+   (e o).record he p.key (OracleIdentity.payment_key_recorded _ _ _ hp)).2
+ have hid := OracleIdentity.authorization_binds_identity _ _ _ _ he
+ apply List.mem_eraseDups.mpr
+ apply List.mem_flatMap.mpr
+ have hd : o.description = (e o).description := congrArg OracleIdentity.Identity.description hid
+ exact ⟨o, ho, hd ▸ hk⟩
+
+theorem credit_backed (c : CageState) (ps : List OracleIdentity.Payment) (hb : Backed c)
+ (hp : ∀ p ∈ ps, p.key ∈ registryKeys c) : Backed (credit c ps) := by
+ constructor
+ · change c.value + OracleIdentity.totalPaid ps =
+     ((registryKeys c).map (fun k => c.balances k + OracleIdentity.paidTo ps k)).sum
+   have hn : (registryKeys c).Nodup := OracleIdentity.dedup_keys_nodup _
+   rw [OracleIdentity.sum_map_add, OracleIdentity.sum_paid_over_cover ps (registryKeys c) hn hp]
+   exact congrArg (fun n => n + OracleIdentity.totalPaid ps) hb.1
+ · intro k hk
+   change c.balances k + OracleIdentity.paidTo ps k = 0
+   rw [hb.2 k hk, OracleIdentity.paid_zero_of_absent ps k
+     (fun p hm he => hk (he ▸ hp p hm))]
+
+theorem clear_sum (ks : List Signer) (f : Signer → Nat) (key : Signer)
+ (hn : ks.Nodup) (hk : key ∈ ks) :
+ (ks.map (fun k => if k = key then 0 else f k)).sum + f key = (ks.map f).sum := by
+ have h := OracleIdentity.sum_map_add ks (fun k => if k = key then 0 else f k)
+   (fun k => if key = k then f key else 0)
+ rw [OracleIdentity.sum_key_indicator ks key (f key) hn, if_pos hk] at h
+ rw [← h]
+ congr 1
+ apply List.map_congr_left
+ intro k _
+ by_cases he : k = key
+ · subst k; simp
+ · have he' : key ≠ k := Ne.symm he
+   simp [he, he']
+
+theorem claim_balance_sum (c : CageState) (o : ClaimOutput) (hk : o.key ∈ registryKeys c) :
+ balanceSum (itemResult c (.claim o)) + c.balances o.key = balanceSum c := by
+ exact clear_sum (registryKeys c) c.balances o.key (OracleIdentity.dedup_keys_nodup _) hk
+
+theorem item_backed (c : CageState) (iv : Interval) (refs : List TokenName) (sigs : List Signer)
+ (i : FoldItem) (hb : Backed c) (ha : itemAllowed c iv refs sigs i) : Backed (itemResult c i) := by
+ cases i with
+ | write o e =>
+   exact credit_backed c _ hb (credits_cover c o.request e (fun x hx => (ha.2.2.2.1 x hx).1))
+ | account o e =>
+   exact credit_backed c _ hb (credits_cover c o.request e (fun x hx => (ha.2.2.2.2 x hx).1))
+ | claim o =>
+   have hsum := claim_balance_sum c o ha.2.1
+   constructor
+   · change c.value - c.balances o.key = _
+     have hv := hb.1
+     omega
+   · intro k hk
+     change (if k = o.key then 0 else c.balances k) = 0
+     split
+     · rfl
+     · exact hb.2 k hk
+
+theorem run_backed {iv refs sigs c items out} (h : FoldRun iv refs sigs c items out)
+ (hb : Backed c) : Backed out := by
+ induction h with
+ | nil => exact hb
+ | cons c i rest out ha hr ih => exact ih (item_backed c iv refs sigs i hb ha)
+
+theorem run_value_conservation {iv refs sigs c items out} (h : FoldRun iv refs sigs c items out)
+ (hb : Backed c) : c.value + grossCredits c items = out.value + claimPayouts c items := by
+ induction h with
+ | nil => simp [grossCredits, claimPayouts]
+ | cons c i rest out ha hr ih =>
+   have ht := ih (item_backed c iv refs sigs i hb ha)
+   cases i with
+   | write o e =>
+     simpa [grossCredits, claimPayouts, FoldItem.claimInput, itemCredits, itemResult, credit,
+       Nat.add_assoc] using ht
+   | account o e =>
+     simpa [grossCredits, claimPayouts, FoldItem.claimInput, itemCredits, itemResult, credit,
+       Nat.add_assoc] using ht
+   | claim o =>
+     have hsum := claim_balance_sum c o ha.2.1
+     have hv := hb.1
+     simp only [itemResult] at ht
+     simp only [grossCredits, itemCredits, OracleIdentity.totalPaid, List.map_nil, List.sum_nil,
+       Nat.zero_add, claimPayouts, FoldItem.claimInput, itemResult]
+     omega
+
+theorem result_append (c : CageState) (xs ys : List FoldItem) :
+ foldResult c (xs ++ ys) = foldResult (foldResult c xs) ys := by
+ induction xs generalizing c with
+ | nil => rfl
+ | cons i rest ih => exact ih (itemResult c i)
+
+theorem credits_unpaid (c : CageState) (r : Request) (e : Selection) (k : Signer)
+ (hz : ∀ o ∈ c.oracles, OracleIdentity.paidTo (oracleCredits r o (e o)) k = 0) :
+ OracleIdentity.paidTo (credits c r e) k = 0 := by
+ unfold credits
+ generalize c.oracles = os at *
+ induction os with
+ | nil => rfl
+ | cons o os ih =>
+   have hh := hz o (by simp)
+   have ht := ih (fun x hx => hz x (by simp [hx]))
+   simp only [List.flatMap_cons, OracleIdentity.paidTo, List.filter_append,
+     List.map_append, List.sum_append] at *
+   omega
+
+theorem run_balance_nonincrease {iv refs sigs c items out} (h : FoldRun iv refs sigs c items out)
+ (key : Signer)
+ (hz : ∀ (n : Nat) o e, (items[n]? = some (FoldItem.write o e) ∨
+   items[n]? = some (FoldItem.account o e)) → ∀ oracle ∈ c.oracles,
+   OracleIdentity.paidTo (oracleCredits o.request oracle (e oracle)) key = 0) :
+ out.balances key ≤ c.balances key := by
+ induction h with
+ | nil => exact Nat.le_refl _
+ | cons c i rest out ha hr ih =>
+   have ht := ih (fun n o e hn oracle ho =>
+     hz (n+1) o e (by simpa using hn) oracle ((item_registry c i).2.1 ▸ ho))
+   apply Nat.le_trans ht
+   cases i with
+   | write o e =>
+     have hp := credits_unpaid c o.request e key (hz 0 o e (Or.inl rfl))
+     simp [itemResult, credit, hp]
+   | account o e =>
+     have hp := credits_unpaid c o.request e key (hz 0 o e (Or.inr rfl))
+     simp [itemResult, credit, hp]
+   | claim o =>
+     simp only [itemResult]
+     split <;> omega
+
 end RequestApprovalFold.ProofHelpers

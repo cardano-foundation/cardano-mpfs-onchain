@@ -3,8 +3,7 @@ import MpfsCage.RequestApprovalFold.Witnesses
 import MpfsCage.OracleIdentity.Statements
 
 /-! Proofs against the 142 statements accepted at c569165 (NOTE-003).
-The ledger distinguishes axiom-checked PROVED rows from the remaining OPEN
-rows, whose original admitted proof bodies are preserved. -/
+All accepted statements have proof bodies; the ledger records their outcomes. -/
 namespace RequestApprovalFold
 
 theorem applyAll_append (t : Trie) (xs ys : List Write) : applyAll t (xs ++ ys) = applyAll (applyAll t xs) ys := by
@@ -198,7 +197,26 @@ theorem absent_inserts_exclusive (tx : FoldTx) (n m : Nat) (a b : RequestOutput)
  foldAccepted tx → n < m → tx.items[n]? = some (FoldItem.write a ea) → tx.items[m]? = some (FoldItem.write b eb) →
  a.request.write = .set k v → Condition.absent k ∈ b.request.conditions →
  Write.unset k ∈ ((tx.items.drop (n + 1)).take (m - (n + 1))).flatMap FoldItem.writes := by
-  sorry
+  intro ha hnm hn hm hw hb
+  apply Classical.byContradiction
+  intro hnone
+  have habsent := foldRun_conditions ha.2.2.2.2 m b eb hm (.absent k) hb
+  have hpresent : ((foldResult tx.cageIn (tx.items.take (n+1))).trie k).isSome := by
+    rw [List.take_add_one, hn]
+    simp only [Option.toList_some, ProofHelpers.result_append, foldResult]
+    simp [itemResult, hw, Write.apply]
+  have hsplit : tx.items.take (n+1) ++
+      (tx.items.drop (n+1)).take (m-(n+1)) = tx.items.take m := by
+    rw [List.take_drop, Nat.add_sub_of_le (by omega : n+1 ≤ m)]
+    have h := List.take_append_drop (n+1) (tx.items.take m)
+    simpa [List.take_take, Nat.min_eq_left (by omega : n+1 ≤ m)] using h
+  have hp := applyAll_keeps_present k
+    (((tx.items.drop (n+1)).take (m-(n+1))).flatMap FoldItem.writes)
+    (foldResult tx.cageIn (tx.items.take (n+1))).trie
+    (fun w hm he => hnone (he ▸ hm)) hpresent
+  rw [← ProofHelpers.result_trie, ← ProofHelpers.result_append, hsplit] at hp
+  change (foldResult tx.cageIn (tx.items.take m)).trie k = none at habsent
+  simp [habsent] at hp
 
 theorem account_complete_and_pays (tx : FoldTx) : foldAccepted tx → ∀ n o e,
  tx.items[n]? = some (FoldItem.account o e) → hasAccount (atTurn tx n) o.request tx.refs e ∧
@@ -399,7 +417,20 @@ theorem spent_seed_cannot_create_again (s : State) (tx : CreateTx) (o : RequestO
 
 theorem request_never_reappears (s s' : State) (o : RequestOutput) :
  Reachable s → o.ref ∈ s.usedOutputs → o ∉ s.live → History s s' → o ∉ s'.live := by
-  sorry
+  intro hr hu hn ht
+  induction ht with
+  | refl => exact hn
+  | @next s t u a hs ht ih =>
+    apply ih (Reachable.next hr hs) (show o.ref ∈ t.usedOutputs from by
+      cases hs <;> first | exact hu | simp [afterCreate, afterClaimCreate, hu])
+    cases hs <;> try exact hn
+    case create tx new hc ha hf hf' =>
+      intro hm
+      rcases List.mem_cons.mp hm with he | he
+      · exact hf' (he ▸ hu)
+      · exact hn he
+    case fold tx _ _ _ _ _ => exact fun hm => hn (List.mem_filter.mp hm).1
+    case withdraw tx _ _ => exact fun hm => hn (List.mem_filter.mp hm).1
 
 theorem one_oracle_signature_suffices (c : CageState) (r : Request) (oracle : Oracle)
  (e : Selection) (sigs : List Signer) : c.oracles = [oracle] →
@@ -909,11 +940,62 @@ theorem output_refs_monotone {s s' : State} {a : Action} : Step s a s' → ∀ r
 
 theorem reachable_output_refs (s : State) : Reachable s →
  (∀ o ∈ s.live, o.ref ∈ s.usedOutputs) ∧ (∀ o ∈ s.claims, o.ref ∈ s.usedOutputs) := by
-  sorry
+  intro h
+  induction h with
+  | registry c ex hc => simp [initial]
+  | @next s s' a hr hs ih =>
+    constructor
+    · intro o ho
+      cases hs <;> try exact ih.1 o ho
+      case create tx new hc ha hf hf' =>
+        rcases List.mem_cons.mp ho with he | he
+        · subst o; exact List.mem_cons_self
+        · exact List.mem_cons_of_mem _ (ih.1 o he)
+      case fold tx _ _ _ _ _ => exact ih.1 o (List.mem_filter.mp ho).1
+      case withdraw tx _ _ => exact ih.1 o (List.mem_filter.mp ho).1
+      case claimCreate tx _ _ _ => exact List.mem_cons_of_mem _ (ih.1 o ho)
+    · intro o ho
+      cases hs <;> try exact ih.2 o ho
+      case create tx new _ _ _ _ => exact List.mem_cons_of_mem _ (ih.2 o ho)
+      case fold tx _ _ _ _ _ => exact ih.2 o (List.mem_filter.mp ho).1
+      case claimCreate tx _ _ _ =>
+        rcases List.mem_cons.mp ho with he | he
+        · subst o; exact List.mem_cons_self
+        · exact List.mem_cons_of_mem _ (ih.2 o he)
+      case claimWithdraw tx _ _ => exact ih.2 o (List.mem_of_mem_erase ho)
 
 theorem reachable_output_refs_unique (s : State) : Reachable s →
  (s.live.map RequestOutput.ref ++ s.claims.map ClaimOutput.ref).Nodup := by
-  sorry
+  intro h
+  induction h with
+  | registry c ex hc => simp [initial]
+  | @next s s' a hr hs ih =>
+    have hm := reachable_output_refs s hr
+    cases hs <;> try exact ih
+    case create tx o hc ha hf hf' =>
+      change (o.ref :: (s.live.map RequestOutput.ref ++ s.claims.map ClaimOutput.ref)).Nodup
+      refine List.nodup_cons.mpr ⟨?_, ih⟩
+      intro h
+      rcases List.mem_append.mp h with h | h
+      · obtain ⟨x, hx, he⟩ := List.mem_map.mp h
+        exact hf' (he ▸ hm.1 x hx)
+      · obtain ⟨x, hx, he⟩ := List.mem_map.mp h
+        exact hf' (he ▸ hm.2 x hx)
+    case fold tx _ _ _ _ _ =>
+      exact ih.sublist ((List.filter_sublist.map _).append (List.filter_sublist.map _))
+    case withdraw tx _ _ =>
+      exact ih.sublist ((List.filter_sublist.map _).append (List.Sublist.refl _))
+    case claimCreate tx hc ha hf =>
+      have hn : tx.output.ref ∉ s.live.map RequestOutput.ref ++ s.claims.map ClaimOutput.ref := by
+        intro h
+        rcases List.mem_append.mp h with h | h
+        · obtain ⟨x, hx, he⟩ := List.mem_map.mp h
+          exact hf (he ▸ hm.1 x hx)
+        · obtain ⟨x, hx, he⟩ := List.mem_map.mp h
+          exact hf (he ▸ hm.2 x hx)
+      simpa only [afterClaimCreate, List.map_cons] using (List.nodup_cons.mpr ⟨hn, ih⟩).perm (List.perm_middle.symm)
+    case claimWithdraw tx _ _ =>
+      exact ih.sublist ((List.Sublist.refl _).append ((List.erase_sublist).map _))
 
 theorem unguarded_registry_impossible (c : CageState) (existing : List CageId) :
  c.oracles = [] → c.rule = none → ¬ registryCreated c existing := by
@@ -1071,25 +1153,54 @@ theorem only_fold_changes_registry {s s' : State} {a : Action} : Step s a s' →
   exact ⟨_, rfl⟩
 
 theorem reachable_balances_backed (s : State) : Reachable s → Backed s.cage := by
-  sorry
+  intro h
+  induction h with
+  | registry c ex hc =>
+    constructor
+    · have hz (ks : List Signer) : (ks.map (fun _ => (0 : Nat))).sum = 0 := by
+        induction ks <;> simp_all
+      simp [initial, balanceSum, hc.2.2.2.1, hc.2.2.2.2, hz]
+    · intro k _; simp [initial, hc.2.2.2.1]
+  | @next s s' a hr hs ih =>
+    cases hs <;> try exact ih
+    case fold tx hc _ _ _ ha =>
+      exact ProofHelpers.run_backed ha.2.2.2.2 (hc.symm ▸ ih)
 
 theorem fold_value_conservation (s s' : State) (tx : FoldTx) : Reachable s → Step s (.fold tx) s' →
  s.cage.value + requestEscrows tx.items + claimEscrows tx.items =
  s'.cage.value + requestRemainders s.cage tx.items + claimPayouts s.cage tx.items + claimEscrows tx.items := by
-  sorry
+  intro hr hs
+  cases hs with
+  | fold _ hc _ _ _ ha =>
+    have hv := ProofHelpers.run_value_conservation ha.2.2.2.2
+      (hc.symm ▸ reachable_balances_backed s hr)
+    have he := ProofHelpers.run_request_conservation ha.2.2.2.2
+    simp only [afterFold]
+    rw [hc] at hv he
+    omega
 
 theorem fold_request_conservation (tx : FoldTx) : foldAccepted tx →
  requestEscrows tx.items = grossCredits tx.cageIn tx.items + requestRemainders tx.cageIn tx.items := by
-  sorry
+  intro h
+  exact ProofHelpers.run_request_conservation h.2.2.2.2
 
 theorem fold_balance_conservation (s s' : State) (tx : FoldTx) : Reachable s → Step s (.fold tx) s' →
  balanceSum s.cage + grossCredits s.cage tx.items = balanceSum s'.cage + claimPayouts s.cage tx.items := by
-  sorry
+  intro hr hs
+  have hb := reachable_balances_backed s hr
+  have hb' := reachable_balances_backed s' (Reachable.next hr hs)
+  cases hs with
+  | fold _ hc _ _ _ ha =>
+    have hv := ProofHelpers.run_value_conservation ha.2.2.2.2 (hc.symm ▸ hb)
+    simpa only [hc, hb.1, show tx.cageOut.value = balanceSum tx.cageOut from hb'.1] using hv
 
 theorem fold_payments_exact (tx : FoldTx) : foldAccepted tx →
  tx.payments = foldPayments tx.cageIn tx.folder tx.items ∧
  totalPaid tx.payments = requestRemainders tx.cageIn tx.items + claimPayouts tx.cageIn tx.items + claimEscrows tx.items := by
-  sorry
+  intro h
+  refine ⟨h.2.2.2.1, ?_⟩
+  rw [h.2.2.2.1]
+  exact ProofHelpers.payments_total _ _ _
 
 theorem group_credits_only_recorded_signers (c : CageState) (r : Request) (o : Oracle) (e : Evidence) (k : Signer) :
  e.authorized o → k ∉ OracleIdentity.recordedKeys e.record → OracleIdentity.paidTo (oracleCredits r o e) k = 0 := by
@@ -1193,7 +1304,13 @@ theorem claim_withdrawal_inversion {s s' : State} (tx : ClaimWithdrawTx) : Reach
  tx.input ∈ s.claims ∧ tx.input.key ∈ tx.signers ∧ tx.input.deadline ≤ tx.interval.lower ∧
  tx.interval.valid ∧ tx.burned = tx.input.tokens ∧ tx.beneficiary = tx.input.key ∧ tx.paid = tx.input.value ∧
  s'.cage = s.cage ∧ tx.input ∉ s'.claims := by
-  sorry
+  intro hr hs
+  have hn := reachable_output_refs_unique s hr
+  have hc : s.claims.Nodup := (List.nodup_append.mp hn).2.1.of_map ClaimOutput.ref (fun _ _ h he => h (congrArg ClaimOutput.ref he))
+  cases hs with
+  | claimWithdraw _ hl ha =>
+    exact ⟨hl, ha.2.2.1, ha.2.1, ha.1, ha.2.2.2.1, ha.2.2.2.2.1,
+      ha.2.2.2.2.2, rfl, hc.not_mem_erase⟩
 
 theorem claim_withdrawal_available (s : State) (o : ClaimOutput) (iv : Interval) :
  o ∈ s.claims → iv.valid → o.deadline ≤ iv.lower →
@@ -1213,7 +1330,15 @@ theorem claim_windows_disjoint (c : CageState) (iv : Interval) (o : ClaimOutput)
 
 theorem claim_discovery_exact (s : State) (id : CageId) (o : ClaimOutput) : Reachable s →
  (o ∈ discoverClaims id s.claims ↔ o ∈ s.claims ∧ s.cage.id = id) := by
-  sorry
+  intro hr
+  simp only [discoverClaims, List.mem_filter, decide_eq_true_eq]
+  constructor
+  · rintro ⟨hl, ht⟩
+    rw [ProofHelpers.claim_tokens s hr o hl] at ht
+    have he : claimName id = claimName s.cage.id := List.mem_singleton.mp ht
+    exact ⟨hl, (by simpa [claimName, tokenName, TokenName.mk.injEq] using he.symm)⟩
+  · rintro ⟨hl, he⟩
+    exact ⟨hl, by rw [ProofHelpers.claim_tokens s hr o hl, he]; simp⟩
 
 theorem request_withdrawal_preserves_registry {s s' : State} (tx : WithdrawTx) : Step s (.withdraw tx) s' → s'.cage = s.cage := by
   intro h
@@ -1317,7 +1442,36 @@ theorem fold_group_credits_only_recorded_signers (s s' : State) (tx : FoldTx) :
    tx.items[n]? = some (FoldItem.account o e)) → ∀ oracle ∈ tx.cageIn.oracles,
    key ∉ OracleIdentity.recordedKeys (e oracle).record) →
    s'.cage.balances key ≤ s.cage.balances key) := by
-  sorry
+  intro hs
+  cases hs with
+  | fold _ hc hl hcl href ha =>
+    have hattr : ∀ (n : Nat) o e, (tx.items[n]? = some (FoldItem.write o e) ∨
+        tx.items[n]? = some (FoldItem.account o e)) → ∀ oracle ∈ tx.cageIn.oracles,
+        (e oracle).authorized oracle ∧
+        ((e oracle).name tx.cageIn.id o.request oracle ∈ s.judgments ∨
+          ((e oracle).approve = true ∧ (e oracle).signers = tx.signers)) := by
+      intro n o e hi oracle ho
+      have hr := ProofHelpers.result_registry tx.cageIn (tx.items.take n)
+      have hom : oracle ∈ (atTurn tx n).oracles := hr.2.1 ▸ ho
+      rcases hi with hi | hi
+      · have hv := (foldRun_step_valid ha.2.2.2.2 n (.write o e) hi).2.2.2.1 oracle hom
+        refine ⟨hv.1, ?_⟩
+        rcases hv.2.2 with hname | hsig
+        · exact Or.inl (href _ (by simpa only [hr.1] using hname))
+        · exact Or.inr ⟨hv.2.1, hsig⟩
+      · have hv := (foldRun_step_valid ha.2.2.2.2 n (.account o e) hi).2.2.2.2 oracle hom
+        exact ⟨hv.1, Or.inl (href _ (by simpa only [hr.1] using hv.2))⟩
+    constructor
+    · intro n o e hi oracle ho
+      have hv := hattr n o e hi oracle ho
+      exact ⟨hv.1, hv.2, fun key hk => group_credits_only_recorded_signers tx.cageIn
+        o.request oracle (e oracle) key hv.1 hk⟩
+    · intro key hk
+      have hz := ProofHelpers.run_balance_nonincrease ha.2.2.2.2 key
+        (fun n o e hi oracle ho => group_credits_only_recorded_signers tx.cageIn
+          o.request oracle (e oracle) key (hattr n o e hi oracle ho).1
+          (hk n o e hi oracle ho))
+      exact hc ▸ hz
 
 /-- The indexed histories used for claim provenance cover exactly Reachable. -/
 theorem trace_reachability (s : State) : Reachable s ↔
