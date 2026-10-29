@@ -3,7 +3,8 @@ import MpfsCage.RequestApprovalFold.Witnesses
 import MpfsCage.OracleIdentity.Statements
 
 /-! Proofs for the accepted durable-witness statement surface.
-Remaining admissions mark open proof obligations; public types are frozen. -/
+Public types are frozen; helpers establish the sequential witness inventory
+and reconcile it with the external fold boundary. -/
 namespace RequestApprovalFold
 
 theorem applyAll_append (t : Trie) (xs ys : List Write) : applyAll t (xs ++ ys) = applyAll (applyAll t xs) ys := by
@@ -958,31 +959,7 @@ theorem output_refs_monotone {s s' : State} {a : Action} : Step s a s' → ∀ r
 
 theorem reachable_output_refs (s : State) : Reachable s →
  (∀ o ∈ s.live, o.ref ∈ s.usedOutputs) ∧ (∀ o ∈ s.claims, o.ref ∈ s.usedOutputs) := by
-  intro h
-  induction h with
-  | registry c ex hc => simp [initial]
-  | @next s s' a hr hs ih =>
-    constructor
-    · intro o ho
-      cases hs <;> try exact ih.1 o ho
-      case create tx new hc ha hf hf' =>
-        rcases List.mem_cons.mp ho with he | he
-        · subst o; exact List.mem_cons_self
-        · exact List.mem_cons_of_mem _ (ih.1 o he)
-      case fold tx _ _ _ _ _ _ _ => exact ih.1 o (List.mem_filter.mp ho).1
-      case withdraw tx _ _ => exact ih.1 o (List.mem_filter.mp ho).1
-      case claimCreate tx _ _ _ => exact List.mem_cons_of_mem _ (ih.1 o ho)
-      case extractionCreate tx _ _ _ => exact List.mem_cons_of_mem _ (ih.1 o ho)
-    · intro o ho
-      cases hs <;> try exact ih.2 o ho
-      case create tx new _ _ _ _ => exact List.mem_cons_of_mem _ (ih.2 o ho)
-      case fold tx _ _ _ _ _ _ _ => exact ih.2 o (List.mem_filter.mp ho).1
-      case claimCreate tx _ _ _ =>
-        rcases List.mem_cons.mp ho with he | he
-        · subst o; exact List.mem_cons_self
-        · exact List.mem_cons_of_mem _ (ih.2 o he)
-      case claimWithdraw tx _ _ => exact ih.2 o (List.mem_of_mem_erase ho)
-      case extractionCreate tx _ _ _ => exact List.mem_cons_of_mem _ (ih.2 o ho)
+ exact ProofHelpers.live_refs s
 
 theorem reachable_output_refs_unique (s : State) : Reachable s →
  (s.live.map RequestOutput.ref ++ s.claims.map ClaimOutput.ref).Nodup := by
@@ -1132,11 +1109,38 @@ theorem folder_discovery_exact (s : State) (iv : Interval) (sigs : List Signer) 
   intro hs
   simp only [folderFinds, request_token_discovery s s.cage.id o hs, and_true]
 
+/-- D03: correspondence includes identity, exact fact, issuer, amount and custody. -/
+theorem reachable_witness_bijection (s : State) : Reachable s → WitnessBacked s := by
+ exact ProofHelpers.reachable_inventory s
+
 theorem folder_discovery_executable (s : State) (iv : Interval) (sigs : List Signer) (e : Selection) (o : RequestOutput) (folder : Signer) :
  Reachable s → (folderFinds s iv sigs e o ↔
  Step s (.fold (singletonFold s iv sigs (FoldItem.write o e) folder))
  (afterFold s (singletonFold s iv sigs (FoldItem.write o e) folder))) := by
-  sorry
+ intro hs
+ rw [folder_discovery_exact s iv sigs e o hs]
+ constructor
+ · rintro ⟨hl,hv⟩
+   apply Step.fold s _ rfl
+   · simpa [singletonFold,withWitnessBoundary,FoldTx.requests,FoldItem.request] using hl
+   · simp [singletonFold,withWitnessBoundary,FoldTx.claims,FoldItem.claimInput]
+   · exact fun _ h => h
+   · exact ProofHelpers.singleton_accepted s iv sigs (.write o e) folder hv.2.2.1 hv
+   · simp [singletonFold,withWitnessBoundary,FoldTx.extractions,FoldItem.extraction]
+   · intro out hout
+     have hm := (List.mem_filter.mp hout).1
+     obtain ⟨event,he,hcons⟩ := List.mem_filterMap.mp hm
+     change event ∈ itemWitnessEvents s.cage (.write o e) ++ [] at he
+     simp only [List.append_nil] at he
+     obtain ⟨o',e',w,heq,hkey,hout',hw⟩ := ProofHelpers.consumed_write (i := .write o e) hv he hcons
+     have hb := reachable_witness_bijection s hs
+     rw [hout']
+     exact (hb.2.1 _ _).mp hw
+ · intro h
+   cases h with
+   | fold _ hc hl _ _ hf _ _ =>
+     refine ⟨hl o (by simp [singletonFold,withWitnessBoundary,FoldTx.requests,FoldItem.request]),?_⟩
+     exact foldRun_step_valid hf.2.2.2.2.1 0 (.write o e) rfl
 
 theorem empty_fold_allowed (s : State) (iv : Interval) (who : Signer) : iv.valid →
  let tx : FoldTx := ⟨s.cage, s.cage, [], [], [], iv, who, who, [], [], [], [], [], [], []⟩
@@ -1174,12 +1178,6 @@ theorem reachable_balances_backed (s : State) : Reachable s → Backed s.cage :=
     cases hs <;> try exact ih
     case fold tx hc _ _ _ ha _ _ =>
       exact ProofHelpers.run_backed ha.2.2.2.2.1 (hc.symm ▸ ih)
-
-theorem fold_value_conservation (s s' : State) (tx : FoldTx) : Reachable s → Step s (.fold tx) s' →
- s.cage.value + requestEscrows tx.items + claimEscrows tx.items + witnessValue tx.witnessInputs =
- s'.cage.value + requestRemainders s.cage tx.items + claimPayouts s.cage tx.items + claimEscrows tx.items +
- unusedDepositRefunds tx.items + witnessRefundTotal s.cage tx.items + witnessValue tx.witnessOutputs := by
-  sorry
 
 theorem fold_request_conservation (tx : FoldTx) : foldAccepted tx →
  requestEscrows tx.items = grossCredits tx.cageIn tx.items + requestRemainders tx.cageIn tx.items + requestDepositInputs tx.items := by
@@ -1518,9 +1516,6 @@ theorem conditions_read_logical (tree : EntryTree) (condition : Condition) :
  condition.holds (logicalTree tree) ↔ condition.holds (logicalTree (stripWitnesses tree)) := by
  rw [logical_tree_stripped]
 
-/-- D03: correspondence includes identity, exact fact, issuer, amount and custody. -/
-theorem reachable_witness_bijection (s : State) : Reachable s → WitnessBacked s := by sorry
-
 /-- D04: a consumer can use the fact without reading a moving registry output. -/
 theorem live_witness_fact (s : State) (out : WitnessOutput) :
  Reachable s → out ∈ s.witnesses →
@@ -1616,14 +1611,43 @@ theorem witness_spent_only_at_own_key (s s' : State) (a : Action) (out : Witness
  ∃ (tx : FoldTx) (n : Nat) (o : RequestOutput) (e : Selection), a = .fold tx ∧ out ∈ tx.witnessInputs ∧ out.token ∈ tx.witnessBurned ∧
  tx.items[n]? = some (.write o e) ∧ o.request.write.key = out.token.key ∧
  itemChanges (atTurn tx n) (.write o e) out.token.key ∧
- ⟨out.token.data.refund, "", out.token.data.deposit⟩ ∈ tx.payments := by sorry
+ ⟨out.token.data.refund, "", out.token.data.deposit⟩ ∈ tx.payments := by
+ intro _ hs ho hn
+ cases hs <;> try exact False.elim (hn ho)
+ case fold tx hc hl hcl href ha hex hw =>
+   have hi : out ∈ tx.witnessInputs := by
+     apply Classical.byContradiction
+     intro hi
+     apply hn
+     exact List.mem_append_left _ (List.mem_filter.mpr ⟨ho,by simpa using hi⟩)
+   obtain ⟨n,o,e,event,hidx,hkey,hchange,_,_,_,hburn,_,hpay⟩ :=
+     ProofHelpers.fold_input_consumed tx out ha hi
+   exact ⟨tx,n,o,e,rfl,hi,hburn,hidx,hkey,hchange,hpay⟩
 
 /-- D11: unrelated items preserve the exact UTxO including its deposit. -/
 theorem untouched_witness_survives (s s' : State) (tx : FoldTx) (out : WitnessOutput) :
  Reachable s → Step s (.fold tx) s' → out ∈ s.witnesses →
  (∀ o e, FoldItem.write o e ∈ tx.items → o.request.write.key ≠ out.token.key) →
  out ∈ s'.witnesses ∧ out ∉ tx.witnessInputs ∧ out.token ∉ tx.witnessBurned ∧
- s'.cage.trie out.token.key = s.cage.trie out.token.key := by sorry
+ s'.cage.trie out.token.key = s.cage.trie out.token.key := by
+ intro hr hs ho hn
+ cases hs with
+ | fold _ hc hl hcl href ha hex hw =>
+   have hi : out ∉ tx.witnessInputs := by
+     intro hi
+     obtain ⟨n,o,e,event,hidx,hkey,_⟩ := ProofHelpers.fold_input_consumed tx out ha hi
+     exact hn o e (List.mem_of_getElem? hidx) hkey
+   refine ⟨List.mem_append_left _ (List.mem_filter.mpr ⟨ho,by simpa using hi⟩),hi,?_,?_⟩
+   · rw [ha.2.2.2.2.2.2.2.2.1]
+     rintro h
+     obtain ⟨other,hm,he⟩ := List.mem_map.mp h
+     have hother := ProofHelpers.live_custody s hr other (hw other hm)
+     have hout := ProofHelpers.live_custody s hr out ho
+     have eq := ProofHelpers.same_token_eq other out ⟨hother.1,hother.2.1⟩ ⟨hout.1,hout.2.1⟩ he
+     exact hi (eq ▸ hm)
+   · change tx.cageOut.trie out.token.key = s.cage.trie out.token.key
+     rw [← hc]
+     exact ProofHelpers.run_untouched ha.2.2.2.2.1 out.token.key hn
 
 /-- D12: complete extraction item inversion, including its refusal domains. -/
 theorem extraction_item_inversion (c : CageState) (iv : Interval) (o : Extraction) :
@@ -1742,18 +1766,66 @@ theorem plain_write_clears_witness (c : CageState) (o : RequestOutput) (e : Sele
 theorem fold_deposits_conserved (s s' : State) (tx : FoldTx) :
  Reachable s → Step s (.fold tx) s' →
  requestDepositInputs tx.items + witnessValue tx.witnessInputs =
- witnessValue tx.witnessOutputs + witnessRefundTotal s.cage tx.items + unusedDepositRefunds tx.items := by sorry
+ witnessValue tx.witnessOutputs + witnessRefundTotal s.cage tx.items + unusedDepositRefunds tx.items := by
+ intro hr hs
+ cases hs with
+ | fold _ hc hl hcl href ha hex hw => exact ProofHelpers.fold_deposit_value s tx hr hc hl hex ha
+
+theorem fold_value_conservation (s s' : State) (tx : FoldTx) : Reachable s → Step s (.fold tx) s' →
+ s.cage.value + requestEscrows tx.items + claimEscrows tx.items + witnessValue tx.witnessInputs =
+ s'.cage.value + requestRemainders s.cage tx.items + claimPayouts s.cage tx.items + claimEscrows tx.items +
+ unusedDepositRefunds tx.items + witnessRefundTotal s.cage tx.items + witnessValue tx.witnessOutputs := by
+ intro hr hs
+ have hd := fold_deposits_conserved s s' tx hr hs
+ cases hs with
+ | fold _ hc _ _ _ ha _ _ =>
+   have hv := ProofHelpers.run_value_conservation ha.2.2.2.2.1
+     (hc.symm ▸ reachable_balances_backed s hr)
+   have he := ProofHelpers.run_request_conservation ha.2.2.2.2.1
+   simp only [afterFold] at *
+   rw [hc] at hv he
+   omega
 
 /-- D22: every finite census of witnessed keys yields exactly the live deposits. -/
 theorem live_outputs_hold_deposits (s : State) (keys : List Key) :
  Reachable s → keys.Nodup →
  (∀ k, k ∈ keys ↔ ∃ w, witnessAt s.cage.tree k = some w) →
- witnessValue s.witnesses = entryDeposits s.cage.tree keys := by sorry
+ witnessValue s.witnesses = entryDeposits s.cage.tree keys := by
+ intro hr hk hkeys
+ have hb := reachable_witness_bijection s hr
+ have hnodup : (s.witnesses.map (fun out => out.token.key)).Nodup := by
+   apply List.pairwise_map.mpr
+   exact hb.1.imp_of_mem (fun ha hb hne he => hne (one_live_witness_per_key s _ _ hr ha hb he))
+ have hperm : (s.witnesses.map (fun out => out.token.key)).Perm keys := by
+   apply ProofHelpers.nodup_perm hnodup hk
+   intro k
+   rw [hkeys]
+   constructor
+   · rintro hm
+     obtain ⟨out,ho,hkey⟩ := List.mem_map.mp hm
+     have hc := hb.2.2 out ho
+     exact ⟨out.token.data,hkey ▸ (hb.2.1 _ _).mpr (hc ▸ ho)⟩
+   · rintro ⟨w,hw⟩
+     exact List.mem_map.mpr ⟨witnessOutput s.cage.id k w,(hb.2.1 k w).mp hw,rfl⟩
+ have hamount : s.witnesses.map WitnessOutput.value =
+     s.witnesses.map (fun out => ((witnessAt s.cage.tree out.token.key).map WitnessData.deposit).getD 0) := by
+   apply List.map_congr_left
+   intro out ho
+   have hc := hb.2.2 out ho
+   have hw := (hb.2.1 _ _).mpr (hc ▸ ho)
+   rw [hw]
+   exact congrArg WitnessOutput.value hc
+ unfold witnessValue entryDeposits
+ rw [hamount]
+ simpa only [List.map_map] using
+   (hperm.map (fun k => ((witnessAt s.cage.tree k).map WitnessData.deposit).getD 0)).sum_nat
 
 /-- D23: amounts and output placement cannot be chosen by a folder. -/
 theorem witness_output_custody (s : State) (out : WitnessOutput) :
  Reachable s → out ∈ s.witnesses → out.address = registryAddress ∧
- out.value = out.token.data.deposit ∧ s.cage.minimum ≤ out.value := by sorry
+ out.value = out.token.data.deposit ∧ s.cage.minimum ≤ out.value := by
+ intro hr ho
+ exact ProofHelpers.live_custody s hr out ho
 
 /-- D24: a live witness originates on this exact reachable trace. -/
 theorem witness_origin_on_trace (c : CageState) (existing : List CageId) (s : State)
@@ -1998,38 +2070,7 @@ theorem write_item_inversion (c : CageState) (iv : Interval) (refs : List TokenN
 theorem reachable_input_refs_unique (s : State) : Reachable s →
  (s.live.map RequestOutput.ref ++ s.claims.map ClaimOutput.ref ++ s.extractions.map Extraction.ref).Nodup ∧
  (∀ o ∈ s.extractions, o.ref ∈ s.usedOutputs) := by
- intro h
- refine ⟨?_,ProofHelpers.extraction_refs s h⟩
- induction h with
- | registry c ex hc => simp [initial]
- | @next s s' a hr hs ih =>
-   have hm := reachable_output_refs s hr
-   have he := ProofHelpers.extraction_refs s hr
-   have bound : ∀ ref ∈ s.live.map RequestOutput.ref ++ s.claims.map ClaimOutput.ref ++ s.extractions.map Extraction.ref, ref ∈ s.usedOutputs := by
-     intro ref hh
-     rcases List.mem_append.mp hh with hh | hh
-     · rcases List.mem_append.mp hh with hh | hh
-       · obtain ⟨o,ho,rfl⟩ := List.mem_map.mp hh; exact hm.1 o ho
-       · obtain ⟨o,ho,rfl⟩ := List.mem_map.mp hh; exact hm.2 o ho
-     · obtain ⟨o,ho,rfl⟩ := List.mem_map.mp hh; exact he o ho
-   cases hs <;> try exact ih
-   case create tx o hc ha hf hu =>
-     exact List.nodup_cons.mpr ⟨fun hh => hu (bound _ hh),ih⟩
-   case claimCreate tx hc ha hf =>
-     have hn := List.nodup_cons.mpr ⟨fun hh => hf (bound _ hh),ih⟩
-     have hn' : (tx.output.ref :: (s.live.map RequestOutput.ref ++ (s.claims.map ClaimOutput.ref ++ s.extractions.map Extraction.ref))).Nodup := by simpa only [List.append_assoc] using hn
-     simpa only [afterClaimCreate,List.map_cons,List.append_assoc,List.cons_append] using hn'.perm (List.perm_middle (l₁ := s.live.map RequestOutput.ref) (l₂ := s.claims.map ClaimOutput.ref ++ s.extractions.map Extraction.ref)).symm
-   case extractionCreate tx hc ha hf =>
-     have hn := List.nodup_cons.mpr ⟨fun hh => hf (bound _ hh),ih⟩
-     exact hn.perm List.perm_middle.symm
-   case fold tx hc hl hcl href ha hex hw =>
-     exact ih.sublist (((List.filter_sublist.map _).append (List.filter_sublist.map _)).append (List.filter_sublist.map _))
-   case withdraw tx hl ha =>
-     exact ih.sublist (((List.filter_sublist.map _).append (List.Sublist.refl _)).append (List.Sublist.refl _))
-   case claimWithdraw tx hl ha =>
-     exact ih.sublist (((List.Sublist.refl _).append (List.erase_sublist.map _)).append (List.Sublist.refl _))
-   case extractionWithdraw tx hl ha =>
-     exact ih.sublist ((List.Sublist.refl _).append (List.erase_sublist.map _))
+ exact ProofHelpers.pending_refs_unique s
 
 /-- D42: a value-changing item must spend the pre-existing witness of its key. -/
 theorem touched_old_witness_burned (s s' : State) (tx : FoldTx) (old : WitnessOutput)
@@ -2038,7 +2079,34 @@ theorem touched_old_witness_burned (s s' : State) (tx : FoldTx) (old : WitnessOu
  tx.items[n]? = some (.write o e) → o.request.write.key = old.token.key →
  itemChanges (atTurn tx n) (.write o e) old.token.key →
  old ∈ tx.witnessInputs ∧ old.token ∈ tx.witnessBurned ∧ old ∉ s'.witnesses ∧
- ⟨old.token.data.refund, "", old.value⟩ ∈ tx.payments := by sorry
+ ⟨old.token.data.refund, "", old.value⟩ ∈ tx.payments := by
+ intro hr hs ho hidx hkey hchange
+ have hb := reachable_witness_bijection s hr
+ have hold := hb.2.2 old ho
+ have hw := (hb.2.1 _ _).mpr (hold ▸ ho)
+ cases hs with
+ | fold _ hc hl hcl href ha hex hwi =>
+   obtain ⟨event,he,hcons⟩ := ProofHelpers.consumed_on_change ha.2.2.2.2.1 old.token.key old.token.data
+     (hc ▸ hw) n (.write o e) hidx hchange
+   have hcons' : event.consumed = some old := by simpa only [hc,← hold] using hcons
+   have hnot : old ∉ tx.witnessEvents.filterMap WitnessEvent.produced := by
+     rintro hm
+     obtain ⟨event,he,hp⟩ := List.mem_filterMap.mp hm
+     rw [ha.2.2.2.2.2.1] at he
+     exact ProofHelpers.fold_no_reproduction s tx old hr ho hl hex event he hp
+   have hin : old ∈ tx.witnessInputs := by
+     rw [ha.2.2.2.2.2.2.1]
+     exact List.mem_filter.mpr ⟨List.mem_filterMap.mpr ⟨event,ha.2.2.2.2.2.1 ▸ he,hcons'⟩,by simpa using hnot⟩
+   refine ⟨hin,?_,?_,?_⟩
+   · rw [ha.2.2.2.2.2.2.2.2.1]; exact List.mem_map.mpr ⟨old,hin,rfl⟩
+   · rintro hm
+     rcases List.mem_append.mp hm with h | h
+     · have hn : old ∉ tx.witnessInputs := by simpa using (List.mem_filter.mp h).2
+       exact hn hin
+     · rw [ha.2.2.2.2.2.2.2.1] at h
+       exact hnot (List.mem_filter.mp h).1
+   · rw [ha.2.2.2.1]
+     exact ProofHelpers.event_refund_paid ha.2.2.2.2.1 tx.folder event old he hcons'
 
 /-- D43: no counterfeit witness input can enter a fold. -/
 theorem fold_witness_inputs_authentic (s s' : State) (tx : FoldTx) :
@@ -2054,7 +2122,9 @@ theorem requests_unique_on_trace (c : CageState) (existing : List CageId) (s : S
  (a b : CreateTx) (oa ob : RequestOutput) :
  registryCreated c existing → Trace (initial c) events s →
  (beforeA,Action.create a oa,afterA) ∈ events → (beforeB,Action.create b ob,afterB) ∈ events →
- a.cageRef.oracles ≠ [] → b.cageRef.oracles ≠ [] → a ≠ b → oa.request ≠ ob.request := by sorry
+ a.cageRef.oracles ≠ [] → b.cageRef.oracles ≠ [] → a ≠ b → oa.request ≠ ob.request := by
+ intro _ ht ha hb hna hnb hne
+ exact ProofHelpers.trace_create_unique ht beforeA afterA beforeB afterB a b oa ob ha hb hna hnb hne
 
 /-- D45: a reference returns exactly the live fact without a spend transition. -/
 theorem witness_reference_sound (s : State) (out : WitnessOutput) (w : WitnessData) :
@@ -2082,7 +2152,28 @@ theorem witness_durability (s s' : State) (a : Action) (out : WitnessOutput) :
  Reachable s → Step s a s' → out ∈ s.witnesses → actionPreservesKey a out.token.key →
  out ∈ s'.witnesses ∧ witnessAt s'.cage.tree out.token.key = witnessAt s.cage.tree out.token.key ∧
  s'.cage.trie out.token.key = s.cage.trie out.token.key ∧
- (∀ tx, a = .fold tx → out ∉ tx.witnessInputs ∧ out.token ∉ tx.witnessBurned) := by sorry
+ (∀ tx, a = .fold tx → out ∉ tx.witnessInputs ∧ out.token ∉ tx.witnessBurned) := by
+ intro hr hs ho hp
+ have hb := reachable_witness_bijection s hr
+ have hout := hb.2.2 out ho
+ have hw := (hb.2.1 _ _).mpr (hout ▸ ho)
+ cases hs <;> try exact ⟨ho,rfl,rfl,by intro tx he; cases he⟩
+ case fold tx hc hl hcl href ha hex hwi =>
+   have hi : out ∉ tx.witnessInputs := by
+     intro hi
+     obtain ⟨n,o,e,event,hidx,hkey,hchange,_⟩ := ProofHelpers.fold_input_consumed tx out ha hi
+     exact hp n (.write o e) hidx hchange
+   have hb' : out.token ∉ tx.witnessBurned := by
+     rw [ha.2.2.2.2.2.2.2.2.1]
+     rintro hm
+     obtain ⟨other,hm,he⟩ := List.mem_map.mp hm
+     have hother := ProofHelpers.live_custody s hr other (hwi other hm)
+     have hout' := ProofHelpers.live_custody s hr out ho
+     exact hi ((ProofHelpers.same_token_eq other out ⟨hother.1,hother.2.1⟩ ⟨hout'.1,hout'.2.1⟩ he) ▸ hm)
+   have hw' := ProofHelpers.run_keeps_witness ha.2.2.2.2.1 out.token.key out.token.data (hc ▸ hw) hp
+   refine ⟨List.mem_append_left _ (List.mem_filter.mpr ⟨ho,by simpa using hi⟩),hw'.trans hw.symm,?_,?_⟩
+   · exact (ProofHelpers.witness_logical hw').trans (ProofHelpers.witness_logical hw).symm
+   · intro tx' he; cases he; exact ⟨hi,hb'⟩
 
 /-- D48: plain same-value set and already-absent unset retain the complete encoded tree. -/
 theorem plain_noop_preserves_witness (c : CageState) (o : RequestOutput) (e : Selection) :
@@ -2115,7 +2206,20 @@ theorem witness_deposit_lock (s s' : State) (a : Action) (out : WitnessOutput) :
  event ∈ itemWitnessEvents (atTurn tx n) i ∧ event.key = out.token.key ∧
  event.consumed = some out ∧ out.token ∈ tx.witnessBurned ∧
  ⟨out.token.data.refund,"",out.token.data.deposit⟩ ∈ itemWitnessRefunds (atTurn tx n) i ∧
- ⟨out.token.data.refund,"",out.token.data.deposit⟩ ∈ tx.payments := by sorry
+ ⟨out.token.data.refund,"",out.token.data.deposit⟩ ∈ tx.payments := by
+ intro _ hs ho hexit
+ cases hs <;> try { rcases hexit with hn | ⟨tx,h,hi⟩; exact False.elim (hn ho); cases h }
+ case fold tx hc hl hcl href ha hex hw =>
+   have hi : out ∈ tx.witnessInputs := by
+     rcases hexit with hn | ⟨tx',he,hi⟩
+     · apply Classical.byContradiction
+       intro hi
+       apply hn
+       exact List.mem_append_left _ (List.mem_filter.mpr ⟨ho,by simpa using hi⟩)
+     · cases he; exact hi
+   obtain ⟨n,o,e,event,hidx,hkey,hchange,he,hkey',hcons,hburn,hrefund,hpay⟩ :=
+     ProofHelpers.fold_input_consumed tx out ha hi
+   exact ⟨tx,n,.write o e,event,rfl,hidx,hchange,he,hkey',hcons,hburn,hrefund,hpay⟩
 
 /-- D51: witnessing blind writes expose the sole additional tree-sensitive refusal. -/
 theorem witnessing_blind_write_availability (c : CageState) (iv : Interval) (refs : List TokenName)
