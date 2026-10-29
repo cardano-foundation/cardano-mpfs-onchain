@@ -9,9 +9,7 @@ This records the design decisions taken from 24 to 27 October 2026, after the
 Singular investigation in which the request lifecycle belongs to the
 application (lambdasistemi/singular#731, #741). Each decision says what was
 decided and why. The Lean model under `lean/MpfsCage/RequestApprovalFold/`
-states this record, except the decisions of 27 October (oracle identities,
-fees accumulated in the registry state, complete accounts and claims as fold items),
-which it does not model yet.
+states this record, with oracle identities from `lean/MpfsCage/OracleIdentity/`.
 
 ## Roles
 
