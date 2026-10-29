@@ -1,24 +1,30 @@
-# Durable witnesses: proof candidate (#128)
+# Registry model with durable witnesses: theorem and atom ledgers (#128)
 
-Status: **PROOF-COMPLETE CANDIDATE — 199/199 public theorems PROVED;
-zero OPEN or REFUTED.** PROOFS mode was authorized by NOTE-010 after the parent
-accepted the third independent statement audit. The model and all 199 public
-elaborated types remain frozen at cbf8f3ed629d58fd32f30706ef444388ccf291d3.
+Status: **199 PROVED, 0 OPEN, 0 REFUTED, at commit 1bded8e.** The model and
+all 199 public elaborated types are frozen at
+cbf8f3ed629d58fd32f30706ef444388ccf291d3, the statements accepted by the third
+independent statement audit.
+
+An independent proof audit of 323e6e3 passed: the 199 elaborated types and
+their dependency closures are byte-identical to cbf8f3e; `Model.lean`,
+`Witnesses.lean` and `DurableWitnesses.lean` are unchanged; a fresh kernel
+replay with `leanchecker` passes, with a planted false theorem rejected as
+control; no escape hatch is present; all 4011 constants use only `propext`,
+`Classical.choice` and `Quot.sound`; and the proofs of the witness bijection,
+burn on value change, durability, deposit lock, custody, conservation,
+extraction terminality, event order and fold payments were read and applied
+to reachable examples.
 
 Proof-source commit: `1bded8e5571f40d49b85ae4ee6962f3f12301f5c`. Every row below binds to that commit.
 All 106 helper theorems, 6 helper definitions and 677 witness/support declarations
 use only propext, Classical.choice and Quot.sound (or no axioms). The full local
-build passes 26 jobs, with zero source admissions. The 17 formerly OPEN public
-rows are now proved, including their transitive dependencies.
+build passes 26 jobs, with zero source admissions.
 
 The proof establishes a sequential witness inventory, fresh issuance references,
 and equality between sequential processing and the net external witness boundary.
 Distinct produced and consumed outputs justify cancellation of intermediate
 witnesses while retaining their refunds. Trace uniqueness uses the actual
 creation events and monotone spent-seed history.
-
-This is creator evidence. No push, hosted CI, independent proof acceptance,
-implementation conformance or merge is claimed.
 
 Statement-audit history:
 
@@ -31,7 +37,7 @@ Statement-audit history:
   cbf8f3e added the independent indexed order statement D57 and reachable DW57,
   killed the exact reversal mutant, corrected the listed ledger attributions,
   recorded the presence interpretation and removed unused unwitnessedTree.
-- Audit 3 of cbf8f3e returned READY-TO-PROVE; NOTE-010 records parent acceptance.
+- Audit 3 of cbf8f3e returned READY-TO-PROVE, accepted before proof work.
   It replayed the campaign in fresh single-writer trees: 199/199 theorem rows
   killed, all 75 guards across 16 constructors covered, and 300/301 ledger atoms
   killed with A091 proved equivalent. Its 301 includes the four MA supplements
@@ -51,18 +57,19 @@ The durable-witness decisions take precedence over the earlier no-per-key-token
 rule. OracleIdentity is imported unchanged. The 28 October money and interval
 rulings in the request-approval-fold ledger remain in force.
 
-A ruling of 29 October on deposits and witnesses inside one fold fixes the
-interpretations below. A-001 is qualified by A-002 and **NOTE-001**, the operator's
-correction that extraction is an ordinarily paid request. NOTE-002/003 impose
-value-change-only burning and issuer deposit lock. A-003, reaffirmed by NOTE-006,
-uses per-item changes. NOTE-005 is withdrawn entirely; NOTE-004 is closed:
+Rulings of 29 October fix the interpretations below: extraction is an
+ordinary request, paying the folder its remainder and covering the ledger
+minimum, plus a separate deposit; a witness is burned only by a fold item that
+changes its key's value; the issuer has no exit and the deposit is locked
+until that change; items apply in order, so a round trip inside one fold
+burns at its first change:
 
 
 - Each witness binds the exact value or absence, refund address, deposit and
   issuance request output reference in the tree entry. Its deposit is at least
   the registry minimum. A plain absent key has no entry. Presence is a consumer
-  observation of an exact-value witness. NOTE-009 confirms that extraction
-  commits to the named exact value: no value-agnostic presence request exists.
+  observation of an exact-value witness. The decision has extraction
+  commit to the named exact value: no value-agnostic presence request exists.
   Any change of that value consumes the witness, including when both values
   are present. A plain same-value set or an unset of an
   already absent key preserves the entry, output, token and deposit unchanged.
@@ -135,7 +142,7 @@ Historical uniqueness additionally has D44 over the exact reachable Trace;
 T08 remains the stronger standalone SpentOnce algebra lemma. No free history is
 used as provenance for a claim or witness in the reachable machine.
 
-ProofHelpers contains 52 proved internal lemmas. NOTE-010 permits their
+ProofHelpers contains 52 proved internal lemmas. The proof rules permit their
 reorganization while freezing the public surface. The accepted 33 helper types
 are retained in the historical freeze below; the current complete helper/type
 inventory and axiom receipts are in evidence/proofs under the creator runtime.
@@ -724,7 +731,7 @@ independent semantic audit. The exact old/new pairs are retained at
 | registry_creation | Expose empty encoded tree as well as empty logical tree. |
 | fold_pays_and_keeps_rest | Keep the exact fee/remainder account and include separately mandated witness refunds. |
 | allocation_conserves_value | Escrow now includes the separate request deposit; allocation still accounts for every unit. |
-| blind_write_folds_on_any_tree | A-003/NOTE-006: preserve universal ordinary-write availability; witnessing generalization is D51 and exposes its new refusal guard. |
+| blind_write_folds_on_any_tree | Per-item burn ruling: preserve universal ordinary-write availability; witnessing generalization is D51 and exposes its new refusal guard. |
 | account_complete_and_pays | Return the unused witnessing deposit separately to the request owner. |
 | withdraw_only_owner_after_window | Whole escrow includes the unused deposit; time and authorization unchanged. |
 | owner_can_withdraw_everything | Construct the withdrawal paying the complete escrow. |
@@ -732,7 +739,7 @@ independent semantic audit. The exact old/new pairs are retained at
 | account_payments_concrete | Retain owner remainder and add the unused deposit. |
 | fold_requests_unique | Include extraction references in the combined distinct-input obligation. |
 | every_rule_allows_burn | Expose all new fold constructor guards including combined extraction reference uniqueness, witness boundary and live-input checks; do not re-run rule admission. |
-| zero_oracle_fold_without_approvals | Expose witnessWriteAllowed under NOTE-002/A-003/NOTE-006; ordinary zero-oracle writes retain their original availability and require no approvals. |
+| zero_oracle_fold_without_approvals | Expose witnessWriteAllowed under the value-change burn ruling; ordinary zero-oracle writes retain their original availability and require no approvals. |
 | empty_fold_allowed | Populate the canonical empty witness boundary. |
 | fold_value_conservation | Include deposits entering and leaving the full registry/request/witness boundary. |
 | fold_request_conservation | Include funded request deposits separately from fees and remainders. |
@@ -751,7 +758,7 @@ D09 pins every witness-boundary equality; D43 pins authentic live inputs.
 
 | Ruling or edge | Kernel-checked reachable scenario | Statement obligations |
 |---|---|---|
-| Paid extraction and two independent minimums (NOTE-001) | paid_extraction; underfunded_refused | D12, D14, D25-D27, T116-T119 |
+| Paid extraction and two independent minimums (extraction is a paid request) | paid_extraction; underfunded_refused | D12, D14, D25-D27, T116-T119 |
 | Rule/oracle bypass despite a rejecting rule and nonempty oracle list | bypasses_rule_and_oracles; DW15; DW16 | D15-D16 |
 | Same-value plain set retains output, token and deposit | same_effect; DW47; DW48 | D46-D48 |
 | Unset of witnessed absence keeps it | absentNoop_effect | D46-D48 |
@@ -759,7 +766,7 @@ D09 pins every witness-boundary equality; D43 pins authentic live inputs.
 | Its unminted deposit returns by account or withdrawal; existing witness stays locked | refused_exits_preserve | D33, D47, D50; ordinary exits |
 | A later intra-fold no-op keeps the earlier witness | intrafold_noop_keeps | D46, D48 |
 | A later value change burns an intermediate witness and refunds its issuer | transient_effect; DW21; DW35 | D21, D35, D46 |
-| Round trip v -> w -> v burns on the first item (A-003, NOTE-006) | roundtrip_burn | D10, D42, D46, D50; outside D47's premise |
+| Round trip v -> w -> v burns on the first item (per-item burn ruling) | roundtrip_burn | D10, D42, D46, D50; outside D47's premise |
 | Refund without issuer or refund-address authorization | refund_without_issuer_signature | T109, D50 |
 
 Names in this table are in RequestApprovalFold.DurableWitnesses. These stories
