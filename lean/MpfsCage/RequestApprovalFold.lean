@@ -1,2 +1,3 @@
 import MpfsCage.RequestApprovalFold.Statements
 import MpfsCage.RequestApprovalFold.Witnesses
+import MpfsCage.RequestApprovalFold.DurableWitnesses

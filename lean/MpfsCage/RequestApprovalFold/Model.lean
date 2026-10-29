@@ -12,6 +12,10 @@ Names are structured collision-free preimages, not a cryptographic theorem.
 Rule predicates, trie functions, signature verification, authenticated UTxOs,
 spent-once seeds and sound trie proofs remain abstract ledger boundaries.
 Executable codecs/driver/corpus remain #109, by A-001. No progress is promised.
+Durable-witness rulings: A-001/A-002 and NOTE-001 fund extraction normally;
+NOTE-002/003 require value-change burns and lock live deposits. A-003, reaffirmed
+by NOTE-006 (with NOTE-005 withdrawn), measures changes per item, including
+round trips. The issuer has no separate witness exit or signature privilege.
 -/
 namespace RequestApprovalFold
 
@@ -62,6 +66,55 @@ def applyAll (t : Trie) : List Write → Trie
   | [] => t
   | w :: ws => applyAll (w.apply t) ws
 
+structure WitnessSpec where
+  refund : String
+  deposit : Nat
+  deriving DecidableEq, Repr
+
+structure WitnessData where
+  fact : Option Val
+  refund : String
+  deposit : Nat
+  issuance : OutputRef
+  deriving DecidableEq, Repr
+
+inductive Entry where
+  | value (value : Val)
+  | witnessed (witness : WitnessData)
+  deriving DecidableEq, Repr
+
+abbrev EntryTree := Key → Option Entry
+
+def emptyEntries : EntryTree := fun _ => none
+
+def Entry.logical : Entry → Option Val
+  | .value v => some v
+  | .witnessed w => w.fact
+
+def logicalTree (tree : EntryTree) : Trie := fun k => (tree k).bind Entry.logical
+
+def stripWitnesses (tree : EntryTree) : EntryTree :=
+  fun k => (logicalTree tree k).map Entry.value
+
+def witnessAt (tree : EntryTree) (k : Key) : Option WitnessData :=
+  match tree k with | some (.witnessed w) => some w | _ => none
+
+def Write.key : Write → Key
+  | .set k _ | .unset k => k
+
+def Write.value : Write → Option Val
+  | .set _ v => some v
+  | .unset _ => none
+
+def writeEntry (w : Write) (spec : Option WitnessSpec) (issuance : OutputRef) : Option Entry :=
+  match w, spec with
+  | .set _ v, some spec => some (.witnessed ⟨some v, spec.refund, spec.deposit, issuance⟩)
+  | .set _ v, none => some (.value v)
+  | .unset _, _ => none
+
+def putEntry (tree : EntryTree) (key : Key) (entry : Option Entry) : EntryTree :=
+  fun k => if k = key then entry else tree k
+
 structure Request where
   cage : CageId
   owner : Signer
@@ -72,7 +125,15 @@ structure Request where
   fees : List (Oracle × Nat)
   deadline : Time
   window : Nat
+  witnessing : Option WitnessSpec := none
   deriving DecidableEq, Repr
+
+def Request.deposit (r : Request) : Nat := (r.witnessing.map WitnessSpec.deposit).getD 0
+
+def Request.witnessValid (r : Request) (minimum : Nat) : Prop :=
+  match r.witnessing with
+  | none => True
+  | some w => minimum ≤ w.deposit ∧ ∃ k v, r.write = .set k v
 
 def Request.fee (r : Request) (oracle : Oracle) : Nat :=
   ((r.fees.find? (fun p => p.1 == oracle)).map Prod.snd).getD 0
@@ -85,11 +146,22 @@ structure CageState where
   id : CageId
   oracles : List Oracle
   protocol : String
-  trie : Trie
+  tree : EntryTree
   rule : Option Rule := none
   balances : Signer → Nat := fun _ => 0
   value : Nat := 0
   minimum : Nat := 1
+
+def CageState.trie (c : CageState) : Trie := logicalTree c.tree
+
+/-- A witnessing no-op cannot replace an already live witness (NOTE-002). -/
+def witnessWriteAllowed (c : CageState) (r : Request) : Prop :=
+  r.witnessing = none ∨ witnessAt c.tree r.write.key = none ∨
+  c.trie r.write.key ≠ r.write.value
+
+/-- The registry script address is a ledger boundary shared by registry states
+and individual witness outputs, not the witness issuer's wallet. -/
+def registryAddress : String := "registry-state-script"
 
 def registryKeys (c : CageState) : List Signer :=
   (c.oracles.flatMap fun o => OracleIdentity.keys o.description).eraseDups
@@ -103,7 +175,7 @@ def Backed (c : CageState) : Prop :=
   c.value = balanceSum c ∧ ∀ k, k ∉ registryKeys c → c.balances k = 0
 
 def registryCreated (c : CageState) (existing : List CageId) : Prop :=
-  c.id ∉ existing ∧ RegistryValid c ∧ c.trie = emptyTrie ∧
+  c.id ∉ existing ∧ RegistryValid c ∧ c.tree = emptyEntries ∧
   c.balances = (fun _ => 0) ∧ c.value = 0
 
 def SameRegistry (a b : CageState) : Prop :=
@@ -163,7 +235,43 @@ def totalFees (c : CageState) (r : Request) : Nat := (c.oracles.map r.fee).sum
 def wellFormed (c : CageState) (o : RequestOutput) : Prop :=
   o.request.cage = c.id ∧ o.tags = c.oracles.map tagName ∧
   totalFees c o.request + c.minimum ≤ o.value ∧
-  o.requestTokens = [requestName c.id] ∧ o.policy = requestPolicy c
+  o.requestTokens = [requestName c.id] ∧ o.policy = requestPolicy c ∧
+  o.request.witnessValid c.minimum
+
+/-- The fee/remainder account stays separate from the deposit escrow. -/
+def RequestOutput.escrow (o : RequestOutput) : Nat := o.value + o.request.deposit
+
+structure Extraction where
+  cage : CageId
+  owner : Signer
+  key : Key
+  wanted : Option Val
+  witness : WitnessSpec
+  value : Nat
+  deadline : Time
+  window : Nat
+  ref : OutputRef
+  tokens : List TokenName
+  policy : RequestPolicy
+  deriving DecidableEq, Repr
+
+def Extraction.escrow (o : Extraction) : Nat := o.value + o.witness.deposit
+
+def Extraction.data (o : Extraction) : WitnessData :=
+  ⟨o.wanted, o.witness.refund, o.witness.deposit, o.ref⟩
+
+def extractionWellFormed (c : CageState) (o : Extraction) : Prop :=
+  o.cage = c.id ∧ c.minimum ≤ o.witness.deposit ∧
+  o.tokens = [requestName c.id] ∧ o.policy = .release ∧ c.minimum ≤ o.value
+
+structure ExtractionCreateTx where
+  cageRef : CageState
+  output : Extraction
+  minted : List TokenName
+  signers : List Signer
+
+def extractionCreateAllowed (tx : ExtractionCreateTx) : Prop :=
+  extractionWellFormed tx.cageRef tx.output ∧ tx.minted = tx.output.tokens
 
 structure CreateTx where
   spent : List OutputRef
@@ -269,22 +377,58 @@ def totalPaid (ps : List Payment) : Nat := (ps.map Payment.amount).sum
 
 def remainder (c : CageState) (o : RequestOutput) : Nat := o.value - totalFees c o.request
 
+structure WitnessToken where
+  cage : CageId
+  key : Key
+  data : WitnessData
+  deriving DecidableEq, Repr
+
+structure WitnessOutput where
+  token : WitnessToken
+  address : String
+  value : Nat
+  deriving DecidableEq, Repr
+
+def witnessOutput (c : CageId) (k : Key) (w : WitnessData) : WitnessOutput :=
+  ⟨⟨c, k, w⟩, registryAddress, w.deposit⟩
+
+/-- Each event explicitly supplies the authenticated entry at its turn. The
+abstract equality check represents sound tree-proof verification. -/
+structure WitnessEvent where
+  key : Key
+  provedEntry : Option Entry
+  consumed : Option WitnessOutput
+  produced : Option WitnessOutput
+  deriving DecidableEq, Repr
+
 inductive FoldItem where
   | write (input : RequestOutput) (selected : Selection)
   | account (input : RequestOutput) (selected : Selection)
   | claim (input : ClaimOutput)
+  | extract (input : Extraction)
+  | extractAccount (input : Extraction)
 
 def FoldItem.request : FoldItem → Option RequestOutput
   | .write o _ | .account o _ => some o
-  | .claim _ => none
+  | _ => none
 
 def FoldItem.claimInput : FoldItem → Option ClaimOutput
   | .claim o => some o
   | _ => none
 
+def FoldItem.extraction : FoldItem → Option Extraction
+  | .extract o | .extractAccount o => some o
+  | _ => none
+
+def FoldItem.entryKey : FoldItem → Option Key
+  | .write o _ => some o.request.write.key
+  | .extract o => some o.key
+  | _ => none
+
 def FoldItem.burned : FoldItem → List TokenName
   | .write o _ | .account o _ => tokensOf o
   | .claim o => o.tokens
+  | .extract o | .extractAccount o => o.tokens
 
 def FoldItem.writes : FoldItem → List Write
   | .write o _ => [o.request.write]
@@ -292,22 +436,52 @@ def FoldItem.writes : FoldItem → List Write
 
 def itemCredits (c : CageState) : FoldItem → List OracleIdentity.Payment
   | .write o e | .account o e => credits c o.request e
-  | .claim _ => []
+  | _ => []
+
+/-- Plain no-op writes keep the complete entry, including its witness. -/
+def writeTree (c : CageState) (o : RequestOutput) : EntryTree :=
+  if o.request.witnessing = none ∧ c.trie o.request.write.key = o.request.write.value
+  then c.tree
+  else putEntry c.tree o.request.write.key (writeEntry o.request.write o.request.witnessing o.ref)
 
 def itemResult (c : CageState) : FoldItem → CageState
-  | .write o e => { credit c (credits c o.request e) with trie := o.request.write.apply c.trie }
+  | .write o e => { credit c (credits c o.request e) with
+      tree := writeTree c o }
   | .account o e => credit c (credits c o.request e)
   | .claim o => { c with
       balances := fun k => if k = o.key then 0 else c.balances k
       value := c.value - c.balances o.key }
+  | .extract o => { c with tree := putEntry c.tree o.key (some (.witnessed o.data)) }
+  | .extractAccount _ => c
+
+def itemWitnessEvents (c : CageState) (i : FoldItem) : List WitnessEvent :=
+  match i.entryKey with
+  | none => []
+  | some k =>
+    let old := (witnessAt c.tree k).map (witnessOutput c.id k)
+    let fresh := (witnessAt (itemResult c i).tree k).map (witnessOutput c.id k)
+    if old = fresh then [] else [⟨k, c.tree k, old, fresh⟩]
+
+def itemWitnessRefunds (c : CageState) (i : FoldItem) : List Payment :=
+  (itemWitnessEvents c i).filterMap fun event =>
+    event.consumed.map fun w => ⟨w.token.data.refund, "", w.value⟩
+
+def unusedDepositPayments (o : RequestOutput) : List Payment :=
+  match o.request.witnessing with
+  | none => []
+  | some spec => [⟨o.request.owner, "", spec.deposit⟩]
 
 def itemPayments (c : CageState) (folder : Signer) : FoldItem → List Payment
-  | .write o _ => [⟨folder, "", remainder c o⟩]
-  | .account o _ => [⟨o.request.owner, "", remainder c o⟩]
+  | .write o e => [⟨folder, "", remainder c o⟩] ++ itemWitnessRefunds c (.write o e)
+  | .account o _ => [⟨o.request.owner, "", remainder c o⟩] ++
+      unusedDepositPayments o
   | .claim o => [⟨o.destination, o.datum, c.balances o.key⟩, ⟨folder, "", o.value⟩]
+  | .extract o => [⟨folder, "", o.value⟩]
+  | .extractAccount o => [⟨o.owner, "", o.value⟩, ⟨o.owner, "", o.witness.deposit⟩]
 
 def stepValid (c : CageState) (interval : Interval) (refs : List TokenName)
     (signers : List Signer) (selected : Selection) (o : RequestOutput) : Prop :=
+  witnessWriteAllowed c o.request ∧
   wellFormed c o ∧ interval.valid ∧ interval.upper < o.request.deadline ∧
   hasApproval c o.request refs signers selected ∧
   (∀ condition ∈ o.request.conditions, condition.holds c.trie) ∧
@@ -322,11 +496,21 @@ def claimAllowed (c : CageState) (interval : Interval) (o : ClaimOutput) : Prop 
   o.cage = c.id ∧ o.key ∈ registryKeys c ∧ o.tokens = [claimName c.id] ∧
   interval.valid ∧ interval.upper < o.deadline ∧ c.minimum ≤ c.balances o.key
 
+def extractionAllowed (c : CageState) (interval : Interval) (o : Extraction) : Prop :=
+  extractionWellFormed c o ∧ interval.valid ∧ interval.upper < o.deadline ∧
+  witnessAt c.tree o.key = none ∧ c.trie o.key = o.wanted
+
+def extractionAccountAllowed (c : CageState) (interval : Interval) (o : Extraction) : Prop :=
+  extractionWellFormed c o ∧ interval.valid ∧ o.deadline ≤ interval.lower ∧
+  interval.upper ≤ o.deadline + o.window
+
 def itemAllowed (c : CageState) (interval : Interval) (refs : List TokenName)
     (signers : List Signer) : FoldItem → Prop
   | .write o e => stepValid c interval refs signers e o
   | .account o e => accountAllowed c interval refs o e
   | .claim o => claimAllowed c interval o
+  | .extract o => extractionAllowed c interval o
+  | .extractAccount o => extractionAccountAllowed c interval o
 
 /-- Ordered effects and guards use exactly the state left by the previous item. -/
 def foldResult (c : CageState) : List FoldItem → CageState
@@ -345,6 +529,19 @@ inductive FoldRun (interval : Interval) (refs : List TokenName) (signers : List 
       FoldRun interval refs signers (itemResult c item) items out →
       FoldRun interval refs signers c (item :: items) out
 
+def foldWitnessEvents (c : CageState) : List FoldItem → List WitnessEvent
+  | [] => []
+  | i :: items => itemWitnessEvents c i ++ foldWitnessEvents (itemResult c i) items
+
+/-- Intermediate issuance is cancelled at the transaction boundary. -/
+def externalWitnessInputs (events : List WitnessEvent) : List WitnessOutput :=
+  let produced := events.filterMap WitnessEvent.produced
+  (events.filterMap WitnessEvent.consumed).filter fun w => w ∉ produced
+
+def externalWitnessOutputs (events : List WitnessEvent) : List WitnessOutput :=
+  let consumed := events.filterMap WitnessEvent.consumed
+  (events.filterMap WitnessEvent.produced).filter fun w => w ∉ consumed
+
 structure FoldTx where
   cageIn : CageState
   cageOut : CageState
@@ -356,16 +553,31 @@ structure FoldTx where
   submitter : Signer
   burned : List TokenName
   payments : List Payment
+  witnessEvents : List WitnessEvent := []
+  witnessInputs : List WitnessOutput := []
+  witnessOutputs : List WitnessOutput := []
+  witnessBurned : List WitnessToken := []
+  witnessMinted : List WitnessToken := []
 
 def FoldTx.requests (tx : FoldTx) := tx.items.filterMap FoldItem.request
 
 def FoldTx.claims (tx : FoldTx) := tx.items.filterMap FoldItem.claimInput
 
+def FoldTx.extractions (tx : FoldTx) := tx.items.filterMap FoldItem.extraction
+
+def witnessBoundary (tx : FoldTx) : Prop :=
+  tx.witnessEvents = foldWitnessEvents tx.cageIn tx.items ∧
+  tx.witnessInputs = externalWitnessInputs tx.witnessEvents ∧
+  tx.witnessOutputs = externalWitnessOutputs tx.witnessEvents ∧
+  tx.witnessBurned = tx.witnessInputs.map WitnessOutput.token ∧
+  tx.witnessMinted = tx.witnessOutputs.map WitnessOutput.token
+
 def foldAccepted (tx : FoldTx) : Prop :=
-  tx.interval.valid ∧ (tx.requests.map RequestOutput.ref ++ tx.claims.map ClaimOutput.ref).Nodup ∧
+  tx.interval.valid ∧ (tx.requests.map RequestOutput.ref ++ tx.claims.map ClaimOutput.ref ++
+    tx.extractions.map Extraction.ref).Nodup ∧
   tx.burned = tx.items.flatMap FoldItem.burned ∧
   tx.payments = foldPayments tx.cageIn tx.folder tx.items ∧
-  FoldRun tx.interval tx.refs tx.signers tx.cageIn tx.items tx.cageOut
+  FoldRun tx.interval tx.refs tx.signers tx.cageIn tx.items tx.cageOut ∧ witnessBoundary tx
 
 structure WithdrawTx where
   input : RequestOutput
@@ -378,7 +590,7 @@ structure WithdrawTx where
 def withdrawAllowed (tx : WithdrawTx) : Prop :=
   tx.interval.valid ∧ tx.input.request.deadline + tx.input.request.window < tx.interval.lower ∧
   tx.input.request.owner ∈ tx.signers ∧ tx.burned = tokensOf tx.input ∧
-  tx.beneficiary = tx.input.request.owner ∧ tx.paid = tx.input.value
+  tx.beneficiary = tx.input.request.owner ∧ tx.paid = tx.input.escrow
 
 structure ClaimWithdrawTx where
   input : ClaimOutput
@@ -391,6 +603,19 @@ structure ClaimWithdrawTx where
 def claimWithdrawAllowed (tx : ClaimWithdrawTx) : Prop :=
   tx.interval.valid ∧ tx.input.deadline ≤ tx.interval.lower ∧ tx.input.key ∈ tx.signers ∧
   tx.burned = tx.input.tokens ∧ tx.beneficiary = tx.input.key ∧ tx.paid = tx.input.value
+
+structure ExtractionWithdrawTx where
+  input : Extraction
+  interval : Interval
+  signers : List Signer
+  burned : List TokenName
+  beneficiary : Signer
+  paid : Nat
+
+def extractionWithdrawAllowed (tx : ExtractionWithdrawTx) : Prop :=
+  tx.interval.valid ∧ tx.input.deadline + tx.input.window < tx.interval.lower ∧
+  tx.input.owner ∈ tx.signers ∧ tx.burned = tx.input.tokens ∧
+  tx.beneficiary = tx.input.owner ∧ tx.paid = tx.input.escrow
 
 inductive RequestSpend where
   | folded (tx : FoldTx)
@@ -450,8 +675,10 @@ structure State where
   notices : List PriceNotice
   usedOutputs : List OutputRef
   claims : List ClaimOutput
+  extractions : List Extraction := []
+  witnesses : List WitnessOutput := []
 
-def initial (c : CageState) : State := ⟨c, [], [], [], [], [], [], []⟩
+def initial (c : CageState) : State := ⟨c, [], [], [], [], [], [], [], [], []⟩
 def removeRequests (live spent : List RequestOutput) := live.filter (fun o => o ∉ spent)
 def afterCreate (s : State) (tx : CreateTx) (o : RequestOutput) : State :=
   { s with usedSeeds := tx.spent ++ s.usedSeeds, live := o :: s.live, usedOutputs := o.ref :: s.usedOutputs }
@@ -459,7 +686,9 @@ def afterJudgment (s : State) (tx : JudgmentTx) : State :=
   { s with judgments := tx.minted ++ s.judgments, issued := tx.minted ++ s.issued }
 def afterFold (s : State) (tx : FoldTx) : State :=
   { s with cage := tx.cageOut, live := removeRequests s.live tx.requests
-           claims := s.claims.filter (fun o => o ∉ tx.claims) }
+           claims := s.claims.filter (fun o => o ∉ tx.claims)
+           extractions := s.extractions.filter (fun o => o ∉ tx.extractions)
+           witnesses := s.witnesses.filter (fun o => o ∉ tx.witnessInputs) ++ tx.witnessOutputs }
 def afterExit (s : State) (o : RequestOutput) : State :=
   { s with live := removeRequests s.live [o] }
 def afterBurn (s : State) (name : TokenName) : State :=
@@ -472,6 +701,11 @@ def afterClaimCreate (s : State) (tx : ClaimCreateTx) : State :=
   { s with claims := tx.output :: s.claims, usedOutputs := tx.output.ref :: s.usedOutputs }
 def afterClaimWithdraw (s : State) (tx : ClaimWithdrawTx) : State :=
   { s with claims := s.claims.erase tx.input }
+
+def afterExtractionCreate (s : State) (tx : ExtractionCreateTx) : State :=
+  { s with extractions := tx.output :: s.extractions, usedOutputs := tx.output.ref :: s.usedOutputs }
+def afterExtractionWithdraw (s : State) (tx : ExtractionWithdrawTx) : State :=
+  { s with extractions := s.extractions.erase tx.input }
 
 def discover (oracle : Oracle) (outputs : List RequestOutput) : List RequestOutput :=
   outputs.filter (fun o => tagName oracle ∈ o.tags)
@@ -495,6 +729,8 @@ inductive Action where
   | priceUpdate (tx : PriceUpdateTx)
   | claimCreate (tx : ClaimCreateTx)
   | claimWithdraw (tx : ClaimWithdrawTx)
+  | extractionCreate (tx : ExtractionCreateTx)
+  | extractionWithdraw (tx : ExtractionWithdrawTx)
 
 def Action.spend : Action → Option RequestSpend
   | .fold tx => some (.folded tx)
@@ -505,6 +741,7 @@ def Action.payments : Action → List Payment
   | .fold tx => tx.payments
   | .withdraw tx => [⟨tx.beneficiary, "", tx.paid⟩]
   | .claimWithdraw tx => [⟨tx.beneficiary, "", tx.paid⟩]
+  | .extractionWithdraw tx => [⟨tx.beneficiary, "", tx.paid⟩]
   | _ => []
 
 def Action.isPrice : Action → Bool
@@ -522,7 +759,9 @@ inductive Step : State → Action → State → Prop where
   | fold (s : State) (tx : FoldTx) :
       tx.cageIn = s.cage → (∀ o ∈ tx.requests, o ∈ s.live) →
       (∀ o ∈ tx.claims, o ∈ s.claims) → (∀ name ∈ tx.refs, name ∈ s.judgments) →
-      foldAccepted tx → Step s (.fold tx) (afterFold s tx)
+      foldAccepted tx → (∀ o ∈ tx.extractions, o ∈ s.extractions) →
+      (∀ w ∈ tx.witnessInputs, w ∈ s.witnesses) →
+      Step s (.fold tx) (afterFold s tx)
   | withdraw (s : State) (tx : WithdrawTx) :
       tx.input ∈ s.live → withdrawAllowed tx → Step s (.withdraw tx) (afterExit s tx.input)
   | burn (s : State) (name : TokenName) :
@@ -537,6 +776,13 @@ inductive Step : State → Action → State → Prop where
   | claimWithdraw (s : State) (tx : ClaimWithdrawTx) :
       tx.input ∈ s.claims → claimWithdrawAllowed tx →
       Step s (.claimWithdraw tx) (afterClaimWithdraw s tx)
+
+  | extractionCreate (s : State) (tx : ExtractionCreateTx) :
+      tx.cageRef = s.cage → extractionCreateAllowed tx → tx.output.ref ∉ s.usedOutputs →
+      Step s (.extractionCreate tx) (afterExtractionCreate s tx)
+  | extractionWithdraw (s : State) (tx : ExtractionWithdrawTx) :
+      tx.input ∈ s.extractions → extractionWithdrawAllowed tx →
+      Step s (.extractionWithdraw tx) (afterExtractionWithdraw s tx)
 
 inductive Reachable : State → Prop where
   | registry (c : CageState) (existing : List CageId) :
@@ -574,8 +820,18 @@ def OldOperation.apply (op : OldOperation) (t : Trie) : Trie :=
 
 /-- Boundary observations for the relational fold; none are validity premises. -/
 def atTurn (tx : FoldTx) (n : Nat) : CageState := foldResult tx.cageIn (tx.items.take n)
+
+/-- Value change is measured at the item, not only at the batch endpoints. -/
+def itemChanges (c : CageState) (i : FoldItem) (k : Key) : Prop :=
+  (itemResult c i).trie k ≠ c.trie k
+
+def actionPreservesKey (a : Action) (k : Key) : Prop :=
+  match a with
+  | .fold tx => ∀ n i, tx.items[n]? = some i → ¬ itemChanges (atTurn tx n) i k
+  | _ => True
 def requestEscrows (items : List FoldItem) : Nat :=
-  ((items.filterMap FoldItem.request).map RequestOutput.value).sum
+  ((items.filterMap FoldItem.request).map RequestOutput.escrow).sum +
+  ((items.filterMap FoldItem.extraction).map Extraction.escrow).sum
 def claimEscrows (items : List FoldItem) : Nat :=
   ((items.filterMap FoldItem.claimInput).map ClaimOutput.value).sum
 def grossCredits (c : CageState) : List FoldItem → Nat
@@ -583,7 +839,10 @@ def grossCredits (c : CageState) : List FoldItem → Nat
   | i :: items => OracleIdentity.totalPaid (itemCredits c i) + grossCredits (itemResult c i) items
 def requestRemainders (c : CageState) : List FoldItem → Nat
   | [] => 0
-  | i :: items => (match i.request with | some o => remainder c o | none => 0) +
+  | i :: items => (match i with
+    | .write o _ | .account o _ => remainder c o
+    | .extract o | .extractAccount o => o.value
+    | .claim _ => 0) +
       requestRemainders (itemResult c i) items
 def claimPayouts (c : CageState) : List FoldItem → Nat
   | [] => 0
@@ -612,9 +871,74 @@ def exitAt (o : RequestOutput) (interval : Interval) : ExitKind → Prop
       interval.upper ≤ o.request.deadline + o.request.window
   | .withdraw => interval.valid ∧ o.request.deadline + o.request.window < interval.lower
 
+def witnessValue (outputs : List WitnessOutput) : Nat :=
+  (outputs.map WitnessOutput.value).sum
+
+def requestDepositInputs (items : List FoldItem) : Nat :=
+  ((items.filterMap FoldItem.request).map fun o => o.request.deposit).sum +
+  ((items.filterMap FoldItem.extraction).map fun o => o.witness.deposit).sum
+
+def unusedDepositRefunds (items : List FoldItem) : Nat :=
+  (items.map fun i => match i with
+    | .account o _ => o.request.deposit
+    | .extractAccount o => o.witness.deposit
+    | _ => 0).sum
+
+def witnessRefundTotal (c : CageState) (items : List FoldItem) : Nat :=
+  witnessValue ((foldWitnessEvents c items).filterMap WitnessEvent.consumed)
+
+def WitnessBacked (s : State) : Prop :=
+  s.witnesses.Nodup ∧
+  (∀ k w, witnessAt s.cage.tree k = some w ↔ witnessOutput s.cage.id k w ∈ s.witnesses) ∧
+  (∀ out ∈ s.witnesses, out = witnessOutput s.cage.id out.token.key out.token.data)
+
+def withWitnessBoundary (tx : FoldTx) : FoldTx :=
+  let events := foldWitnessEvents tx.cageIn tx.items
+  let inputs := externalWitnessInputs events
+  let outputs := externalWitnessOutputs events
+  { tx with
+    witnessEvents := events
+    witnessInputs := inputs
+    witnessOutputs := outputs
+    witnessBurned := inputs.map WitnessOutput.token
+    witnessMinted := outputs.map WitnessOutput.token }
+
 def singletonFold (s : State) (interval : Interval) (signers : List Signer)
     (item : FoldItem) (folder : Signer) : FoldTx :=
-  ⟨s.cage, itemResult s.cage item, [item], s.judgments, signers, interval,
-    folder, folder, item.burned, itemPayments s.cage folder item⟩
+  withWitnessBoundary ⟨s.cage, itemResult s.cage item, [item], s.judgments, signers, interval,
+    folder, folder, item.burned, itemPayments s.cage folder item, [], [], [], [], []⟩
+
+inductive ExtractionSpend where
+  | folded (tx : FoldTx)
+  | withdrawn (tx : ExtractionWithdrawTx)
+
+def extractionSpendAllowed (o : Extraction) : ExtractionSpend → Prop
+  | .folded tx => foldAccepted tx ∧ o ∈ tx.extractions
+  | .withdrawn tx => extractionWithdrawAllowed tx ∧ tx.input = o
+
+def ExtractionSpend.interval : ExtractionSpend → Interval
+  | .folded tx => tx.interval
+  | .withdrawn tx => tx.interval
+
+def ExtractionSpend.exitsAs (spend : ExtractionSpend) (o : Extraction) : ExitKind → Prop
+  | .write => match spend with | .folded tx => .extract o ∈ tx.items | _ => False
+  | .account => match spend with | .folded tx => .extractAccount o ∈ tx.items | _ => False
+  | .withdraw => match spend with | .withdrawn tx => tx.input = o | _ => False
+
+def extractionExitAt (o : Extraction) (iv : Interval) : ExitKind → Prop
+  | .write => iv.valid ∧ iv.upper < o.deadline
+  | .account => iv.valid ∧ o.deadline ≤ iv.lower ∧ iv.upper ≤ o.deadline + o.window
+  | .withdraw => iv.valid ∧ o.deadline + o.window < iv.lower
+
+def entryDeposits (tree : EntryTree) (keys : List Key) : Nat :=
+  (keys.map fun k => ((witnessAt tree k).map WitnessData.deposit).getD 0).sum
+
+def discoverExtractions (c : CageId) (outputs : List Extraction) : List Extraction :=
+  outputs.filter fun o => requestName c ∈ o.tokens
+
+/-- Read-only reference-input observation. It does not spend a witness or the
+registry state; consumer-contract semantics remain outside this Step model. -/
+def referenceWitness (s : State) (out : WitnessOutput) : Option WitnessData :=
+  if out ∈ s.witnesses then some out.token.data else none
 
 end RequestApprovalFold
