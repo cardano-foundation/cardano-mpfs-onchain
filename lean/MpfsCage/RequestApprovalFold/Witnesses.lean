@@ -2,14 +2,18 @@ import MpfsCage.RequestApprovalFold.Model
 
 namespace RequestApprovalFold.Witnesses
 
+attribute [local simp] CageState.trie logicalTree Entry.logical Request.witnessValid
+  withWitnessBoundary FoldTx.extractions FoldItem.extraction emptyEntries
+  writeEntry putEntry Write.key Write.value writeTree witnessWriteAllowed
+
 /-! Kernel-checked reachability traces. This file imports only Model: admitted
 statements cannot contaminate antecedent witnesses. -/
 def group : OracleIdentity.Description := .group 1 (.cons (.key "alice") 1 (.cons (.key "bob") 1 .nil))
 def oracle : Oracle := OracleIdentity.identity group
 def rec : SigningRecord := .group (.cons 1 (.key "alice") .nil)
 def bobRec : SigningRecord := .group (.cons 1 (.key "bob") .nil)
-def cage : CageState := ⟨⟨"policy", "registry"⟩, [oracle], "protocol", emptyTrie, none, fun _ => 0, 0, 2⟩
-def request : Request := ⟨cage.id, "owner", "seed", .set "x" "v", [.absent "x"], "evidence", [(oracle, 6)], 10, 5⟩
+def cage : CageState := ⟨⟨"policy", "registry"⟩, [oracle], "protocol", emptyEntries, none, fun _ => 0, 0, 2⟩
+def request : Request := ⟨cage.id, "owner", "seed", .set "x" "v", [.absent "x"], "evidence", [(oracle, 6)], 10, 5, none⟩
 def output : RequestOutput := ⟨request, 10, [tagName oracle], "request-output", [requestName cage.id], .release⟩
 def create : CreateTx := ⟨[request.seed], cage, tokensOf output, [output], [], .release⟩
 def evidence (v : Bool) : Evidence := ⟨group, ["alice"], rec, v, [.absent "y"]⟩
@@ -73,12 +77,13 @@ def account_evidence (v : Bool) : hasAccount cage request s3.judgments (selected
   cases v <;> simp [s3, s2, s1, s0, afterJudgment, afterCreate, initial, judge, selected]
 
 def write_valid : stepValid cage ⟨3, 4⟩ s3.judgments [] (selected true) output := by
+  refine ⟨Or.inl rfl, ?_⟩
   refine ⟨wf, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, approval_ok, ?_, ?_⟩
   · simp [output, request, cage, Condition.holds, emptyTrie]
   · simp [selected, evidence, cage, Condition.holds, emptyTrie]
 
 def write_ok : foldAccepted writeTx := by
-  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, ?_, ?_⟩
+  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, ?_, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · simp [writeTx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
   · rfl
   · exact .cons _ _ _ _ write_valid (.nil _)
@@ -89,6 +94,8 @@ def step_write : Step s3 (.fold writeTx) s4 := by
   · simp [writeTx, singletonFold, FoldTx.claims, FoldItem.claimInput]
   · exact fun _ h => h
   · exact write_ok
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def reachable4 : Reachable s4 := .next reachable3 step_write
 
@@ -96,7 +103,7 @@ def account_valid (v : Bool) : accountAllowed cage ⟨10, 15⟩ s3.judgments out
   ⟨wf, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, account_evidence v⟩
 
 def account_ok (v : Bool) : foldAccepted (accountTx v) := by
-  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, rfl, ?_⟩
+  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · simp [accountTx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
   · exact .cons _ _ _ _ (account_valid v) (.nil _)
 
@@ -106,6 +113,8 @@ def step_account (v : Bool) : Step s3 (.fold (accountTx v)) (afterFold s3 (accou
   · simp [accountTx, singletonFold, FoldTx.claims, FoldItem.claimInput]
   · exact fun _ h => h
   · exact account_ok v
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def reachableAccount (v : Bool) : Reachable (afterFold s3 (accountTx v)) := .next reachable3 (step_account v)
 def withdraw_ok : withdrawAllowed withdraw := by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert
@@ -122,7 +131,7 @@ def reachable5 : Reachable s5 := .next reachable4 step_claim_create
 def claim_valid : claimAllowed s5.cage ⟨20, 25⟩ claim := by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert
 
 def claim_ok : foldAccepted claimTx := by
-  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, rfl, ?_⟩
+  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · simp [claimTx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
   · exact .cons _ _ _ _ claim_valid (.nil _)
 
@@ -132,6 +141,8 @@ def step_claim : Step s5 (.fold claimTx) s6 := by
   · simp [claimTx, singletonFold, FoldTx.claims, FoldItem.claimInput, s5, afterClaimCreate, createClaim]
   · exact fun _ h => h
   · exact claim_ok
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def reachable6 : Reachable s6 := .next reachable5 step_claim
 
@@ -160,9 +171,9 @@ def writeClaimItems : List FoldItem := [.write output (selected true), .claim cl
 def writeClaimTx : FoldTx :=
   ⟨cage, foldResult cage writeClaimItems, writeClaimItems, s3.judgments, [], ⟨3, 4⟩,
     "folder", "submitter", writeClaimItems.flatMap FoldItem.burned,
-    foldPayments cage "folder" writeClaimItems⟩
+    foldPayments cage "folder" writeClaimItems, [], [], [], [], []⟩
 def writeClaim_ok : foldAccepted writeClaimTx := by
-  refine ⟨by finite, ?_, rfl, rfl, ?_⟩
+  refine ⟨by finite, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · change ([output.ref] ++ [claim.ref]).Nodup
     decide
   · refine FoldRun.cons cage (.write output (selected true)) [.claim claim] _ write_valid ?_
@@ -175,6 +186,8 @@ def step_write_claim : Step withClaim (.fold writeClaimTx) (afterFold withClaim 
       afterClaimCreate, fundedClaimCreate, createClaim]
   · exact fun _ h => h
   · exact writeClaim_ok
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def notice : PriceNotice := ⟨oracle, priceName oracle, ⟨7, [("protocol", 9)]⟩⟩
 def mintPrice : PriceMintTx := ⟨notice, group, ["alice"], [priceName oracle]⟩
@@ -252,7 +265,7 @@ def write_valid : stepValid cage ⟨3, 4⟩ [] [] (selected true) output := by
   simp [stepValid, wellFormed, hasApproval, cage, output, totalFees, requestPolicy,
     Interval.valid, Witnesses.output, Witnesses.request, Witnesses.cage, Condition.holds, emptyTrie, rule]
 def write_ok : foldAccepted writeTx := by
-  refine ⟨by finite, ?_, rfl, rfl, ?_⟩
+  refine ⟨by finite, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · simp [writeTx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
   · exact .cons _ _ _ _ write_valid (.nil _)
 def writeStep : Step created (.fold writeTx) (afterFold created writeTx) := by
@@ -261,13 +274,15 @@ def writeStep : Step created (.fold writeTx) (afterFold created writeTx) := by
   · simp [writeTx, singletonFold, FoldTx.claims, FoldItem.claimInput]
   · exact fun _ h => h
   · exact write_ok
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def accountTx : FoldTx := singletonFold created ⟨10, 15⟩ [] (.account output (selected false)) "folder"
 def account_valid : accountAllowed cage ⟨10, 15⟩ [] output (selected false) := by
   simp [accountAllowed, wellFormed, hasAccount, cage, output, totalFees, requestPolicy,
     Interval.valid, Witnesses.output, Witnesses.request, Witnesses.cage, rule]
 def account_ok : foldAccepted accountTx := by
-  refine ⟨by finite, ?_, rfl, rfl, ?_⟩
+  refine ⟨by finite, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · simp [accountTx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
   · exact .cons _ _ _ _ account_valid (.nil _)
 def accountStep : Step created (.fold accountTx) (afterFold created accountTx) := by
@@ -276,6 +291,8 @@ def accountStep : Step created (.fold accountTx) (afterFold created accountTx) :
   · simp [accountTx, singletonFold, FoldTx.claims, FoldItem.claimInput]
   · exact fun _ h => h
   · exact account_ok
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def withdraw : WithdrawTx := { Witnesses.withdraw with input := output, burned := tokensOf output }
 def withdrawStep : Step created (.withdraw withdraw) (afterExit created output) :=
@@ -287,8 +304,8 @@ def group : OracleIdentity.Description := .group 1 (.cons (.key "alice") 1 (.con
 def oracle : Oracle := OracleIdentity.identity group
 def rec : SigningRecord := .group (.cons 1 (.key "alice") .nil)
 def bobRec : SigningRecord := .group (.cons 1 (.key "bob") .nil)
-def cage : CageState := ⟨⟨"policy", "registry"⟩, [oracle], "protocol", emptyTrie, some Zero.rule, fun _ => 0, 0, 2⟩
-def request : Request := ⟨cage.id, "owner", "seed", .set "x" "v", [.absent "x"], "evidence", [(oracle, 6)], 10, 5⟩
+def cage : CageState := ⟨⟨"policy", "registry"⟩, [oracle], "protocol", emptyEntries, some Zero.rule, fun _ => 0, 0, 2⟩
+def request : Request := ⟨cage.id, "owner", "seed", .set "x" "v", [.absent "x"], "evidence", [(oracle, 6)], 10, 5, none⟩
 def output : RequestOutput := ⟨request, 10, [tagName oracle], "request-output", [requestName cage.id], .rule "creator-rule"⟩
 def create : CreateTx := ⟨[request.seed], cage, tokensOf output, [output], ["creator"], .rule "creator-rule"⟩
 def evidence (v : Bool) : Evidence := ⟨group, ["alice"], rec, v, [.absent "y"]⟩
@@ -352,12 +369,13 @@ def account_evidence (v : Bool) : hasAccount cage request s3.judgments (selected
   cases v <;> simp [s3, s2, s1, s0, afterJudgment, afterCreate, initial, judge, selected]
 
 def write_valid : stepValid cage ⟨3, 4⟩ s3.judgments [] (selected true) output := by
+  refine ⟨Or.inl rfl, ?_⟩
   refine ⟨wf, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, approval_ok, ?_, ?_⟩
   · simp [output, request, cage, Condition.holds, emptyTrie]
   · simp [selected, evidence, cage, Condition.holds, emptyTrie]
 
 def write_ok : foldAccepted writeTx := by
-  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, ?_, ?_⟩
+  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, ?_, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · simp [writeTx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
   · rfl
   · exact .cons _ _ _ _ write_valid (.nil _)
@@ -368,6 +386,8 @@ def step_write : Step s3 (.fold writeTx) s4 := by
   · simp [writeTx, singletonFold, FoldTx.claims, FoldItem.claimInput]
   · exact fun _ h => h
   · exact write_ok
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def reachable4 : Reachable s4 := .next reachable3 step_write
 
@@ -375,7 +395,7 @@ def account_valid (v : Bool) : accountAllowed cage ⟨10, 15⟩ s3.judgments out
   ⟨wf, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, account_evidence v⟩
 
 def account_ok (v : Bool) : foldAccepted (accountTx v) := by
-  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, rfl, ?_⟩
+  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · simp [accountTx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
   · exact .cons _ _ _ _ (account_valid v) (.nil _)
 
@@ -385,6 +405,8 @@ def step_account (v : Bool) : Step s3 (.fold (accountTx v)) (afterFold s3 (accou
   · simp [accountTx, singletonFold, FoldTx.claims, FoldItem.claimInput]
   · exact fun _ h => h
   · exact account_ok v
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def reachableAccount (v : Bool) : Reachable (afterFold s3 (accountTx v)) := .next reachable3 (step_account v)
 def withdraw_ok : withdrawAllowed withdraw := by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert
@@ -401,7 +423,7 @@ def reachable5 : Reachable s5 := .next reachable4 step_claim_create
 def claim_valid : claimAllowed s5.cage ⟨20, 25⟩ claim := by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert
 
 def claim_ok : foldAccepted claimTx := by
-  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, rfl, ?_⟩
+  refine ⟨by (try dsimp only [Interval.valid, withdrawAllowed, claimCreateAllowed, claimAllowed]); decide +revert, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · simp [claimTx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
   · exact .cons _ _ _ _ claim_valid (.nil _)
 
@@ -411,6 +433,8 @@ def step_claim : Step s5 (.fold claimTx) s6 := by
   · simp [claimTx, singletonFold, FoldTx.claims, FoldItem.claimInput, s5, afterClaimCreate, createClaim]
   · exact fun _ h => h
   · exact claim_ok
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def reachable6 : Reachable s6 := .next reachable5 step_claim
 
@@ -447,9 +471,10 @@ def reachable : Reachable withAgain := .next (.next reachable1 unsetStep) againS
 
 def items : List FoldItem := [.write output (selected true), .write unsetOutput (selected true), .write againOutput (selected true)]
 def tx : FoldTx := ⟨cage, foldResult cage items, items, [], ["alice"], ⟨3, 4⟩,
-  "folder", "submitter", items.flatMap FoldItem.burned, foldPayments cage "folder" items⟩
+  "folder", "submitter", items.flatMap FoldItem.burned, foldPayments cage "folder" items, [], [], [], [], []⟩
 
 def firstValid : stepValid cage ⟨3, 4⟩ [] ["alice"] (selected true) output := by
+  refine ⟨Or.inl rfl, ?_⟩
   refine ⟨wf, by finite, by finite, ?_, ?_, ?_⟩
   · intro o ho
     have h : o = oracle := by simpa [cage] using ho
@@ -462,6 +487,7 @@ def afterFirst := itemResult cage (.write output (selected true))
 def afterUnset := itemResult afterFirst (.write unsetOutput (selected true))
 
 def unsetValid : stepValid afterFirst ⟨3, 4⟩ [] ["alice"] (selected true) unsetOutput := by
+  refine ⟨Or.inl rfl, ?_⟩
   refine ⟨?_, by finite, by finite, ?_, ?_, ?_⟩
   · simp [wellFormed, afterFirst, itemResult, credit, unsetOutput, output, request,
       cage, totalFees, Request.fee, requestPolicy]
@@ -474,6 +500,7 @@ def unsetValid : stepValid afterFirst ⟨3, 4⟩ [] ["alice"] (selected true) un
       Condition.holds, Write.apply, emptyTrie]
 
 def againValid : stepValid afterUnset ⟨3, 4⟩ [] ["alice"] (selected true) againOutput := by
+  refine ⟨Or.inl rfl, ?_⟩
   refine ⟨?_, by finite, by finite, ?_, ?_, ?_⟩
   · simp [wellFormed, afterUnset, afterFirst, itemResult, credit, againOutput, unsetOutput,
       output, request, cage, totalFees, Request.fee, requestPolicy]
@@ -482,12 +509,12 @@ def againValid : stepValid afterUnset ⟨3, 4⟩ [] ["alice"] (selected true) ag
     subst o
     exact ⟨authorization true, rfl, Or.inr rfl⟩
   · simp [againOutput, unsetOutput, output, request, afterUnset, afterFirst, itemResult,
-      credit, Condition.holds, Write.apply]
+      credit, cage, Condition.holds, Write.apply]
   · simp [selected, evidence, afterUnset, afterFirst, itemResult, credit, cage, output, request,
       unsetOutput, Condition.holds, Write.apply, emptyTrie]
 
 def accepted : foldAccepted tx := by
-  refine ⟨by finite, ?_, rfl, rfl, ?_⟩
+  refine ⟨by finite, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
   · change ([output.ref, unsetOutput.ref, againOutput.ref] ++ []).Nodup
     decide
   · exact .cons _ _ _ _ firstValid (.cons _ _ _ _ unsetValid (.cons _ _ _ _ againValid (.nil _)))
@@ -497,6 +524,8 @@ def step : Step withAgain (.fold tx) (afterFold withAgain tx) := by
   · simp [tx, items, FoldTx.claims, FoldItem.claimInput]
   · simp [tx]
   · exact accepted
+  · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+  · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def spentOnce : SpentOnce [create, createAgain] := by
   intro a b seed ha hb hsa hsb
@@ -607,15 +636,15 @@ def W01 : Reachable s0 ∧ (applyAll emptyTrie [.set "x" "v", .unset "x"]) "x" =
 
 /-- Reachable antecedent for T02: foldRun_step_valid. -/
 def W02 : Reachable s3 ∧ FoldRun writeTx.interval writeTx.refs writeTx.signers cage writeTx.items writeTx.cageOut ∧ writeTx.items[0]? = some (FoldItem.write output (selected true)) :=
- ⟨reachable3, write_ok.2.2.2.2, rfl⟩
+ ⟨reachable3, write_ok.2.2.2.2.1, rfl⟩
 
 /-- Reachable antecedent for T03: foldRun_result. -/
 def W03 : Reachable s3 ∧ FoldRun writeTx.interval writeTx.refs writeTx.signers cage writeTx.items writeTx.cageOut ∧ writeTx.items[0]? = some (FoldItem.write output (selected true)) :=
- ⟨reachable3, write_ok.2.2.2.2, rfl⟩
+ ⟨reachable3, write_ok.2.2.2.2.1, rfl⟩
 
 /-- Reachable antecedent for T04: foldRun_conditions. -/
 def W04 : Reachable s3 ∧ FoldRun writeTx.interval writeTx.refs writeTx.signers cage writeTx.items writeTx.cageOut ∧ writeTx.items[0]? = some (FoldItem.write output (selected true)) :=
- ⟨reachable3, write_ok.2.2.2.2, rfl⟩
+ ⟨reachable3, write_ok.2.2.2.2.1, rfl⟩
 
 /-- Reachable antecedent for T05: applyAll_keeps_present. -/
 def W05 : Reachable s4 ∧ (s4.cage.trie "x").isSome = true ∧ (∀ w ∈ [Write.set "x" "v2"], w ≠ .unset "x") :=
@@ -993,7 +1022,7 @@ def W101 : Reachable s4 ∧ Condition.holds s4.cage.trie (.present "x") :=
 
 /-- Reachable antecedent for T102: foldRun_oracle_conditions. -/
 def W102 : Reachable s3 ∧ FoldRun writeTx.interval writeTx.refs writeTx.signers cage writeTx.items writeTx.cageOut ∧ writeTx.items[0]? = some (FoldItem.write output (selected true)) :=
- ⟨reachable3, write_ok.2.2.2.2, rfl⟩
+ ⟨reachable3, write_ok.2.2.2.2.1, rfl⟩
 
 /-- Reachable antecedent for T103: fold_all_conditions_hold. -/
 def W103 := writeAntecedent
@@ -1024,12 +1053,12 @@ def W109 : Reachable s3 ∧ output ∈ s3.live ∧ stepValid s3.cage ⟨3,4⟩ s
  ⟨reachable3,by simp [s3,s2,s1,afterJudgment,afterCreate],write_valid⟩
 
 /-- Reachable antecedent for T110: empty_fold_allowed. -/
-def W110 : Reachable s4 ∧ (⟨20,21⟩ : Interval).valid ∧ foldAccepted (⟨s4.cage,s4.cage,[],[],[],⟨20,21⟩,"folder","anyone",[],[]⟩ : FoldTx) :=
- ⟨reachable4,by finite,⟨by finite,by simp [FoldTx.requests,FoldTx.claims],rfl,rfl,.nil _⟩⟩
+def W110 : Reachable s4 ∧ (⟨20,21⟩ : Interval).valid ∧ foldAccepted (⟨s4.cage,s4.cage,[],[],[],⟨20,21⟩,"folder","anyone",[],[],[],[],[],[],[]⟩ : FoldTx) :=
+ ⟨reachable4,by finite,⟨by finite,by simp [FoldTx.requests,FoldTx.claims],rfl,rfl,.nil _,⟨rfl,rfl,rfl,rfl,rfl⟩⟩⟩
 
 /-- Reachable antecedent for T111: empty_fold_earns_nothing. -/
-def W111 : Reachable s4 ∧ (⟨20,21⟩ : Interval).valid ∧ foldAccepted (⟨s4.cage,s4.cage,[],[],[],⟨20,21⟩,"folder","anyone",[],[]⟩ : FoldTx) :=
- ⟨reachable4,by finite,⟨by finite,by simp [FoldTx.requests,FoldTx.claims],rfl,rfl,.nil _⟩⟩
+def W111 : Reachable s4 ∧ (⟨20,21⟩ : Interval).valid ∧ foldAccepted (⟨s4.cage,s4.cage,[],[],[],⟨20,21⟩,"folder","anyone",[],[],[],[],[],[],[]⟩ : FoldTx) :=
+ ⟨reachable4,by finite,⟨by finite,by simp [FoldTx.requests,FoldTx.claims],rfl,rfl,.nil _,⟨rfl,rfl,rfl,rfl,rfl⟩⟩⟩
 
 /-- Reachable antecedent for T112: creation_rule_input_binding. -/
 def W112 := ruledAntecedent
@@ -1173,9 +1202,10 @@ def items : List FoldItem := [.write longOutput (selected true), .account output
 def afterWrite := itemResult cage (.write longOutput (selected true))
 def afterAccount := itemResult afterWrite (.account output (selected false))
 def tx : FoldTx := ⟨cage, foldResult cage items, items, source.judgments, ["alice"], ⟨10,12⟩,
- "folder", "submitter", items.flatMap FoldItem.burned, foldPayments cage "folder" items⟩
+ "folder", "submitter", items.flatMap FoldItem.burned, foldPayments cage "folder" items, [], [], [], [], []⟩
 
 def longValid : stepValid cage ⟨10,12⟩ source.judgments ["alice"] (selected true) longOutput := by
+ refine ⟨Or.inl rfl, ?_⟩
  refine ⟨?_, by finite, by finite, ?_, ?_, ?_⟩
  · simp [wellFormed, longOutput, output, request, cage, totalFees, Request.fee, requestPolicy]
  · intro o ho
@@ -1191,7 +1221,7 @@ def accountValid : accountAllowed afterWrite ⟨10,12⟩ source.judgments output
  · exact account_evidence false
 
 def accepted : foldAccepted tx := by
- refine ⟨by finite, ?_, rfl, rfl, ?_⟩
+ refine ⟨by finite, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
  · change ([longOutput.ref, output.ref] ++ [claim.ref]).Nodup
    decide
  · exact .cons _ _ _ _ longValid (.cons _ _ _ _ accountValid (.cons _ _ _ _ (by finite) (.nil _)))
@@ -1203,6 +1233,8 @@ def step : Step source (.fold tx) (afterFold source tx) := by
  · simp [tx, items, FoldTx.claims, FoldItem.claimInput, source, afterClaimCreate, claimCreate, createClaim]
  · exact fun _ h => h
  · exact accepted
+ · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+ · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def conserved : Reachable source ∧ Step source (.fold tx) (afterFold source tx) ∧
  (atTurn tx 2).balances "alice" = 12 ∧ tx.cageOut.balances "alice" = 0 ∧
@@ -1259,6 +1291,7 @@ def approval : hasApproval cage request [] ["alice"] selected := by
 
 def tx : FoldTx := singletonFold source ⟨3,4⟩ ["alice"] (.write output selected) "folder"
 def valid : stepValid cage ⟨3,4⟩ [] ["alice"] selected output := by
+ refine ⟨Or.inl rfl, ?_⟩
  refine ⟨create_ok.2.2.2.1, by finite, by finite, approval, ?_, ?_⟩
  · simp [output, request, Witnesses.request, cage, Witnesses.cage, Condition.holds, emptyTrie]
  · intro o ho condition hc
@@ -1270,7 +1303,7 @@ def valid : stepValid cage ⟨3,4⟩ [] ["alice"] selected output := by
    · simp [selected, keyEvidence] at hc
 
 def accepted : foldAccepted tx := by
- refine ⟨by finite, ?_, rfl, rfl, ?_⟩
+ refine ⟨by finite, ?_, rfl, rfl, ?_, by exact ⟨rfl, rfl, rfl, rfl, rfl⟩⟩
  · simp [tx, singletonFold, FoldTx.requests, FoldTx.claims, FoldItem.request, FoldItem.claimInput]
  · exact .cons _ _ _ _ valid (.nil _)
 def step : Step source (.fold tx) (afterFold source tx) := by
@@ -1279,6 +1312,8 @@ def step : Step source (.fold tx) (afterFold source tx) := by
  · simp [tx, singletonFold, FoldTx.claims, FoldItem.claimInput]
  · exact fun _ h => h
  · exact accepted
+ · intro o h; change o ∈ ([] : List Extraction) at h; contradiction
+ · intro w h; change w ∈ ([] : List WitnessOutput) at h; contradiction
 
 def summedOnce : Reachable source ∧ Step source (.fold tx) (afterFold source tx) ∧
  tx.cageOut.balances "alice" = 10 ∧ tx.cageOut.value = 10 ∧ balanceSum tx.cageOut = 10 ∧
