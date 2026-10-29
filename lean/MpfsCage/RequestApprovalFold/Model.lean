@@ -96,8 +96,6 @@ def logicalTree (tree : EntryTree) : Trie := fun k => (tree k).bind Entry.logica
 def stripWitnesses (tree : EntryTree) : EntryTree :=
   fun k => (logicalTree tree k).map Entry.value
 
-def unwitnessedTree (t : Trie) : EntryTree := fun k => (t k).map Entry.value
-
 def witnessAt (tree : EntryTree) (k : Key) : Option WitnessData :=
   match tree k with | some (.witnessed w) => some w | _ => none
 

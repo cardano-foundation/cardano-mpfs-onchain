@@ -1169,4 +1169,10 @@ theorem account_item_inversion (c : CageState) (iv : Interval) (refs : List Toke
  iv.valid ∧ o.request.deadline ≤ iv.lower ∧ iv.upper ≤ o.request.deadline + o.request.window ∧
  hasAccount c o.request refs e := by sorry
 
+/-- D57: witness events are concatenated in indexed item order, each computed at
+its own turn. This specification does not call foldWitnessEvents. -/
+theorem fold_witness_events_in_item_order (tx : FoldTx) :
+ foldAccepted tx → tx.witnessEvents =
+ tx.items.zipIdx.flatMap (fun p => itemWitnessEvents (atTurn tx p.2) p.1) := by sorry
+
 end RequestApprovalFold

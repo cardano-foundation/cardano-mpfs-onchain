@@ -1,8 +1,8 @@
 # Durable witnesses: model and statement candidate (#128)
 
-Status: **CANDIDATE — 198 public statements, 33 internal proof-helper statements,
+Status: **CANDIDATE — 199 public statements, 33 internal proof-helper statements,
 all intentionally admitted pending independent statement audit.** No universal proof, independent-audit pass, hosted CI result or implementation
-conformance is claimed. The 142 accepted public guarantees are retained; 56
+conformance is claimed. The 142 accepted public guarantees are retained; 57
 new guarantees cover durable witnesses and their request lifecycle. The old
 ledger remains historical evidence for commit 85f2b3e, not a current proof claim.
 
@@ -22,7 +22,10 @@ uses per-item changes. NOTE-005 is withdrawn entirely; NOTE-004 is closed:
 - Each witness binds the exact value or absence, refund address, deposit and
   issuance request output reference in the tree entry. Its deposit is at least
   the registry minimum. A plain absent key has no entry. Presence is a consumer
-  observation of an exact-value witness. A plain same-value set or an unset of an
+  observation of an exact-value witness. NOTE-009 confirms that extraction
+  commits to the named exact value: no value-agnostic presence request exists.
+  Any change of that value consumes the witness, including when both values
+  are present. A plain same-value set or an unset of an
   already absent key preserves the entry, output, token and deposit unchanged.
 - CageState.tree is the authoritative entry tree. CageState.trie is its logical
   projection, not a second stored tree or an external obligation map. Conditions
@@ -104,10 +107,11 @@ All legacy rows are restated over the new model; none is retired. W136 covers th
 old constructor cases, supplemented by DW25 and DW27 for the two new constructors.
 A witness supplies concrete reachable premises, sometimes more than the theorem
 requires. The mutant identifies a semantic edit expected to falsify the statement;
-The prior audit killed 76/193 theorem rows at d2d6f15 and found F1/F2;
-those receipts are not reclassified as this repair's verification. Creator checks
-for this repair kill M10/M11 against D52/D53/D55. Other repair mutation rows and
-retained-row floor coverage remain for the next independent audit.
+Audit 2 of 32d882c killed 198/198 public rows but returned NOT-READY because
+DA062 lacked an independent event-order guarantee. Its results are prior-candidate
+independent evidence, not a fresh campaign on this repair. D57 and its creator kill
+are new here; the other row statuses retain their original creator evidence class.
+The round-1 section below is historical; audit 2 closed its F3 coverage gap.
 
 | Row | Theorem | Obligation | Reachable witness | Named mutant | Status |
 |---|---|---|---|---|---|
@@ -228,7 +232,7 @@ retained-row floor coverage remain for the next independent audit.
 | T115 | reachable_balances_backed | reachable balances backed | Witnesses.W115 | M-credit-unbacked | ADMITTED / NOT-RUN |
 | T116 | fold_value_conservation | fold value conservation | Witnesses.W116 | M-claim-value | ADMITTED / NOT-RUN |
 | T117 | fold_request_conservation | fold request conservation | Witnesses.W117 | M-remainder | ADMITTED / NOT-RUN |
-| T118 | fold_balance_conservation | fold balance conservation | Witnesses.W118 | M-credit-unbacked | ADMITTED / NOT-RUN |
+| T118 | fold_balance_conservation | fold balance conservation | Witnesses.W118 | M-claim-payout-stale (audit-2 L4-M09) | ADMITTED / NOT-RUN |
 | T119 | fold_payments_exact | fold credits / outputs exact | Witnesses.W119 | M-arbitrary-payments | ADMITTED / NOT-RUN |
 | T120 | group_credits_only_recorded_signers | group credits only recorded signers | Witnesses.W120 | M-unsigned-fees | ADMITTED / NOT-RUN |
 | T121 | group_credits_exact_split | group credits exact split | Witnesses.W121 | M-extra-fee | ADMITTED / NOT-RUN |
@@ -315,6 +319,7 @@ retained-row floor coverage remain for the next independent audit.
 | D54 | extraction_never_reappears | DurableWitnesses.DW54 | MD54 | ADMITTED / NOT-RUN |
 | D55 | extraction_consumption_terminal | DurableWitnesses.DW55 | MD55 | ADMITTED / creator M10 and M11 KILLED |
 | D56 | account_item_inversion | DurableWitnesses.DW56 | MD56 | ADMITTED / NOT-RUN |
+| D57 | fold_witness_events_in_item_order | DurableWitnesses.DW57 | MD57 / AT4-DA062 | ADMITTED / creator KILLED |
 
 ## New mutation definitions
 
@@ -370,12 +375,13 @@ retained-row floor coverage remain for the next independent audit.
 | MD48 | writeTree | Use putEntry unconditionally even for a plain no-op |
 | MD49 | stepValid | Remove witnessWriteAllowed |
 | MD50 | Step | Add an issuer-signed witness withdrawal after a timeout |
-| MD51 | witnessWriteAllowed | Reject all witnessing writes even when the value changes |
+| MD51 | writeEntry | Store none as the fact of a witnessing set (audit-2 L6-M20) |
 | MD52 | afterExtractionWithdraw | Keep the consumed input (audit M10) |
 | MD53 | afterFold | Keep folded extractions (audit M11) |
 | MD54 | Step.extractionCreate | Drop fresh output-reference guard, allowing an already consumed extraction to be recreated |
 | MD55 | afterFold | Keep folded extractions, allowing repeated consumption (audit M11; M10 also checked) |
 | MD56 | accountAllowed | Remove wellFormed, admitting an unfunded witnessing request |
+| MD57 | foldWitnessEvents | Concatenate tail events before current item events (exact AT4-DA062) |
 
 Guard-removal counterexamples may use a malformed proposed action after the same
 reachable prefix. Redundant guards must be classified by the independent auditor;
@@ -496,11 +502,12 @@ contract. Its full-domain and reachable-domain mutant results must be distinguis
 | M-claim-withdraw-gap | claimWithdrawAllowed | Require strict deadline < lower instead of deadline <= lower |
 | M-fold-unsigned-credit | credit | Credit a key absent from all selected signing records |
 | M-trace-missing-step | Trace.cons | Remove the Step premise from the recorded event |
-
+| M-claim-payout-stale | claimPayouts | Recurse with incoming c instead of itemResult c i (audit-2 L4-M09) |
 
 ## Inherited semantic atoms
 
-The 157 inherited atoms remain obligations. Their names and scenarios are retained;
+The 153 inherited atoms A001–A153 remain the inherited denominator. MA1–MA4
+are four supplemental mappings, outside that denominator. Names and scenarios are retained;
 A005 now means tree = emptyEntries, A146 pays RequestOutput.escrow, and tree mutations
 target the encoded tree while logical observations still use CageState.trie. The
 new atom table below records the additional obligations and composition cases.
@@ -528,7 +535,7 @@ new atom table below records the additional obligations and composition cases.
 | A019 | Binding | createAllowed: Mint policy matches the source rule or release | W113 | creation_request_policy | M-A019: Ignore tx.policy equality |
 | A020 | Binding | Step.create: Fresh output reference, distinct from seed | W94 | reachable_output_refs_unique | M-A020: Remove ref-not-used premise |
 | A021 | Effect | afterCreate: Record spent seeds monotonically | W40 | reachable_requests_have_spent_seeds | M-A021: Omit spent-seed insertion |
-| A022 | Effect | afterCreate: Insert exactly the created request | W136 | step_inversion | M-A022: Insert an unrelated request as well |
+| A022 | Effect | afterCreate: Insert exactly the created request | W136 | reachable_output_refs | AT1-A022: afterCreate: also inserts {o with ref := o.ref ++ "-extra"} into live |
 | A023 | Effect | afterCreate: Record the fresh request output reference | W93 | reachable_output_refs | M-A023: Omit usedOutputs insertion |
 | A024 | Binding | Step.judge: Judgment references actual source registry | W46 | new_judgment_is_authorized | M-A024: Drop cageRef equality |
 | A025 | Binding | Step.judge: Judgment references an authentic live request | W46 | new_judgment_is_authorized | M-A025: Drop requestRef membership |
@@ -559,7 +566,7 @@ new atom table below records the additional obligations and composition cases.
 | A050 | Binding | stepValid: Write requires well-formed request and token | W86 | fold_requires_request_token | M-A050: Drop wellFormed |
 | A051 | Condition | stepValid: All requester conditions checked at current trie | W17 | fold_conditions_hold_when_applied | M-A051: Check against emptyTrie |
 | A052 | Condition | stepValid: All selected oracle conditions checked at current trie | W103 | fold_all_conditions_hold | M-A052: Omit oracle condition checks |
-| A053 | Time | accountAllowed: Nonempty account interval | W135 | None: equivalent guard removal | M-A053: Drop interval.valid |
+| A053 | Time | accountAllowed: Nonempty account interval | W135 | account_item_inversion | AT1-A053: accountAllowed: drop interval.valid |
 | A054 | Time | accountAllowed: Account starts at or after deadline | W47 | exit_time_window | M-A054: Drop deadline <= lower |
 | A055 | Time | accountAllowed: Account ends no later than deadline plus window | W47 | exit_time_window | M-A055: Drop upper bound |
 | A056 | Binding | accountAllowed: Account requires well-formed request and token | W86 | fold_requires_request_token | M-A056: Drop wellFormed |
@@ -725,18 +732,20 @@ or ProofHelpers; no witness relies on an intentional theorem admission.
 
 ## Added semantic-atom ledger
 
-Rows are anticipated single semantic edits; only DA105/DA107 have creator
-mutation kills in this repair. Other rows are NOT-RUN on this repair. The scenario
+Rows name single semantic edits. DA105/DA107 have round-1 creator kills;
+DA062 has a round-2 creator kill. Audit-2 attributions below refer to 32d882c.
+Other mutations have not been rerun on this repair. The scenario
 provides a reachable prefix; refusal mutants vary the proposed action after
 that prefix. A compilation failure is not a kill. Structural token and field
 constraints are tested by changes at their consuming law. There are 144
-added atoms and 157 inherited atoms; this is a finite creator coverage claim.
+added atoms and 153 inherited atoms, for 297 numbered atoms. MA1–MA4 are
+supplemental mappings. This is a finite coverage claim, with evidence classes below.
 
 | Atom | Production site | Guard, effect, refusal or observation | Reachable scenario | Expected falsifier | Single-atom mutant |
 |---|---|---|---|---|---|
 | DA001 | Entry.logical.value | Ordinary present values read unchanged | DurableWitnesses.DW02 | conditions_read_logical | M-DA001: Return none for an ordinary value |
 | DA002 | Entry.logical.witnessed | Read the attested value or absence | DurableWitnesses.DW04 | live_witness_fact | M-DA002: Return none for every witnessed value |
-| DA003 | logicalTree | No entry reads as absence | DurableWitnesses.DW06 | live_witness_absence | M-DA003: Return a dummy present value for a missing entry |
+| DA003 | logicalTree | No entry reads as absence | DurableWitnesses.DW06 | registry_creation | AT3-DA003: logicalTree reads some "dummy" for a missing entry |
 | DA004 | stripWitnesses | Remove annotations while retaining logical facts | DurableWitnesses.DW01 | logical_tree_stripped | M-DA004: Discard ordinary values |
 | DA005 | CageState.trie | Conditions use the projection of the actual encoded tree | Witnesses.W18 | fold_root_is_folded_writes | M-DA005: Return emptyTrie for every state |
 | DA006 | witnessAt | Only witnessed entries carry obligations | DurableWitnesses.DW03 | reachable_witness_bijection | M-DA006: Treat ordinary values as a dummy witness |
@@ -758,7 +767,7 @@ added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 | DA022 | Step.extractionCreate | Authenticate the current registry reference | DurableWitnesses.DW25 | extraction_creation_inversion | M-DA022: Drop cageRef = source cage |
 | DA023 | Step.extractionCreate | Require the creation predicate | DurableWitnesses.DW25 | extraction_creation_inversion | M-DA023: Drop extractionCreateAllowed |
 | DA024 | Step.extractionCreate | Fresh reference across every input class | DurableWitnesses.DW41 | reachable_input_refs_unique | M-DA024: Drop output.ref not-in usedOutputs |
-| DA025 | Step.extractionCreate | Store exactly the supplied request | DurableWitnesses.DW25 | extraction_creation_inversion | M-DA025: Substitute a different refund address in the stored request |
+| DA025 | Step.extractionCreate | Store exactly the supplied request | DurableWitnesses.DW25 | extraction_creation_inversion | AT3-DA025: Step.extractionCreate target stores output with refund := "other" |
 | DA026 | afterExtractionCreate | Preserve existing pending extractions | DurableWitnesses.DW30 | extraction_removal_legal | M-DA026: Replace the list rather than prepend |
 | DA027 | afterExtractionCreate | Record the fresh ref permanently | DurableWitnesses.DW41 | reachable_input_refs_unique | M-DA027: Do not insert the fresh reference |
 | DA028 | afterExtractionCreate | Leave registry and live witnesses unchanged | Witnesses.W114 | only_fold_changes_registry | M-DA028: Modify the registry tree during creation |
@@ -771,7 +780,7 @@ added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 | DA035 | extractionAllowed | Strictly predeadline application | DurableWitnesses.DW28 | extraction_exit_window | M-DA035: Permit upper = deadline |
 | DA036 | extractionAllowed | Only an unwitnessed key can be extracted | DurableWitnesses.DW17 | extraction_witnessed_refused | M-DA036: Remove witnessAt = none |
 | DA037 | extractionAllowed | Exact wanted fact holds at its turn | DurableWitnesses.DW18 | extraction_stale_refused | M-DA037: Remove trie-key = wanted |
-| DA038 | extractionAllowed | No oracle evidence or rule participation | DurableWitnesses.DW16 | extraction_permissionless_fold | M-DA038: Require an empty registry oracle list |
+| DA038 | extractionAllowed | No oracle evidence or rule participation | DurableWitnesses.DW16 | extraction_item_inversion | AT4-DA038: extractionAllowed additionally requires c.oracles = [] |
 | DA039 | itemAllowed.extract | Call extractionAllowed for the actual item | DurableWitnesses.DW13 | extraction_attests_requested | M-DA039: Accept every extraction item |
 | DA040 | itemResult.extract | Replace precisely the extracted key | DurableWitnesses.DW13 | extraction_attests_requested | M-DA040: Update a fixed different key |
 | DA041 | itemResult.extract | Preserve every other key | DurableWitnesses.DW11 | untouched_witness_survives | M-DA041: Clear the whole tree before installing the extracted key |
@@ -789,14 +798,14 @@ added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 | DA053 | putEntry | Leave all other keys unchanged | DurableWitnesses.DW11 | untouched_witness_survives | M-DA053: Clear unrelated keys |
 | DA054 | itemResult.write | Update the authoritative entry tree at the write key | Witnesses.W18 | fold_root_is_folded_writes | M-DA054: Leave the old encoded tree unchanged |
 | DA055 | itemResult.account | Leave witness obligations unchanged | DurableWitnesses.DW11 | untouched_witness_survives | M-DA055: Strip all witnesses on complete account |
-| DA056 | itemResult.claim | Leave witness obligations unchanged | DurableWitnesses.DW11 | untouched_witness_survives | M-DA056: Strip all witnesses on claim |
+| DA056 | itemResult.claim | Leave witness obligations unchanged | DurableWitnesses.DW11 | reachable_witness_bijection | AT4-DA056: itemResult .claim also tree := stripWitnesses c.tree |
 | DA057 | itemWitnessEvents | Event key is the touched key | DurableWitnesses.DW08 | witnessed_write_obligation | M-DA057: Use a fixed other key |
 | DA058 | itemWitnessEvents | Prove the exact entry at the item turn | DurableWitnesses.DW08 | witnessed_write_obligation | M-DA058: Set provedEntry to none |
 | DA059 | itemWitnessEvents | Consume the old entry witness only when the item changes its value | DurableWitnesses.DW08 | witnessed_write_obligation | M-DA059: Omit consumed |
 | DA060 | itemWitnessEvents | Produce exactly the new entry witness | DurableWitnesses.DW03 | reachable_witness_bijection | M-DA060: Omit produced |
 | DA061 | itemWitnessEvents | Omit an event when old and new witness are equal | DurableWitnesses.DW48 | plain_noop_preserves_witness | M-DA061: Emit a consumed and produced pair for an unchanged witness |
-| DA062 | foldWitnessEvents | Accumulate events in item order | DurableWitnesses.DW09 | fold_witness_boundary_exact | M-DA062: Reverse the events |
-| DA063 | foldWitnessEvents | Each item sees its predecessor result | DurableWitnesses.DW13 | extraction_attests_requested | M-DA063: Recurse with the incoming state |
+| DA062 | foldWitnessEvents | Accumulate events in item order | DurableWitnesses.DW57 | fold_witness_events_in_item_order | AT4-DA062: Concatenate tail events before current item events (creator KILLED) |
+| DA063 | foldWitnessEvents | Each item sees its predecessor result | DurableWitnesses.DW13 | fold_payments_exact | AT4-DA063: foldWitnessEvents recurses with incoming state c |
 | DA064 | witnessOutput | Bind registry identity in the token | DurableWitnesses.DW04 | live_witness_fact | M-DA064: Substitute a different cage |
 | DA065 | witnessOutput | Bind the witnessed key in the token | DurableWitnesses.DW03 | reachable_witness_bijection | M-DA065: Substitute a fixed different key |
 | DA066 | witnessOutput | Bind the entire fact/refund/deposit/issuance record | DurableWitnesses.DW34 | witness_token_issuance_bound | M-DA066: Erase issuance from the token |
@@ -809,7 +818,7 @@ added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 | DA073 | witnessBoundary | Check exact external witness outputs | DurableWitnesses.DW09 | fold_witness_boundary_exact | M-DA073: Remove witnessOutputs equality |
 | DA074 | witnessBoundary | Burn exactly the external consumed tokens | DurableWitnesses.DW09 | fold_witness_boundary_exact | M-DA074: Remove witnessBurned equality |
 | DA075 | witnessBoundary | Mint exactly the external produced tokens | DurableWitnesses.DW09 | fold_witness_boundary_exact | M-DA075: Remove witnessMinted equality |
-| DA076 | foldAccepted | Include extraction refs in combined Nodup | DurableWitnesses.DW41 | reachable_input_refs_unique | M-DA076: Exclude extraction refs from the uniqueness check |
+| DA076 | foldAccepted | Include extraction refs in combined Nodup | DurableWitnesses.DW41 | fold_requests_unique | AT4-DA076: foldAccepted Nodup excludes extraction refs |
 | DA077 | foldAccepted | Require the witness boundary as part of fold acceptance | DurableWitnesses.DW09 | fold_witness_boundary_exact | M-DA077: Drop witnessBoundary |
 | DA078 | Step.fold | Every consumed extraction is live in this source | DurableWitnesses.DW43 | fold_witness_inputs_authentic | M-DA078: Drop extraction-input membership |
 | DA079 | Step.fold | Every spent witness output is live in this source | DurableWitnesses.DW43 | fold_witness_inputs_authentic | M-DA079: Drop witness-input membership |
@@ -853,7 +862,7 @@ added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 | DA117 | witnessValue | Sum exact output values | DurableWitnesses.DW22 | live_outputs_hold_deposits | M-DA117: Return zero |
 | DA118 | entryDeposits | Sum exactly the per-entry declared deposits over a complete key census | DurableWitnesses.DW22 | live_outputs_hold_deposits | M-DA118: Return zero |
 | DA119 | extractionSpendAllowed.folded | Require accepted fold and exact extraction membership | DurableWitnesses.DW28 | extraction_exit_window | M-DA119: Accept any folded extraction spend |
-| DA120 | extractionSpendAllowed.withdrawn | Require valid withdrawal of this exact input | DurableWitnesses.DW28 | extraction_exit_window | M-DA120: Ignore the actual withdrawn input |
+| DA120 | extractionSpendAllowed.withdrawn | Require valid withdrawal of this exact input | DurableWitnesses.DW28 | None: equivalent under exitsAs (da120_shadowed) | AT5-DA120: Drop tx.input = o in withdrawn arm; audit-2 equivalence, not a kill |
 | DA121 | ExtractionSpend.exitsAs | Classify actual extract/account/withdraw actions separately | DurableWitnesses.DW29 | extraction_exit_exclusive | M-DA121: Classify account as extraction too |
 | DA122 | extractionExitAt | Preserve the three closed/nonempty window classes | DurableWitnesses.DW38 | extraction_windows_disjoint | M-DA122: Overlap write and account at deadline |
 | DA123 | extractionExitAt | No gap at deadline or window endpoint | DurableWitnesses.DW37 | extraction_windows_cover | M-DA123: Require account lower strictly after deadline |
@@ -861,25 +870,25 @@ added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 | DA125 | referenceWitness | Reject an output not currently live | DurableWitnesses.DW45 | witness_reference_sound | M-DA125: Return every supplied output's record |
 | DA126 | Write.value | Exact result value for either write constructor | DurableWitnesses.DW46 | item_burn_iff_value_change | M-DA126: Read unset as a dummy present value |
 | DA127 | witnessWriteAllowed | Plain writes always pass the witness-specific guard | Witnesses.W22 | blind_write_folds_on_any_tree | M-DA127: Reject plain no-op writes |
-| DA128 | witnessWriteAllowed | Witnessing set can create on an unwitnessed key | DurableWitnesses.DW51 | witnessing_blind_write_availability | M-DA128: Reject witnessing on unwitnessed keys |
+| DA128 | witnessWriteAllowed | Witnessing set can create on an unwitnessed key | DurableWitnesses.DW51 | write_item_inversion | AT5-DA128: witnessWriteAllowed: witnessing requires an existing witness and change |
 | DA129 | witnessWriteAllowed | Witnessing set on a witnessed key requires an actual value change | DurableWitnesses.DW49 | witnessing_noop_refused | M-DA129: Remove the differing-value condition |
 | DA130 | stepValid | Enforce witnessWriteAllowed at this actual turn | DurableWitnesses.DW49 | witnessing_noop_refused | M-DA130: Drop witnessWriteAllowed |
 | DA131 | writeTree | Preserve whole encoded tree on a plain same-value write | DurableWitnesses.DW48 | plain_noop_preserves_witness | M-DA131: Apply putEntry unconditionally |
 | DA132 | writeTree | Preserve witnessed absence on unset of an already absent key | DurableWitnesses.DW48 + DurableWitnesses.absentNoop_effect | plain_noop_preserves_witness | M-DA132: Drop the no-op branch for unset |
-| DA133 | writeTree | A changing write still installs the requested entry | DurableWitnesses.DW46 | item_burn_iff_value_change | M-DA133: Preserve the tree on all plain writes |
+| DA133 | writeTree | A changing write still installs the requested entry | DurableWitnesses.DW46 | blind_write_folds_on_any_tree | AT5-DA133: writeTree: condition reduced to witnessing = none |
 | DA134 | FoldItem.entryKey | Only writes and extraction can affect witness entries | DurableWitnesses.DW47 | witness_durability | M-DA134: Return a key for complete-account items |
 | DA135 | itemChanges | Compare logical values at the item turn | DurableWitnesses.DW46 | item_burn_iff_value_change | M-DA135: Use write-key equality as the change predicate |
 | DA136 | actionPreservesKey | Every sequential item must preserve the key | DurableWitnesses.DW47 | witness_durability | M-DA136: Compare only the fold endpoints |
 | DA137 | actionPreservesKey | All non-fold actions preserve witnesses | DurableWitnesses.DW50 | witness_deposit_lock | M-DA137: Allow issuer-signed withdrawal to remove live witness |
 | DA138 | Step | No timeout or issuer withdrawal for a live witness | DurableWitnesses.DW50 | witness_deposit_lock | M-DA138: Add a live-witness withdrawal after a deadline |
-| DA139 | foldAccepted | Refund does not require issuer or refund-address signature | Witnesses.W109 + DurableWitnesses.refund_without_issuer_signature | expected_approval_lookup | M-DA139: Require every consumed witness refund address in transaction signers |
-| DA140 | foldWitnessEvents | A later no-op does not burn an earlier intra-fold witness | DurableWitnesses.DW46 + DurableWitnesses.intrafold_noop_keeps | item_burn_iff_value_change | M-DA140: Emit consumption on an absent unset after extraction |
-| DA141 | foldWitnessEvents | A later reversal does not undo the first value-change burn | DurableWitnesses.DW46 + DurableWitnesses.roundtrip_burn | item_burn_iff_value_change | M-DA141: Filter old burns whose facts hold at the final tree |
-| DA142 | itemPayments.account | Return only the unused request deposit and keep live witness deposit locked | DurableWitnesses.DW47 | witness_durability | M-DA142: Include the existing witness deposit in owner payment |
+| DA139 | foldAccepted | Refund does not require issuer or refund-address signature | Witnesses.W109 + DurableWitnesses.refund_without_issuer_signature | folder_discovery_executable | AT5-DA139: foldAccepted: add refund addresses of witnessInputs in signers |
+| DA140 | foldWitnessEvents | A later no-op does not burn an earlier intra-fold witness | DurableWitnesses.DW46 + DurableWitnesses.intrafold_noop_keeps | fold_payments_exact | AT5-DA140: foldWitnessEvents: extra consumption event for a no-op unset of a witnessed key |
+| DA141 | foldWitnessEvents | A later reversal does not undo the first value-change burn | DurableWitnesses.DW46 + DurableWitnesses.roundtrip_burn | fold_payments_exact | AT5-DA141: foldWitnessEvents: drop consumptions whose fact holds at the fold result |
+| DA142 | itemPayments.account | Return only the unused request deposit and keep live witness deposit locked | DurableWitnesses.DW47 | unused_witnessing_deposit_returned | AT5-DA142: itemPayments.account: also pay existing witness deposit to owner |
 | DA143 | FoldItem.burned.extract | Burn every extraction request token on application | DurableWitnesses.DW53 | extraction_removal_legal | M-DA143: Return [] for extract |
 | DA144 | FoldItem.burned.extractAccount | Burn every extraction request token on complete account | DurableWitnesses.DW53 | extraction_removal_legal | M-DA144: Return [] for extractAccount |
 
-## Repair round 1: NOTE-007
+## Repair round 1: NOTE-007 (historical receipts)
 
 The independent audit of d2d6f15 returned NOT-READY: F1 refuted the unrestricted
 payments_total helper; F2 identified missing extraction terminality; F3 left
@@ -973,7 +982,7 @@ unwitnessed negative control, and proves the bad item has no FoldRun. Its output
 must have only standard axioms. These are finite-domain checks and a guard
 exclusion proof, not a proof of the repaired universal helper.
 
-## Repair verification and freeze identity
+## Repair round 1 verification and freeze identity (historical)
 
 Required local build: `cd lean && nix develop ..#aiken --quiet -c lake build`
 passed 26 jobs (Lean 4.29.0). Receipt: `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/repair-1/build.log`,
@@ -990,8 +999,105 @@ query, inventory, raw log and checked receipt are in this repair evidence direct
   `8ae54ce7ebc2f305bc4d185ab51c9f2712b1579a977b3b885c3064b8741e4851` (JSON.stringify of the type-record array).
 - All 193 prior public types and 32/33 helper types match the previous compiler
   freeze exactly. Only payments_total changes; five public statements are added.
-- 231 full types are recorded below and in `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/repair-1/freeze.json`.
+- Its 231 full types are retained in `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/repair-1/freeze.json`.
 - The local repair commit is recorded in STATUS.md. No push or acceptance claim.
+
+
+## Repair round 2: NOTE-009
+
+F1: D57 independently specifies the ordered event list as a flatMap over
+items.zipIdx, computing each item's events at atTurn tx index. It does not call
+foldWitnessEvents. This pins concatenation to item order, including transient
+issuance before later consumption. DW57 supplies a reachable accepted extraction
+then changing write, with consumed list [none, some outputA] and produced list
+[some outputA, some outputB]. No existing public or helper statement changes.
+
+The exact AT4-DA062 edit was read from the audit's mutation.diff, applied once to
+Model.lean, and compiled in an isolated library. The auditor's byte-identical
+demo_da062 source compiles only under the mutant, with propext and Quot.sound.
+The new kill proves the negation of D57's type on the same accepted trTx; the
+unmutated control fails inside the final inequality proof (decide proves false).
+DemoExcluded.lean separately proves that D57 rules out demo_da062's proposition;
+that conditional theorem compiles under both models. Target type equality with
+the actual compiled D57 is checked by rfl in Binding.lean. Neither the kill nor
+the exclusion proof applies an admitted production theorem or a precompiled
+scenario proof: the imported scenario data are definitions, and the accepted
+FoldRun is reconstructed in the probe under the current Model. Both proofs use
+only standard axioms. This is creator sensitivity evidence, not a universal
+proof of D57 or independent acceptance of this repair.
+
+A1: corrected attributions below are audited results on 32d882c. Their precise
+lane rows and successful verdicts are copied into audit-attribution-receipt.json.
+The original blind attribution is replaced in each atom row; DA025 specifically
+edits the Step.extractionCreate target, not afterExtractionCreate on both sides.
+
+| Atom | Correct falsifier | Audited mutant / kill |
+|---|---|---|
+| A022 | reachable_output_refs | AT1-A022 / kill_reachable_output_refs |
+| A053 | account_item_inversion | AT1-A053 / kill_account_item_inversion |
+| DA003 | registry_creation | AT3-DA003 / kill_da003 |
+| DA025 | extraction_creation_inversion | AT3-DA025 / kill_da025 |
+| DA038 | extraction_item_inversion | AT4-DA038 / kill_da038 |
+| DA056 | reachable_witness_bijection | AT4-DA056 / kill_da056 |
+| DA063 | fold_payments_exact | AT4-DA063 / kill_da063 |
+| DA076 | fold_requests_unique | AT4-DA076 / kill_da076 |
+| DA128 | write_item_inversion | AT5-DA128 / kill_da128 |
+| DA133 | blind_write_folds_on_any_tree | AT5-DA133 / kill_da133 |
+| DA139 | folder_discovery_executable | AT5-DA139 / kill_da139 |
+| DA140 | fold_payments_exact | AT5-DA140 / kill_da140_pay |
+| DA141 | fold_payments_exact | AT5-DA141 / kill_da141_pay |
+| DA142 | unused_witnessing_deposit_returned | AT5-DA142 / kill_da142 |
+
+DA062 now maps to D57 and the local AT4-DA062 kill. DA120 is equivalent only in
+the conjunction with exitsAs used by D28/D29: removing tx.input = o from the
+observation predicate is shadowed there. da120_shadowed is a kernel-checked
+audit-2 proof using propext, not a mutation kill; Step does not consume that
+predicate. A053 is not equivalent: D56 observes interval.valid on standalone
+account itemAllowed and AT1-A053 kills it. A091 and DA134 have separate audit-2
+equivalence proofs; DA134's old expected-falsifier cell is only a historical
+expectation, superseded by da134_equivalent (itemWitnessEvents unchanged).
+
+T118 now names L4-M09 (claimPayouts recurses on the incoming state); its successful
+kill is kill_fold_balance_conservation. M-credit-unbacked changes only value and
+cannot falsify balance conservation. MD51 now names the L6-M20 writeEntry edit
+that stores absence instead of the witnessing set's value; kill_d51 detects it.
+The old MD51 guard edit cannot falsify D51 because that guard is in its premise.
+
+The numbered atom denominator is 153 inherited plus 144 added = 297; MA1–MA4
+are supplemental mappings. Audit 2 reports 293 killed, three equivalent and
+DA062 surviving at 32d882c. This repair adds the targeted DA062 creator kill;
+it does not claim a new independent 297-atom campaign.
+
+A2: presence is an exact-value witness observed as presence. Extraction names
+the exact value it commits to, and any value change consumes that witness.
+There is no value-agnostic presence witness or extraction request in this model.
+This records NOTE-009's interpretation; no model behavior changes for it.
+
+A5: unwitnessedTree was unused and is removed. The entire Model diff against
+32d882c is that deletion; OracleIdentity and all other model definitions remain
+byte-identical. The audit's semantic type census at 32d882c (21 restated, 117
+same-type with changed dependencies, four fully identical, 56 new) is distinct
+from the source-text census of 18 changed old signatures above.
+
+Local evidence directory: `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/repair-2`.
+Independent audit evidence cited read-only: `/code/mpfs-onchain-lean-128-20261029/.archived/claude-statement-audit-2/evidence`.
+
+## Repair round 2 verification and freeze identity
+
+Required build: `cd lean && nix develop ..#aiken --quiet -c lake build` passed
+26 jobs (Lean 4.29.0). Build log SHA-256: `b992acab2b8e7a68f33e41f2054821490b7b69bfd3ef2021752f1621fa78bdaa`.
+Axiom census: 909/909; all 677 witness/support constants use only
+standard axioms. Exactly 199 public and 33 helper statements intentionally use
+sorryAx in STATEMENTS mode. Axiom log SHA-256: `356934011bd83f18cedf6bd971921d0352027c7f7ea188d050c4c9f5a0503974`.
+
+- Model SHA-256: `7073843ebcafeb9146208221510594c9d38bd6efbb67acdb0556a3c4d32654a4`.
+- Ordered qualified names and full elaborated types SHA-256:
+  `0aa171c55e4ecf9e166948d4e1bdfd004a6f92b69ae41c6f1d5438309c62a127` (JSON.stringify of the type-record array).
+- All 198 prior public and all 33 helper types are byte-identical to the previous
+  compiler freeze. Only D57 is added. All 232 full types follow and are in freeze.json.
+- No admission in Model or witnesses; no new proof claim for any universal statement.
+- Local commit and final committed-head verification are recorded in STATUS.md.
+  This remains a repair CANDIDATE pending independent re-audit. No push.
 
 ## Full elaborated statement types
 
@@ -6069,6 +6175,21 @@ RequestApprovalFold.account_item_inversion : ∀ (c : RequestApprovalFold.CageSt
                           (RequestApprovalFold.Request.deadline (RequestApprovalFold.RequestOutput.request o))
                           (RequestApprovalFold.Request.window (RequestApprovalFold.RequestOutput.request o))))
                       (RequestApprovalFold.hasAccount c (RequestApprovalFold.RequestOutput.request o) refs e))))))))))
+```
+
+### RequestApprovalFold.fold_witness_events_in_item_order
+
+```lean
+RequestApprovalFold.fold_witness_events_in_item_order : ∀ (tx : RequestApprovalFold.FoldTx),
+  RequestApprovalFold.foldAccepted tx →
+    @Eq.{1} (List.{0} RequestApprovalFold.WitnessEvent) (RequestApprovalFold.FoldTx.witnessEvents tx)
+      (@List.flatMap.{0, 0} (Prod.{0, 0} RequestApprovalFold.FoldItem Nat) RequestApprovalFold.WitnessEvent
+        (fun (p : Prod.{0, 0} RequestApprovalFold.FoldItem Nat) =>
+          RequestApprovalFold.itemWitnessEvents
+            (RequestApprovalFold.atTurn tx (@Prod.snd.{0, 0} RequestApprovalFold.FoldItem Nat p))
+            (@Prod.fst.{0, 0} RequestApprovalFold.FoldItem Nat p))
+        (@List.zipIdx.{0} RequestApprovalFold.FoldItem (RequestApprovalFold.FoldTx.items tx)
+          (@OfNat.ofNat.{0} Nat (nat_lit 0) (instOfNatNat (nat_lit 0)))))
 ```
 
 ### RequestApprovalFold.ProofHelpers.registry_refl

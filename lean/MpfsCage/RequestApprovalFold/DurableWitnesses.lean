@@ -919,4 +919,14 @@ def DW56 : Reachable refusedPending ∧
  itemAllowed refusedPending.cage ⟨10,15⟩ [] [] (.account refusedOutput (Witnesses.selected false)) :=
  ⟨refused_pending_reachable,refused_account_valid⟩
 
+/-- D57: an accepted reachable extraction followed by a changing write records
+issuance before consumption of the transient witness. -/
+def DW57 : Reachable transientSource ∧ foldAccepted transientTx ∧
+ Step transientSource (.fold transientTx) transientResult ∧
+ transientTx.witnessEvents = transientTx.items.zipIdx.flatMap
+   (fun p => itemWitnessEvents (atTurn transientTx p.2) p.1) ∧
+ transientTx.witnessEvents.map WitnessEvent.consumed = [none, some outputA] ∧
+ transientTx.witnessEvents.map WitnessEvent.produced = [some outputA, some outputB] :=
+ ⟨transient_source_reachable,transient_accepted,transient_step,rfl,rfl,rfl⟩
+
 end RequestApprovalFold.DurableWitnesses
