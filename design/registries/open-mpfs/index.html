@@ -1,0 +1,2028 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://cardano-foundation.github.io/cardano-mpfs-onchain/design/registries/open-mpfs/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../lifecycle/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Open MPFS design document - Cardano MPFS Onchain</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#open-mpfs-design-document" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Cardano MPFS Onchain" class="md-header__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Cardano MPFS Onchain
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Open MPFS design document
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Follow the system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Follow the system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Cardano MPFS Onchain" class="md-nav__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Cardano MPFS Onchain
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../introduction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../haskell-cage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Haskell Cage Library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types & Encodings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/proofs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proof System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/properties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Properties
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Permissionless multi-oracle registries
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Permissionless multi-oracle registries
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open MPFS design document
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open MPFS design document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#shared-state-needs-folding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared state needs folding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-open-mpfs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why open MPFS
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Why open MPFS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-moog-taught" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What moog taught
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-permissionless-singular-taught" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What permissionless Singular taught
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-a-keeper-to-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a keeper to services
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-system-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The system at a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#who-checks-what" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who checks what
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#judgments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Judgments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#money" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Money
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oracle-identities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Oracle identities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slots-and-check-protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slots and check protocols
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Slots and check protocols">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#worked-example-moog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked example: moog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#durable-witnesses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable witnesses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternatives rejected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-and-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status and open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Request lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../economics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Economics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../oracles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Oracle identities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../slots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Oracle slots (draft)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../formal-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Formal model and audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Design
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Permissionless multi-oracle registries
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="open-mpfs-design-document">Open MPFS: design document</h1>
+<p><strong>As anyone who wants a shared, verifiable key-value registry on Cardano, I
+want to create one by naming the oracles that judge it and the checks they
+perform, so that the registry needs no owner, no script of its own and no
+folding infrastructure, its rules can never be changed under its users, and
+anyone can fold what its oracles have approved.</strong></p>
+<p>This document gathers the decisions taken from 24 to 27 October 2026 on open
+MPFS: Merkle Patricia Forestry registries without an owner, judged by
+independent oracles and folded by anyone. Each section says what is decided,
+what is a draft whose direction is agreed but whose details are still moving,
+and what is open.</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Decided</strong></td>
+<td>Recorded in the decision records; the earlier part is modelled in Lean and audited</td>
+</tr>
+<tr>
+<td><strong>Draft</strong></td>
+<td>Direction agreed in discussion; details may still change</td>
+</tr>
+<tr>
+<td><strong>Open</strong></td>
+<td>Not decided</td>
+</tr>
+</tbody>
+</table>
+<p>The decision records are the authority; this document explains them:</p>
+<ul>
+<li><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/request-approval-fold/decisions.md"><code>specs/request-approval-fold/decisions.md</code></a>:
+  requests, judgments, folds and money;</li>
+<li><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-identity/decisions.md"><code>specs/oracle-identity/decisions.md</code></a>:
+  oracle identities and how fees reach keys;</li>
+<li><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-slots/decisions.md"><code>specs/oracle-slots/decisions.md</code></a>:
+  slots and check protocols, the draft.</li>
+<li><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/durable-witnesses/decisions.md"><code>specs/durable-witnesses/decisions.md</code></a>:
+  durable witnesses of registry facts.</li>
+</ul>
+<h2 id="shared-state-needs-folding">Shared state needs folding</h2>
+<p>The hard problem here is not the Merkle Patricia Forestry. It is shared
+state on Cardano.</p>
+<p>A registry is one piece of state that many people want to change. On Cardano
+that state lives in a single output, and changing it means spending that output
+and creating its successor. Only one transaction can spend an output. If two
+people each build a transaction that updates the registry, the first one in a
+block wins and the other is rejected, because the output it spent no longer
+exists. With many writers, almost every direct update would fail.</p>
+<p>With a Merkle Patricia Forestry it is worse. A write carries a proof built
+against the root the writer last saw. When another update lands first, the
+root changes and the proof is stale: the loser must fetch the new tree,
+rebuild its proof and race again, against everyone else doing the same.</p>
+<p>So writers do not touch the state, and do not build proofs. Each writer creates a <strong>request</strong> in an
+output of its own, where it contends with nobody. Then one transaction spends
+the state together with a batch of requests and applies them all, in order,
+producing the next state. That transaction is a <strong>fold</strong>.</p>
+<pre class="mermaid"><code>flowchart LR
+  a([Writer A]) -- "own output" --&gt; ra[(Request A)]
+  b([Writer B]) -- "own output" --&gt; rb[(Request B)]
+  c([Writer C]) -- "own output" --&gt; rc[(Request C)]
+  ra &amp; rb &amp; rc --&gt; fold["Fold: one transaction&lt;br/&gt;applies the batch in order"]
+  s0[(State n)] -- "spent once" --&gt; fold
+  fold --&gt; s1[(State n + 1)]</code></pre>
+<p>The folder builds every proof at fold time, one after another, each against
+the root left by the previous write, so the proofs are right by construction.
+A writer only states its write and the conditions it expects of the tree; the
+folder proves them. The Merkle Patricia Forestry makes the state small enough
+to live in one output, a root hash, and makes each write checkable with a
+short proof; any shared state on Cardano, with or without a tree, needs the
+same folding pattern.</p>
+<p>Folding answers contention and raises two questions in its place: who folds,
+and who decides which requests may be folded. MPFS today answers both with
+one key. Open MPFS answers them with services anyone can run.</p>
+<h2 id="why-open-mpfs">Why open MPFS</h2>
+<p>MPFS today is a registry with a keeper. One key owns the cage, judges every
+request, and is the only party allowed to fold. The design makes the keeper
+unable to cheat the tree, but not unnecessary: every write waits for it, every
+rule lives in its private code, and running it is a cost its operator carries
+for the sake of its own application. Open MPFS turns that keeper into a set of
+services anyone can offer and be paid for. Two experiences led here.</p>
+<h3 id="what-moog-taught">What moog taught</h3>
+<p>Moog runs its registry on the shipped cage. Reading what its oracle actually
+checks shows five things.</p>
+<pre class="mermaid"><code>flowchart LR
+  req([Requesters]) -- "requests with a tip" --&gt; op["One operator key:&lt;br/&gt;owner, oracle and folder"]
+  op -- "runs off chain" --&gt; checks["Moog's checks:&lt;br/&gt;signatures, tree facts, GitHub"]
+  op -- "the only one who can fold,&lt;br/&gt;end or sweep the cage" --&gt; cage[(Cage)]
+  agent([Moog agent]) -- "results, trusted by the operator" --&gt; op</code></pre>
+<ul>
+<li><strong>One key does three jobs.</strong> The owner is the oracle and the only folder; it
+  can also end the cage. If its operator stops, nothing moves, and nobody else
+  may step in.</li>
+<li><strong>Every check is off chain, in one program, even those the chain could
+  make.</strong> The oracle checks the requester's signature, that a role or a
+  white-listing exists, that test runs are numbered in order, that results
+  come from the agent. The chain could check all of these with signatures and
+  tree conditions; instead readers trust that one program ran them. Only the
+  GitHub lookups truly need an oracle.</li>
+<li><strong>Generic checks are locked inside one application.</strong> "This GitHub user
+  publishes this key" and "this repository's code owners name this user" are
+  useful to many registries, but they exist only as moog's oracle code, run by
+  moog's operator, for moog.</li>
+<li><strong>Running the oracle is a cost, not a business.</strong> The requester's tip pays
+  for the folding transaction. The operator runs the oracle because it needs
+  the registry, so nobody outside the application has a reason to run one,
+  and nobody can compete to run it better or cheaper.</li>
+<li><strong>Unaccepted requests are never refused.</strong> Moog's oracle has no refusal: a
+  request it will not accept stays in the cage, checked again at every poll,
+  until its owner retracts it, and the requester learns nothing about why.</li>
+</ul>
+<h3 id="what-permissionless-singular-taught">What permissionless Singular taught</h3>
+<p>Singular, a permissionless mint of unique names over a Merkle Patricia
+Forestry registry, went through the same move first.</p>
+<ul>
+<li><strong>Anyone can fold, from public data alone.</strong> Singular's folds need no signer
+  and no privileged folder; the request's remainder is the folder's bid, so
+  folding is a market instead of a duty.</li>
+<li><strong>No one keeps power over a registry after creating it.</strong> Singular has no
+  authority to update parameters or migrate a registry; whoever could would
+  hold power over every name in it.</li>
+<li><strong>What a creator declares unchecked becomes an attack.</strong> Singular's creators
+  wrote policy references into the registry that creation did not check, and
+  a forged one let someone mint a live name outside any fold. Everything a
+  creator declares must either be checked or be the registry's identity, named
+  by hash.</li>
+<li><strong>Admission belongs to the application, not to the protocol.</strong> Singular's
+  investigation (lambdasistemi/singular#731, #741) moved the request lifecycle
+  out of the protocol and into the application, which keeps the protocol small
+  and provable. In open MPFS the application is the registry's rule and its
+  oracles; the protocol only folds what they admitted. Open MPFS keeps one
+  generic request lifecycle for every registry, because oracles must be paid
+  for judging even when nothing is written.</li>
+<li><strong>No state outside the tree.</strong> Per-key tokens held outside Singular's
+  registry were where its forgeries lived; open MPFS keeps everything in the
+  tree.</li>
+</ul>
+<h3 id="from-a-keeper-to-services">From a keeper to services</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>MPFS today</th>
+<th>Open MPFS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who may fold</td>
+<td>The owner</td>
+<td>Anyone, paid by the request's remainder</td>
+</tr>
+<tr>
+<td>Who judges</td>
+<td>The owner's oracle</td>
+<td>Independent oracles, named per slot, each paid per judgment</td>
+</tr>
+<tr>
+<td>Where the rules are</td>
+<td>One private program</td>
+<td>Signatures in the rule, tree facts in conditions, only outside-world facts in oracles</td>
+</tr>
+<tr>
+<td>Who can change or end the registry</td>
+<td>The owner</td>
+<td>No one</td>
+</tr>
+<tr>
+<td>A request that is not accepted</td>
+<td>Waits until its owner retracts it</td>
+<td>Refused and paid for, with the refusal on chain</td>
+</tr>
+<tr>
+<td>Why someone runs an oracle</td>
+<td>To have their own registry</td>
+<td>To earn fees from every registry that names it</td>
+</tr>
+<tr>
+<td>Reusing a check</td>
+<td>Copy the code</td>
+<td>Name the same check protocol and provider</td>
+</tr>
+</tbody>
+</table>
+<p>The parties who care about a registry each run the piece they are good at,
+in the service of requesters. A team that needs a registry declares its rule
+and picks its providers, once. Whoever can verify something about the world,
+such as a GitHub identity, publishes a check and serves it to every registry
+that wants it, for a fee. Whoever runs an indexer and a node folds, for the
+remainder. Requesters pay each of them for exactly the work done, and no one
+of them can stop, redirect or rewrite the others.</p>
+<h2 id="the-system-at-a-glance">The system at a glance</h2>
+<p>Two words carry the whole design. A <strong>registry</strong> is a key-value database
+together with its rules: what users create, write to and read. Its <strong>registry
+state</strong> is the one output on chain, marked by a unique token, that holds the
+database's root hash, its slots, protocol and rule, and the oracles' fee
+balances. The database itself lives off chain, rebuilt by anyone from the
+writes recorded on chain. The shipped design calls the registry state the
+cage.</p>
+<pre class="mermaid"><code>flowchart LR
+  creator([Registry creator]) -- "mints, naming slots,&lt;br/&gt;protocol and rule" --&gt; state[(Registry state:&lt;br/&gt;root, slots, balances)]
+  requester([Requester]) -- "creates request: write,&lt;br/&gt;conditions, evidence, fees" --&gt; request[(Request output)]
+  oracle([Oracle]) -- "judges off chain,&lt;br/&gt;mints approval or refusal" --&gt; judgment[(Judgment token)]
+  folder([Folder]) -- "spends requests, reads judgments,&lt;br/&gt;proves conditions" --&gt; state
+  request -- "spent by exactly one exit" --&gt; folder
+  judgment -. "read by reference" .-&gt; folder
+  reader([Reader]) -- "replays folds" --&gt; state</code></pre>
+<p>The shipped cage has one owner that alone folds requests, and one request
+script per cage. Open MPFS removes both. A registry is data naming its
+judges; one request script per release serves every registry; folding is a
+service anyone can offer and be paid for.</p>
+<table>
+<thead>
+<tr>
+<th>Who</th>
+<th>Wants</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Registry creator</td>
+<td>A registry whose rules are fixed forever</td>
+<td>Names the slots, the protocol and the rule, once</td>
+</tr>
+<tr>
+<td>Requester</td>
+<td>One write applied under conditions they choose</td>
+<td>Creates a request carrying the write, the conditions, the evidence and the fees</td>
+</tr>
+<tr>
+<td>Oracle</td>
+<td>To be paid for judging</td>
+<td>Judges off chain, mints an approval or a refusal, collects its fees by claim</td>
+</tr>
+<tr>
+<td>Folder</td>
+<td>The remainder of the requests it folds</td>
+<td>Applies approved requests to the tree, proving their conditions</td>
+</tr>
+<tr>
+<td>Reader</td>
+<td>The registry's contents</td>
+<td>Rebuilds the tree by replaying folds; every write is on chain</td>
+</tr>
+</tbody>
+</table>
+<h2 id="registries">Registries</h2>
+<p><strong>Decided.</strong></p>
+<ul>
+<li><strong>Anyone can create a registry.</strong> Creation mints the registry state with an
+  empty root, the oracles, the protocol and optionally a rule. No script is
+  applied to a registry.</li>
+<li><strong>A registry needs at least one oracle or a rule.</strong> A registry with neither
+  would accept any write.</li>
+<li><strong>Everything is declared at creation and never changes.</strong> Whoever could
+  change a part would hold power over everyone who trusted the registry. The
+  oracles and the protocol are the registry's identity: new judges mean a new,
+  empty registry.</li>
+<li><strong>A registry has no owner and no end.</strong> Its oracles are its only judges. A
+  registry whose oracles stop answering stops moving.</li>
+<li><strong>Oracles need not consent to being named.</strong> Naming is an offer of business;
+  an oracle that does not want it never answers.</li>
+</ul>
+<h2 id="who-checks-what">Who checks what</h2>
+<p><strong>Decided</strong>, with the slot row a draft. A registry defends itself in four
+layers, each blind to what another sees:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Runs</th>
+<th>Defends against</th>
+<th>Blind to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rule</td>
+<td>Once, when the request is created</td>
+<td>The wrong writer (signatures), malformed writes, writes without the conditions they need (it demands them)</td>
+<td>The tree and the outside world</td>
+</tr>
+<tr>
+<td>Conditions</td>
+<td>At the fold, at the request's turn</td>
+<td>Stale, out-of-order or duplicated writes</td>
+<td>Anything not in the tree</td>
+</tr>
+<tr>
+<td>Oracles in slots</td>
+<td>Off chain, attested by a judgment</td>
+<td>False claims about the outside world</td>
+<td>Keys outside their slots</td>
+</tr>
+<tr>
+<td>The fold</td>
+<td>Every fold</td>
+<td>Forged requests, late folds, altered bytes, missing approvals, false conditions</td>
+<td>Meaning: it checks bytes, hashes and proofs</td>
+</tr>
+</tbody>
+</table>
+<p>Under all four lies immutability: no one can switch them off later.</p>
+<ul>
+<li><strong>An oracle is needed only where the chain cannot see the data.</strong> Signatures
+  belong to the rule; facts about earlier writes are conditions; only the
+  outside world needs an oracle.</li>
+<li><strong>A service that only reports its own work is a key in the rule, not an
+  oracle.</strong> Its writes are trusted because it signed them; the registry limits
+  where it may write and that it cannot overwrite.</li>
+<li><strong>The <code>equals</code> condition ties a signer to the tree.</strong> A rule can demand "the
+  user's registered key equals the key that signed", so an earlier
+  registration authorizes a later request with no oracle.</li>
+<li><strong>Rules are compiled minting policies</strong>, named by hash in the registry state,
+  minting the request token, so they run exactly once, at creation, on one
+  request. They reach the tree only by demanding conditions.</li>
+<li><strong>The condition language is <code>absent</code>, <code>present</code> and <code>equals</code></strong>, each costing
+  one Merkle Patricia Forestry proof in the fold.</li>
+</ul>
+<h2 id="requests">Requests</h2>
+<p><strong>Decided.</strong></p>
+<ul>
+<li><strong>A request carries one write</strong>, <code>set key value</code> or <code>unset key</code>, on chain in
+  its datum, so readers rebuild the tree for free.</li>
+<li><strong>A request carries conditions</strong>, checked at the fold against the tree at its
+  turn. Compare-and-swap is a write with a condition on its own key.</li>
+<li><strong>A request carries evidence</strong>, opaque to the chain; the protocol decides
+  whether it holds the evidence or its hash.</li>
+<li><strong>A request carries a seed</strong>, an output spent by its creation, so no two
+  requests in history are equal and no judgment can be replayed.</li>
+<li><strong>A request carries a deadline and a window</strong>, which divide its life into
+  three periods, each with exactly one exit.</li>
+<li><strong>A request carries one request token</strong>, minted by the rule or the release
+  policy at creation. It is what makes a request genuine; folders find a
+  registry's live requests with one query by it.</li>
+<li><strong>A request carries one tag per oracle</strong>, named after the oracle, so an
+  oracle finds all its work across every registry with one query.</li>
+</ul>
+<pre class="mermaid"><code>stateDiagram-v2
+  [*] --&gt; Pending: created, seed spent,&lt;br/&gt;request token and tags minted
+  Pending --&gt; Folded: fold before the deadline,&lt;br/&gt;with every approval it needs
+  Pending --&gt; Settled: complete account in the window,&lt;br/&gt;a verdict from every oracle
+  Pending --&gt; Withdrawn: owner, after the window
+  Folded --&gt; [*]: write applied, fees credited,&lt;br/&gt;remainder to the folder
+  Settled --&gt; [*]: fees credited,&lt;br/&gt;remainder to the owner
+  Withdrawn --&gt; [*]: everything to the owner</code></pre>
+<table>
+<thead>
+<tr>
+<th>Period</th>
+<th>The only exit</th>
+<th>Who is paid</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Before the deadline</td>
+<td>A fold applying the write</td>
+<td>Oracles their fees; the folder the remainder</td>
+</tr>
+<tr>
+<td>From the deadline to the deadline plus the window</td>
+<td>A fold settling it by complete account</td>
+<td>Oracles their fees; the owner the remainder</td>
+</tr>
+<tr>
+<td>After the window</td>
+<td>The owner's withdrawal</td>
+<td>The owner everything</td>
+</tr>
+</tbody>
+</table>
+<h2 id="judgments">Judgments</h2>
+<p><strong>Decided</strong>, with the trimmed minting checks a draft.</p>
+<ul>
+<li><strong>An oracle approves or refuses by minting a token</strong> under the release
+  policy, by reference to the request. Nothing is spent, so oracles never
+  contend for an output.</li>
+<li><strong>The policy computes the token's name</strong> from the registry, the complete
+  request datum, the oracle, the verdict, the members of a group oracle that
+  signed and, for an approval, the oracle's conditions. The oracle chooses its
+  verdict, its conditions and who signs; it cannot produce a name for content
+  it did not see.</li>
+<li><strong>An approval may carry the oracle's conditions</strong>, the assumptions it judged
+  under; the fold proves them at the request's turn.</li>
+<li><strong>A fold signed by an oracle counts as its approval</strong>, so an oracle that
+  folds itself needs no separate judgment.</li>
+<li><strong>Approving and refusing pay the same</strong>, so an oracle gains nothing by its
+  verdict.</li>
+<li><strong>Equivocation is accepted.</strong> An oracle can mint both verdicts; under the
+  periods above it changes nothing, and both stay on chain under its
+  signature.</li>
+<li><strong>Draft: minting checks only what the fold cannot.</strong> The policy needs the
+  preimage of the name, to see which oracle it claims; the oracle's
+  authorization; and a time before the request's deadline, so that no oracle
+  is paid by a complete account for a judgment made too late. Whether the
+  oracle belongs to the registry is left to the fold, which matches names
+  against its own slots. A judgment then needs no reference to the registry state,
+  which every fold spends, so judging never races folding.</li>
+</ul>
+<pre class="mermaid"><code>sequenceDiagram
+  participant R as Requester
+  participant O as Oracle
+  participant F as Folder
+  participant C as Registry state
+  R-&gt;&gt;R: create request: write, conditions, evidence, fees, seed
+  O-&gt;&gt;O: parse under its check, look at the world
+  O-&gt;&gt;O: mint approval named after the exact request datum
+  F-&gt;&gt;C: fold: genuine request, on time, approvals of every matching slot,&lt;br/&gt;conditions proved, write applied, fees credited</code></pre>
+<p>What the fold checks for each request, in order:</p>
+<ol>
+<li>The request carries the registry's request token, and the fold's validity
+   interval falls before its deadline.</li>
+<li>Which slots match: each slot whose prefix starts the written key, by byte
+   comparison. No CDDL is read on chain.</li>
+<li>For each matching slot, a judgment token whose name the fold recomputes
+   from the request it spends, the slot's oracle and the conditions and
+   signers given in the redeemer; or that oracle's authorization of the fold.</li>
+<li>Every condition, the requester's and each approval's, against the tree at
+   this turn, by proof.</li>
+<li>The new root after the write.</li>
+<li>Each matching slot's fee, credited to the signers of its judgment.</li>
+</ol>
+<h2 id="money">Money</h2>
+<p><strong>Decided.</strong></p>
+<ul>
+<li><strong>The request pays for judgment, not for outcome</strong>, declaring a fee per
+  oracle.</li>
+<li><strong>Fees accumulate in the registry state.</strong> Paying each oracle in its own output would
+  cost the ledger's minimum per oracle per request. The registry state keeps a balance
+  per key and holds their sum.</li>
+<li><strong>Only a fold spends the registry state.</strong> Everything that changes it is an item of a
+  fold, so nothing races the fold:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Fold item</th>
+<th>When</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Write request</td>
+<td>Before its deadline</td>
+<td>Applies the write, credits the fees, remainder to the folder</td>
+</tr>
+<tr>
+<td>Complete account</td>
+<td>In its window</td>
+<td>Writes nothing, credits the fees, remainder to the owner</td>
+</tr>
+<tr>
+<td>Claim</td>
+<td>Before its deadline</td>
+<td>Pays one key's whole balance to the destination the claim names</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>An oracle collects its fees by claim</strong>, a request created with its key's
+  signature that names the payout address and datum. The folder cannot choose
+  the payout; the fold checks it exactly.</li>
+<li><strong>The escrow exceeds the fees by the ledger's minimum</strong>, so a complete
+  account can always refund the owner.</li>
+</ul>
+<pre class="mermaid"><code>flowchart LR
+  req([Request escrow]) -- "fee per oracle" --&gt; cage[(Registry state: one balance per key)]
+  req -- "remainder" --&gt; folder([Folder, or the owner&lt;br/&gt;on a complete account])
+  cage -- "claim: whole balance" --&gt; payout([Payout chosen by the key])</code></pre>
+<h2 id="oracle-identities">Oracle identities</h2>
+<p><strong>Decided.</strong> The oracle identity is a standard of its own, which open MPFS
+consumes and which may move to its own repository.</p>
+<ul>
+<li><strong>An oracle is a key or a group</strong>: a threshold and members, each a key or a
+  group, each with a share. Groups nest.</li>
+<li><strong>Its identity is the hash of its description</strong> and never changes. Keys are
+  not rotated: a group that loses members beyond its threshold is dead, and
+  its users name a new identity in a new registry.</li>
+<li><strong>A key authorizes by signing; a group when its threshold of members
+  authorize</strong>, recursively. The description travels in the redeemer; one
+  library function checks it for every contract, rules included.</li>
+<li><strong>Only the members that signed are paid</strong>, by their shares, down to keys.
+  The signers are bound in the judgment's name. The integer remainder goes to
+  the first signer.</li>
+<li><strong>A key stolen compromises only its oracles, up to their thresholds.</strong> A
+  registry naming several oracles already needs all of them; a single oracle
+  protects itself with a group.</li>
+</ul>
+<pre class="mermaid"><code>flowchart TD
+  group["Group oracle, threshold 2"] -- "share 2" --&gt; alice["Key: Alice"]
+  group -- "share 1" --&gt; bob["Key: Bob"]
+  group -- "share 1" --&gt; inner["Group oracle, threshold 1"]
+  inner -- "share 1" --&gt; carol["Key: Carol"]
+  inner -- "share 1" --&gt; dave["Key: Dave"]</code></pre>
+<p>If Alice and Carol sign a judgment whose fee is 9, Alice is paid 6 and Carol
+3; Bob and Dave, who did not sign, are paid nothing.</p>
+<h2 id="slots-and-check-protocols">Slots and check protocols</h2>
+<p><strong>Draft</strong>, except where marked decided.</p>
+<ul>
+<li><strong>A registry names its oracles in slots</strong>: an oracle identity, the hash of a
+  check protocol, a key prefix and parameters.</li>
+<li><strong>A write needs approval only from the slots whose prefix matches its key.</strong>
+  Keys under no slot are gated by the rule alone; a registry without a rule
+  refuses them. When several slots match, all must approve.</li>
+<li><strong>A check protocol is a document named by hash</strong>, published by whoever
+  writes the checking software: what is checked, the parameters, the shape of
+  the key after the prefix and of the value, in CDDL. A new version is a new
+  hash.</li>
+<li><strong>Under a slot's prefix the registry imports the check's shapes</strong>; the rule
+  may only narrow them.</li>
+<li><strong>A registry protocol ships a request zoo</strong>, one sample per kind of request,
+  validated before creation against each slot's check, its parameters and the
+  rule. A passing zoo means the registry engages its checks correctly.</li>
+<li><strong>An oracle reads slots, not registry documents.</strong> It engages a slot when it
+  implements its check, accepts its parameters and the fee meets its price.</li>
+<li><strong>Decided: liveness is incentivized, not enforced.</strong> A silent oracle stalls
+  its slots and nothing replaces it, since a fallback judge would reintroduce
+  an owner. Answering is what earns. A creator protects a registry by choosing
+  providers, or by naming a group of competing providers whose threshold
+  trades liveness against agreement.</li>
+<li><strong>Decided: creating a registry is a challenge to its oracles.</strong> Nothing is
+  negotiated beforehand; a slot proves to be served when its kinds of request
+  are judged. A creator probes each slot and abandons a silent registry at the
+  cost of its creation.</li>
+</ul>
+<p>With slots, "every oracle" in the sections above reads "every oracle whose
+slot matches the key": tags, approvals, complete accounts and fees follow the
+matching slots.</p>
+<h3 id="worked-example-moog">Worked example: moog</h3>
+<p>Moog lets GitHub users request test runs on Antithesis. Its registry splits
+into three GitHub slots and two prefixes gated by its rule alone:</p>
+<pre class="mermaid"><code>flowchart LR
+  write([A write]) --&gt; match{"Key prefix"}
+  match -- "user/github/" --&gt; s1["GitHub oracle:&lt;br/&gt;key file check"]
+  match -- "role/github/" --&gt; s2["GitHub oracle:&lt;br/&gt;code owners role check"]
+  match -- "run/github/" --&gt; s3["GitHub oracle:&lt;br/&gt;compose assets check"]
+  match -- "white/github/, state/github/" --&gt; rule["Rule alone:&lt;br/&gt;the agent signs"]</code></pre>
+<p>A test run needs the GitHub oracle only to confirm that the commit and its
+compose file exist. That the requester holds the role, that the repository is
+white-listed, that the requester's registered key signed and that runs are
+numbered in order are conditions and rule checks. The agent's acceptances and
+results need no oracle: the rule checks the agent's signature and a condition
+checks the previous state. The CDDL for the slots, the checks and the moog
+protocol is on <a href="../slots/">Oracle slots and check protocols</a>.</p>
+<h2 id="durable-witnesses">Durable witnesses</h2>
+<p><strong>Decided.</strong></p>
+<p>A consumer proving a fact about one key references the registry state and
+its root. A fold writing any other key spends that output and changes the
+root, so the consumer must rebuild its proof although its fact still holds.
+Durable witnesses remove that dependence on unrelated writes.</p>
+<ul>
+<li><strong>A witness attests one fact about one key</strong>: absent, present, or holding
+  an exact value.</li>
+<li><strong>Anyone extracts one by funding its deposit</strong>, and is its issuer.</li>
+<li><strong>It stays usable until the next change to its key.</strong> Writes to other keys
+  leave it usable and its deposit in place.</li>
+<li><strong>The registry tracks the obligation per key, and every fold complies.</strong> The
+  next change to a tracked key consumes its witness and refunds the deposit to
+  the issuer in the same fold; otherwise the fold is invalid. A value change
+  consumes a presence witness even when the key stays present.</li>
+<li><strong>A key has at most one witness, kept in the trie.</strong> A key is unwitnessed,
+  holding its value or with no entry when absent, or witnessed, when its entry
+  is the witness: the attested value or absence and the refund address. A
+  witnessed absence reads as absent to conditions and readers.</li>
+<li><strong>Extraction is a request that needs only its deposit</strong>, with no rule and
+  no oracle, folded like a write, that turns the key's entry
+  into a witness. The next <code>set</code> or <code>unset</code> on the key proves that entry,
+  burns the witness and pays the deposit to the refund address.</li>
+<li><strong>Extraction commits to the value it wants</strong>, or to absence, and is folded
+  only when the key is unwitnessed and holds exactly that at its turn.</li>
+<li><strong>The folder burns, writes and mints in one transaction.</strong> It burns the
+  old witness token, changes the tree and, when the request asks, mints the
+  new witness token, so a witnessed entry always has exactly one live token.</li>
+<li><strong>Witness tokens sit at the registry state's address</strong>, each in its own
+  output funded by its deposit. A consumer references it; only a fold spends
+  it.</li>
+<li><strong>A <code>set</code> request can include the witnessing</strong>: it writes the value and
+  leaves the key witnessed with it, refunding any earlier witness in the same
+  fold.</li>
+<li><strong>The deposit is separate</strong> from oracle fees, the folder's remainder and
+  the request owner's refund.</li>
+<li><strong>A witness attests what the registry records</strong>; its outside-world meaning
+  still rests on the rule and the oracles.</li>
+</ul>
+<pre class="mermaid"><code>flowchart TB
+  issuer([Anyone]) -- "extracts, funds deposit" --&gt; live[Witness outstanding:&lt;br/&gt;key tracks the obligation]
+  live -- "used as evidence" --&gt; consumer([Consumer contract])
+  live -- "next change&lt;br/&gt;to this key" --&gt; fold[One fold: changes the key,&lt;br/&gt;consumes the witness,&lt;br/&gt;refunds the issuer]
+  fold -- "result" --&gt; done[Old witness unusable,&lt;br/&gt;deposit returned]</code></pre>
+<p>This follows Singular's second product milestone, whose presence, absent and
+terminal witnesses introduced proof durability.</p>
+<h2 id="alternatives-rejected">Alternatives rejected</h2>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Chosen</th>
+<th>Rejected</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who folds</td>
+<td>Anyone</td>
+<td>The registry's owner</td>
+<td>An owner is a single point of control and failure</td>
+</tr>
+<tr>
+<td>Changing a registry</td>
+<td>Never</td>
+<td>Changeable oracles, prices or rules</td>
+<td>Whoever may change them holds power over every user</td>
+</tr>
+<tr>
+<td>Where the rule runs</td>
+<td>Once, at creation, as the request token's minting policy</td>
+<td>At every fold</td>
+<td>The fold would traverse the whole batch to check what is fixed at creation</td>
+</tr>
+<tr>
+<td>How judgments travel</td>
+<td>Tokens minted by reference to the request</td>
+<td>Off-chain signatures carried in the fold's redeemer (draft)</td>
+<td>Tokens make the chain the meeting point, keep refusals on record and give the complete account its evidence</td>
+</tr>
+<tr>
+<td>Where fees go</td>
+<td>A balance per key in the registry state, claimed later</td>
+<td>A fee output per oracle per fold</td>
+<td>Each output costs the ledger's minimum, and small fees could not be paid at all</td>
+</tr>
+<tr>
+<td>Who chooses an oracle's payout</td>
+<td>The key, in its claim</td>
+<td>The folder; a payout address fixed by a group</td>
+<td>The folder could misdirect it; a majority could cut out a member</td>
+</tr>
+<tr>
+<td>Who is paid in a group</td>
+<td>The members that signed</td>
+<td>Every member</td>
+<td>A member that never judged would be paid for another's work</td>
+</tr>
+<tr>
+<td>Oracle keys</td>
+<td>Fixed identities, no rotation</td>
+<td>Rotation by the group</td>
+<td>Rotation needs a mutable identity, which is a power over every registry</td>
+</tr>
+<tr>
+<td>What an oracle can be</td>
+<td>Keys and groups of keys</td>
+<td>A script credential</td>
+<td>The chain sees a script act only through a zero withdrawal, a staking registration per oracle, or by spending its own output, an extra input per judgment</td>
+</tr>
+<tr>
+<td>A silent oracle</td>
+<td>Incentives only</td>
+<td>A fallback judge after a timeout</td>
+<td>A fallback judge is an owner</td>
+</tr>
+<tr>
+<td>Equivocation</td>
+<td>Accepted, public</td>
+<td>A ballot per oracle burned at judgment</td>
+<td>Under the three periods it changes nothing</td>
+</tr>
+</tbody>
+</table>
+<h2 id="status-and-open-questions">Status and open questions</h2>
+<p>The decisions up to 26 October, the request, judgment and fold design with
+rules and request tokens, are modelled in Lean and audited; see
+<a href="../formal-model/">Formal model and audits</a>. The decisions of 27 October are
+not modelled yet: oracle identities, fees in the registry state, complete accounts and
+claims as fold items, durable witnesses, slots and the trimmed minting
+checks. Nothing is
+implemented in the validators yet.</p>
+<p>Open:</p>
+<ul>
+<li>Whether prices are announced per check protocol, listing every provider of
+  a check in one query, instead of per oracle.</li>
+<li>Whether the fee is declared per matching slot, and whether a judgment's
+  name binds the slot, for an oracle in two slots matching one key.</li>
+<li>Whether oracles attest facts independently of any registry, valid until an
+  expiry, so that one judgment of a world fact serves every registry that uses
+  the same check; this would need its own payment path.</li>
+<li>The cost of prefix matching, condition proofs and fee splits in the fold, to
+  be measured on a devnet.</li>
+<li>The migration or coexistence of existing cages.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.indexes", "navigation.sections", "navigation.path", "toc.integrate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
