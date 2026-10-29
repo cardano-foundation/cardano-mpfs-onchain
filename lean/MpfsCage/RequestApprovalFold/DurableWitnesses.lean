@@ -895,4 +895,28 @@ def refund_without_issuer_signature : Reachable replacementPending ∧
  ⟨"refund-A","",3⟩ ∈ replacementTx.payments :=
  ⟨replacement_pending_reachable,replacement_step,rfl,rfl,rfl,by decide⟩
 
+/-- Repair F2: each terminality premise is instantiated on the reachable lifecycle. -/
+def DW52 := DW27
+
+def DW53 : Reachable pending ∧ Step pending (.fold extractTx) live ∧
+ extraction ∈ extractTx.extractions ∧ Step pending (.fold accountTx) accountResult ∧
+ extraction ∈ accountTx.extractions :=
+ ⟨pending_reachable,extract_step,by decide,account_step,by decide⟩
+
+def DW54 : Reachable live ∧ extraction.ref ∈ live.usedOutputs ∧ extraction ∉ live.extractions ∧
+ History live unrelated :=
+ ⟨live_reachable,by decide,by decide,.next unrelated_create_step (.next unrelated_step (.refl _))⟩
+
+def DW55 : Reachable pending ∧ Step pending (.extractionWithdraw withdrawTx) withdrawn ∧
+ withdrawTx.input = extraction ∧ History withdrawn withdrawn ∧
+ Step pending (.fold extractTx) live ∧ extraction ∈ extractTx.extractions ∧ History live unrelated ∧
+ Step pending (.fold accountTx) accountResult ∧ extraction ∈ accountTx.extractions ∧
+ History accountResult accountResult :=
+ ⟨pending_reachable,withdraw_step,rfl,.refl _,extract_step,by decide,DW54.2.2.2,
+ account_step,by decide,.refl _⟩
+
+def DW56 : Reachable refusedPending ∧
+ itemAllowed refusedPending.cage ⟨10,15⟩ [] [] (.account refusedOutput (Witnesses.selected false)) :=
+ ⟨refused_pending_reachable,refused_account_valid⟩
+
 end RequestApprovalFold.DurableWitnesses

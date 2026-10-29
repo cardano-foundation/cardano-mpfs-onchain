@@ -1136,4 +1136,37 @@ theorem witnessing_blind_write_availability (c : CageState) (iv : Interval) (ref
  (itemResult { c with tree := t } (.write o e)) ∧
  (itemResult { c with tree := t } (.write o e)).trie = o.request.write.apply (logicalTree t) := by sorry
 
+/-- D52: withdrawal consumes the one authentic extraction from a reachable inventory. -/
+theorem extraction_exits_remove_consumed (s s' : State) (tx : ExtractionWithdrawTx) :
+ Reachable s → Step s (.extractionWithdraw tx) s' → tx.input ∉ s'.extractions := by sorry
+
+/-- D53: application and complete account both remove every folded extraction. -/
+theorem extraction_fold_removes_consumed (s : State) (tx : FoldTx) (o : Extraction) :
+ o ∈ tx.extractions → o ∉ (afterFold s tx).extractions := by sorry
+
+/-- D54: a used extraction reference cannot return after it has left the inventory. -/
+theorem extraction_never_reappears (s s' : State) (o : Extraction) :
+ Reachable s → o.ref ∈ s.usedOutputs → o ∉ s.extractions → History s s' →
+ o ∉ s'.extractions := by sorry
+
+/-- D55: all three consumption routes are terminal on the actual successor history. -/
+theorem extraction_consumption_terminal (s t u : State) (a : Action) (o : Extraction) :
+ Reachable s → Step s a t →
+ ((∃ tx, a = .fold tx ∧ o ∈ tx.extractions) ∨
+  (∃ tx, a = .extractionWithdraw tx ∧ tx.input = o)) →
+ History t u → o ∉ t.extractions ∧ o ∉ u.extractions := by sorry
+
+/-- D56: account exposes all well-formedness, witness funding, time and evidence guards. -/
+theorem account_item_inversion (c : CageState) (iv : Interval) (refs : List TokenName)
+ (sigs : List Signer) (o : RequestOutput) (e : Selection) :
+ itemAllowed c iv refs sigs (.account o e) ↔
+ o.request.cage = c.id ∧ o.tags = c.oracles.map tagName ∧
+ totalFees c o.request + c.minimum ≤ o.value ∧
+ o.requestTokens = [requestName c.id] ∧ o.policy = requestPolicy c ∧
+ (match o.request.witnessing with
+  | none => True
+  | some spec => c.minimum ≤ spec.deposit ∧ ∃ k v, o.request.write = .set k v) ∧
+ iv.valid ∧ o.request.deadline ≤ iv.lower ∧ iv.upper ≤ o.request.deadline + o.request.window ∧
+ hasAccount c o.request refs e := by sorry
+
 end RequestApprovalFold

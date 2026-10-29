@@ -87,7 +87,9 @@ theorem run_request_conservation {iv refs sigs c items out}
  requestEscrows items = grossCredits c items + requestRemainders c items + requestDepositInputs items := by
  sorry
 
-theorem payments_total (c : CageState) (folder : Signer) (items : List FoldItem) :
+theorem payments_total (c : CageState) (folder : Signer) (items : List FoldItem)
+ (iv : Interval) (refs : List TokenName) (sigs : List Signer) (out : CageState)
+ (run : FoldRun iv refs sigs c items out) :
  totalPaid (foldPayments c folder items) =
  requestRemainders c items + claimPayouts c items + claimEscrows items +
  unusedDepositRefunds items + witnessRefundTotal c items := by

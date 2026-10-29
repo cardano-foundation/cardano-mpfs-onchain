@@ -1,9 +1,8 @@
 # Durable witnesses: model and statement candidate (#128)
 
-Status: **CANDIDATE — 193 public statements, 33 internal proof-helper statements,
-all intentionally admitted pending independent statement audit.** No proof,
-mutation kill, independent-audit pass, hosted CI result or implementation
-conformance is claimed. The 142 accepted public guarantees are retained; 51
+Status: **CANDIDATE — 198 public statements, 33 internal proof-helper statements,
+all intentionally admitted pending independent statement audit.** No universal proof, independent-audit pass, hosted CI result or implementation
+conformance is claimed. The 142 accepted public guarantees are retained; 56
 new guarantees cover durable witnesses and their request lifecycle. The old
 ledger remains historical evidence for commit 85f2b3e, not a current proof claim.
 
@@ -105,7 +104,10 @@ All legacy rows are restated over the new model; none is retired. W136 covers th
 old constructor cases, supplemented by DW25 and DW27 for the two new constructors.
 A witness supplies concrete reachable premises, sometimes more than the theorem
 requires. The mutant identifies a semantic edit expected to falsify the statement;
-**every new and inherited mutation campaign is NOT-RUN on this candidate**.
+The prior audit killed 76/193 theorem rows at d2d6f15 and found F1/F2;
+those receipts are not reclassified as this repair's verification. Creator checks
+for this repair kill M10/M11 against D52/D53/D55. Other repair mutation rows and
+retained-row floor coverage remain for the next independent audit.
 
 | Row | Theorem | Obligation | Reachable witness | Named mutant | Status |
 |---|---|---|---|---|---|
@@ -308,6 +310,11 @@ requires. The mutant identifies a semantic edit expected to falsify the statemen
 | D49 | witnessing_noop_refused | DurableWitnesses.DW49 | MD49 | ADMITTED / NOT-RUN |
 | D50 | witness_deposit_lock | DurableWitnesses.DW50 | MD50 | ADMITTED / NOT-RUN |
 | D51 | witnessing_blind_write_availability | DurableWitnesses.DW51 | MD51 | ADMITTED / NOT-RUN |
+| D52 | extraction_exits_remove_consumed | DurableWitnesses.DW52 | MD52 | ADMITTED / creator M10 KILLED |
+| D53 | extraction_fold_removes_consumed | DurableWitnesses.DW53 | MD53 | ADMITTED / creator M11 KILLED |
+| D54 | extraction_never_reappears | DurableWitnesses.DW54 | MD54 | ADMITTED / NOT-RUN |
+| D55 | extraction_consumption_terminal | DurableWitnesses.DW55 | MD55 | ADMITTED / creator M10 and M11 KILLED |
+| D56 | account_item_inversion | DurableWitnesses.DW56 | MD56 | ADMITTED / NOT-RUN |
 
 ## New mutation definitions
 
@@ -364,6 +371,11 @@ requires. The mutant identifies a semantic edit expected to falsify the statemen
 | MD49 | stepValid | Remove witnessWriteAllowed |
 | MD50 | Step | Add an issuer-signed witness withdrawal after a timeout |
 | MD51 | witnessWriteAllowed | Reject all witnessing writes even when the value changes |
+| MD52 | afterExtractionWithdraw | Keep the consumed input (audit M10) |
+| MD53 | afterFold | Keep folded extractions (audit M11) |
+| MD54 | Step.extractionCreate | Drop fresh output-reference guard, allowing an already consumed extraction to be recreated |
+| MD55 | afterFold | Keep folded extractions, allowing repeated consumption (audit M11; M10 also checked) |
+| MD56 | accountAllowed | Remove wellFormed, admitting an unfunded witnessing request |
 
 Guard-removal counterexamples may use a malformed proposed action after the same
 reachable prefix. Redundant guards must be classified by the independent auditor;
@@ -713,10 +725,11 @@ or ProofHelpers; no witness relies on an intentional theorem admission.
 
 ## Added semantic-atom ledger
 
-Every row is an anticipated single semantic edit, **NOT-RUN**. The scenario
+Rows are anticipated single semantic edits; only DA105/DA107 have creator
+mutation kills in this repair. Other rows are NOT-RUN on this repair. The scenario
 provides a reachable prefix; refusal mutants vary the proposed action after
 that prefix. A compilation failure is not a kill. Structural token and field
-constraints are tested by changes at their consuming law. There are 142
+constraints are tested by changes at their consuming law. There are 144
 added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 
 | Atom | Production site | Guard, effect, refusal or observation | Reachable scenario | Expected falsifier | Single-atom mutant |
@@ -825,9 +838,9 @@ added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 | DA102 | extractionWithdrawAllowed | Pay all ordinary escrow and deposit | DurableWitnesses.DW27 | extraction_withdrawal_inversion | M-DA102: Pay deposit only |
 | DA103 | Step.extractionWithdraw | Consume an authentic pending extraction | DurableWitnesses.DW27 | extraction_withdrawal_inversion | M-DA103: Drop pending-input membership |
 | DA104 | Step.extractionWithdraw | Check the complete withdrawal predicate | DurableWitnesses.DW27 | extraction_withdrawal_inversion | M-DA104: Drop extractionWithdrawAllowed |
-| DA105 | afterExtractionWithdraw | Remove the consumed extraction | DurableWitnesses.DW27 | extraction_withdrawal_inversion | M-DA105: Leave it live |
+| DA105 | afterExtractionWithdraw | Remove the consumed extraction | DurableWitnesses.DW52 | extraction_exits_remove_consumed | M-DA105: Leave it live (M10; creator kill) |
 | DA106 | afterExtractionWithdraw | Preserve registry and witnesses | DurableWitnesses.DW36 | only_fold_changes_witnesses | M-DA106: Clear witnesses on withdrawal |
-| DA107 | afterFold | Remove folded or accounted extraction requests | DurableWitnesses.DW30 | extraction_removal_legal | M-DA107: Keep them live |
+| DA107 | afterFold | Remove folded or accounted extraction requests | DurableWitnesses.DW53 | extraction_fold_removes_consumed | M-DA107: Keep them live (M11; creator kill) |
 | DA108 | afterFold | Remove externally consumed old witnesses | DurableWitnesses.DW42 | touched_old_witness_burned | M-DA108: Retain consumed witnesses |
 | DA109 | afterFold | Install surviving produced witness outputs | DurableWitnesses.DW03 | reachable_witness_bijection | M-DA109: Do not append produced outputs |
 | DA110 | afterFold | Preserve untouched outputs exactly | DurableWitnesses.DW11 | untouched_witness_survives | M-DA110: Retain only the transaction's new outputs |
@@ -863,51 +876,124 @@ added atoms and 157 inherited atoms; this is a finite creator coverage claim.
 | DA140 | foldWitnessEvents | A later no-op does not burn an earlier intra-fold witness | DurableWitnesses.DW46 + DurableWitnesses.intrafold_noop_keeps | item_burn_iff_value_change | M-DA140: Emit consumption on an absent unset after extraction |
 | DA141 | foldWitnessEvents | A later reversal does not undo the first value-change burn | DurableWitnesses.DW46 + DurableWitnesses.roundtrip_burn | item_burn_iff_value_change | M-DA141: Filter old burns whose facts hold at the final tree |
 | DA142 | itemPayments.account | Return only the unused request deposit and keep live witness deposit locked | DurableWitnesses.DW47 | witness_durability | M-DA142: Include the existing witness deposit in owner payment |
+| DA143 | FoldItem.burned.extract | Burn every extraction request token on application | DurableWitnesses.DW53 | extraction_removal_legal | M-DA143: Return [] for extract |
+| DA144 | FoldItem.burned.extractAccount | Burn every extraction request token on complete account | DurableWitnesses.DW53 | extraction_removal_legal | M-DA144: Return [] for extractAccount |
 
-## Local verification and freeze identity
+## Repair round 1: NOTE-007
 
-The required command was run from lean/:
+The independent audit of d2d6f15 returned NOT-READY: F1 refuted the unrestricted
+payments_total helper; F2 identified missing extraction terminality; F3 left
+117 retained rows without mutation evidence. This repair addresses F1/F2 and
+advisories A1/A2. F3 remains the next auditor's task. No other existing public
+statement or model definition changed.
 
-```sh
-nix develop ..#aiken --quiet -c lake build
-```
+F1: ProofHelpers.payments_total now requires FoldRun iv refs sigs c items out.
+All 33 helpers were checked against the new item and action kinds; the other
+32 retain their types. The per-helper readback is reproduced below. A finite
+probe reproduces the old counterexample, validates its unwitnessed control,
+and proves the invalid extraction has no FoldRun (HelperDomain.lean, all three
+proofs depend only on propext). This is not a universal proof of the repaired helper.
 
-It passed all 26 jobs with the Nix-provided Lean 4.29.0. The local receipt is
-`/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/build-final.log`
-(SHA-256 `3ee4e6994f29f7341821fca0d969f3ad68e8c52b476af0fef412ae09090aad74`). The lean-lsp service
-could not start because its client rejects the repository's existing 4.16.0
-toolchain declaration; the prescribed Nix compiler was used throughout.
+F2: D52 removes withdrawn extractions under a reachable Step; D53 removes both
+folded and complete-account extractions; D54 forbids any used, absent extraction
+from returning along History; D55 combines removal and non-reappearance along
+the actual consuming step and its successor history. D52 uses reachability
+because List.erase removes only one occurrence on an arbitrary duplicate list.
+DW52-DW55 instantiate withdrawal, extraction, complete account and a nonempty
+reachable successor history. DA105 and DA107 now point to non-vacuous removal
+statements, replacing the audit-refuted attribution to inversion/removal-legal.
 
-Axiom inspection covered **897 / 897 declarations**:
-671 witness/support constants have only the allowed standard axioms
-(propext, Classical.choice, Quot.sound); 193 public statements and 33 internal
-helpers have precisely the expected intentional theorem admissions. Unexpected
-axioms: 0. There are no admissions in Model, Witnesses or DurableWitnesses.
-This is kernel evidence for the scenarios, not universal proof of the 193 claims.
-The raw axiom receipt is `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/axioms.log`
-(SHA-256 `c3c24a668512a418cb058fb598cb60035270be9a8b82259634b321ca45e2884f`); inventory, query source and checked JSON
-receipt sit alongside it. Earlier failed attempts and superseded receipts remain
-in that runtime evidence directory; only the final receipts identify this cut.
+A1: D56 unfolds every account item guard, including the full witness-validity
+match, minimum deposit and set-only restriction. A2: DA143/DA144 cover the two
+extraction token-burn branches.
 
-Freeze identity (proof bodies and Statements file hash are intentionally excluded):
+Targeted creator mutation evidence (not independent audit):
 
-- Model.lean SHA-256: `b5300daa1fefde47edaab08d0393c2d5c14beaec57baee65dd7c480301d07204`.
+| Fault | Exact one-effect edit | New theorem negation checked | Control |
+|---|---|---|---|
+| M10 | afterExtractionWithdraw leaves the pending list unchanged | D52 and D55 | Both kills fail at the concrete membership proof |
+| M11 | afterFold leaves the extraction list unchanged | D53 and D55 | Both kills fail at the concrete membership proof |
+
+The probes rebuild the actual mutated Model in isolated creator-owned libraries.
+They construct a reachable pending extraction and actual withdrawal/account Steps
+without importing creator witnesses or admitted production proofs. Target types
+are copied verbatim from the new declarations and bound to their actual compiled
+types by three definitional equality checks in Binding.lean. Each kill proves the
+negation of that type, without applying the admitted theorem. All four kill axiom
+lists are checked for absence of sorryAx; a compilation failure is not a kill.
+Inputs, exact edits, commands and logs are under `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/repair-1`.
+NOTE-008 resolved Q-004 by supplying the archived evidence path. The independently
+reconstructed M10/M11 mutations were then compared with the auditor's exact edit
+files and produce byte-identical mutant Model sources.
+
+### Helper readback for NOTE-007 F1
+
+Creator readback, not independent audit. All 33 helper types were re-read against
+both extraction item kinds, both extraction actions, witness funding and no-op
+preservation. Only payments_total changes; no other helper change is proposed.
+
+| Helper | New-kind/domain check |
+|---|---|
+| registry_refl | SameRegistry algebra, no item case. |
+| registry_trans | SameRegistry algebra, no item case. |
+| item_registry | Both extraction items preserve all five registry identity fields. |
+| result_registry | Sequential composition of item_registry; both new cases preserve identity. |
+| fees_registry | Fees depend only on unchanged oracle identities. |
+| result_trie | Already has FoldRun: extract's wanted equality preserves logical value. |
+| singleton_accepted | Caller supplies itemAllowed; canonical singleton witness boundary handles extract and empty account events. |
+| oracle_total | OracleIdentity payment algebra, no item case. |
+| credits_total | Assumes authorization; extraction calls neither ordinary credits nor this helper. |
+| run_result | FoldRun uses the same itemResult recursion for all five items. |
+| step_registry | Extraction creation/withdrawal preserve cage; fold uses run. |
+| wf_registry | Ordinary wellFormed uses identity, oracles, policy and minimum, all in SameRegistry. |
+| live_wf | Extraction actions preserve ordinary live inputs; folds preserve registry metadata and only remove inputs. |
+| registry_valid | Both added actions preserve cage; folds preserve registry metadata. |
+| request_member | Extraction kinds return none from FoldItem.request; original disjunction remains exact. |
+| claim_origin_step | Added actions do not add claims; extraction folds only filter existing claims. |
+| claim_origin_trace | Step-origin invariant along actual Trace; added actions do not add claims. |
+| trace_snoc | Generic Trace constructor composition, no action-specific case. |
+| trace_reaches | Generic Trace/Reachable composition, no action-specific case. |
+| authorized_nonempty | Imported oracle authorization, independent of extraction. |
+| claim_tokens | Extraction transitions do not add/change claims or registry identity. |
+| run_request_conservation | Has FoldRun; extract/account escrow = ordinary value + deposit and zero credits. |
+| payments_total | REPAIRED: add FoldRun iv refs sigs c items out. Invalid extraction on a witnessed key excluded. Valid extract has no consumed witness; extractAccount has neither events nor credits and returns value plus deposit. |
+| credits_cover | Only ordinary credits, unchanged oracle algebra. |
+| credit_backed | Fee-balance algebra; deposits never enter credit. |
+| clear_sum | Finite arithmetic, no action or item case. |
+| claim_balance_sum | Claim case unchanged; no extraction premise. |
+| item_backed | Has itemAllowed and Backed; both extraction kinds preserve balances and backing. |
+| run_backed | Has FoldRun and Backed; both new cases preserve backing. |
+| run_value_conservation | Has FoldRun and Backed; both new cases have zero fee credit and claim payout, unchanged registry value. |
+| result_append | Pure ordered foldResult recursion; still exact for both new constructors. |
+| credits_unpaid | Ordinary credit algebra, independent of extraction. |
+| run_balance_nonincrease | Has FoldRun; both extraction kinds leave every fee balance unchanged. |
+
+HelperDomain.lean reproduces the original arithmetic counterexample, checks the
+unwitnessed negative control, and proves the bad item has no FoldRun. Its output
+must have only standard axioms. These are finite-domain checks and a guard
+exclusion proof, not a proof of the repaired universal helper.
+
+## Repair verification and freeze identity
+
+Required local build: `cd lean && nix develop ..#aiken --quiet -c lake build`
+passed 26 jobs (Lean 4.29.0). Receipt: `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/repair-1/build.log`,
+SHA-256 `6b6f668080512ba5dd5c2d4bb735703a302d84f7c7486e5e2e81af6472343c50`.
+
+Axiom census: 907/907 declarations; 676 witness/support constants have only
+standard axioms (propext, Classical.choice, Quot.sound). Exactly 198 public and
+33 helper proofs intentionally use sorryAx. Model and witness sources have no
+admissions. Axiom log SHA-256: `c22dde7518313fc0f690eaa0a9d90a524fd74c3cdd17668f78ad906e476748de`;
+query, inventory, raw log and checked receipt are in this repair evidence directory.
+
+- Model SHA-256 (unchanged): `b5300daa1fefde47edaab08d0393c2d5c14beaec57baee65dd7c480301d07204`.
 - Ordered qualified names and full elaborated types SHA-256:
-  `90bee2d188248165474df64565c6ac5dfd0cf6213af94cfe6fac42474678d306` (JSON.stringify of the type-record array).
-- 193 public names, 33 helper names; all 226 full elaborated types appear below.
-- Machine-readable manifest: `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/freeze.json`.
-- Raw type-query log: `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/types.log`;
-  query source: `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/Freeze.lean`.
-
-The local commit recorded in STATUS.md binds these files. This is a model and
-statement **CANDIDATE** for independent audit. No push, proof-phase authorization,
-mutation execution, hosted CI or acceptance is implied.
+  `8ae54ce7ebc2f305bc4d185ab51c9f2712b1579a977b3b885c3064b8741e4851` (JSON.stringify of the type-record array).
+- All 193 prior public types and 32/33 helper types match the previous compiler
+  freeze exactly. Only payments_total changes; five public statements are added.
+- 231 full types are recorded below and in `/code/mpfs-onchain-lean-128-20261029/astra-durable-witnesses-model/evidence/repair-1/freeze.json`.
+- The local repair commit is recorded in STATUS.md. No push or acceptance claim.
 
 ## Full elaborated statement types
-
-These are compiler output with pp.all enabled. Public statements appear first,
-then the retained internal helper surface. Proof edits must preserve these types
-and the model identity unless a later ruling explicitly reopens the freeze.
 
 ### RequestApprovalFold.applyAll_append
 
@@ -5859,6 +5945,132 @@ RequestApprovalFold.witnessing_blind_write_availability : ∀ (c : RequestApprov
                       (RequestApprovalFold.Request.write (RequestApprovalFold.RequestOutput.request o))))
 ```
 
+### RequestApprovalFold.extraction_exits_remove_consumed
+
+```lean
+RequestApprovalFold.extraction_exits_remove_consumed : ∀ (s s' : RequestApprovalFold.State)
+  (tx : RequestApprovalFold.ExtractionWithdrawTx),
+  RequestApprovalFold.Reachable s →
+    RequestApprovalFold.Step s (RequestApprovalFold.Action.extractionWithdraw tx) s' →
+      Not
+        (@Membership.mem.{0, 0} RequestApprovalFold.Extraction (List.{0} RequestApprovalFold.Extraction)
+          (@List.instMembership.{0} RequestApprovalFold.Extraction) (RequestApprovalFold.State.extractions s')
+          (RequestApprovalFold.ExtractionWithdrawTx.input tx))
+```
+
+### RequestApprovalFold.extraction_fold_removes_consumed
+
+```lean
+RequestApprovalFold.extraction_fold_removes_consumed : ∀ (s : RequestApprovalFold.State)
+  (tx : RequestApprovalFold.FoldTx) (o : RequestApprovalFold.Extraction),
+  @Membership.mem.{0, 0} RequestApprovalFold.Extraction (List.{0} RequestApprovalFold.Extraction)
+      (@List.instMembership.{0} RequestApprovalFold.Extraction) (RequestApprovalFold.FoldTx.extractions tx) o →
+    Not
+      (@Membership.mem.{0, 0} RequestApprovalFold.Extraction (List.{0} RequestApprovalFold.Extraction)
+        (@List.instMembership.{0} RequestApprovalFold.Extraction)
+        (RequestApprovalFold.State.extractions (RequestApprovalFold.afterFold s tx)) o)
+```
+
+### RequestApprovalFold.extraction_never_reappears
+
+```lean
+RequestApprovalFold.extraction_never_reappears : ∀ (s s' : RequestApprovalFold.State)
+  (o : RequestApprovalFold.Extraction),
+  RequestApprovalFold.Reachable s →
+    @Membership.mem.{0, 0} RequestApprovalFold.OutputRef (List.{0} RequestApprovalFold.OutputRef)
+        (@List.instMembership.{0} RequestApprovalFold.OutputRef) (RequestApprovalFold.State.usedOutputs s)
+        (RequestApprovalFold.Extraction.ref o) →
+      Not
+          (@Membership.mem.{0, 0} RequestApprovalFold.Extraction (List.{0} RequestApprovalFold.Extraction)
+            (@List.instMembership.{0} RequestApprovalFold.Extraction) (RequestApprovalFold.State.extractions s) o) →
+        RequestApprovalFold.History s s' →
+          Not
+            (@Membership.mem.{0, 0} RequestApprovalFold.Extraction (List.{0} RequestApprovalFold.Extraction)
+              (@List.instMembership.{0} RequestApprovalFold.Extraction) (RequestApprovalFold.State.extractions s') o)
+```
+
+### RequestApprovalFold.extraction_consumption_terminal
+
+```lean
+RequestApprovalFold.extraction_consumption_terminal : ∀ (s t u : RequestApprovalFold.State)
+  (a : RequestApprovalFold.Action) (o : RequestApprovalFold.Extraction),
+  RequestApprovalFold.Reachable s →
+    RequestApprovalFold.Step s a t →
+      Or
+          (@Exists.{1} RequestApprovalFold.FoldTx fun (tx : RequestApprovalFold.FoldTx) =>
+            And (@Eq.{1} RequestApprovalFold.Action a (RequestApprovalFold.Action.fold tx))
+              (@Membership.mem.{0, 0} RequestApprovalFold.Extraction (List.{0} RequestApprovalFold.Extraction)
+                (@List.instMembership.{0} RequestApprovalFold.Extraction) (RequestApprovalFold.FoldTx.extractions tx)
+                o))
+          (@Exists.{1} RequestApprovalFold.ExtractionWithdrawTx fun (tx : RequestApprovalFold.ExtractionWithdrawTx) =>
+            And (@Eq.{1} RequestApprovalFold.Action a (RequestApprovalFold.Action.extractionWithdraw tx))
+              (@Eq.{1} RequestApprovalFold.Extraction (RequestApprovalFold.ExtractionWithdrawTx.input tx) o)) →
+        RequestApprovalFold.History t u →
+          And
+            (Not
+              (@Membership.mem.{0, 0} RequestApprovalFold.Extraction (List.{0} RequestApprovalFold.Extraction)
+                (@List.instMembership.{0} RequestApprovalFold.Extraction) (RequestApprovalFold.State.extractions t) o))
+            (Not
+              (@Membership.mem.{0, 0} RequestApprovalFold.Extraction (List.{0} RequestApprovalFold.Extraction)
+                (@List.instMembership.{0} RequestApprovalFold.Extraction) (RequestApprovalFold.State.extractions u) o))
+```
+
+### RequestApprovalFold.account_item_inversion
+
+```lean
+RequestApprovalFold.account_item_inversion : ∀ (c : RequestApprovalFold.CageState) (iv : RequestApprovalFold.Interval)
+  (refs : List.{0} RequestApprovalFold.TokenName) (sigs : List.{0} RequestApprovalFold.Signer)
+  (o : RequestApprovalFold.RequestOutput) (e : RequestApprovalFold.Selection),
+  Iff (RequestApprovalFold.itemAllowed c iv refs sigs (RequestApprovalFold.FoldItem.account o e))
+    (And
+      (@Eq.{1} RequestApprovalFold.CageId
+        (RequestApprovalFold.Request.cage (RequestApprovalFold.RequestOutput.request o))
+        (RequestApprovalFold.CageState.id c))
+      (And
+        (@Eq.{1} (List.{0} RequestApprovalFold.TokenName) (RequestApprovalFold.RequestOutput.tags o)
+          (@List.map.{0, 0} RequestApprovalFold.Oracle RequestApprovalFold.TokenName RequestApprovalFold.tagName
+            (RequestApprovalFold.CageState.oracles c)))
+        (And
+          (@LE.le.{0} Nat instLENat
+            (@HAdd.hAdd.{0, 0, 0} Nat Nat Nat (@instHAdd.{0} Nat instAddNat)
+              (RequestApprovalFold.totalFees c (RequestApprovalFold.RequestOutput.request o))
+              (RequestApprovalFold.CageState.minimum c))
+            (RequestApprovalFold.RequestOutput.value o))
+          (And
+            (@Eq.{1} (List.{0} RequestApprovalFold.TokenName) (RequestApprovalFold.RequestOutput.requestTokens o)
+              (@List.cons.{0} RequestApprovalFold.TokenName
+                (RequestApprovalFold.requestName (RequestApprovalFold.CageState.id c))
+                (@List.nil.{0} RequestApprovalFold.TokenName)))
+            (And
+              (@Eq.{1} RequestApprovalFold.RequestPolicy (RequestApprovalFold.RequestOutput.policy o)
+                (RequestApprovalFold.requestPolicy c))
+              (And
+                (RequestApprovalFold.account_item_inversion.match_1.{1}
+                  (fun (x : Option.{0} RequestApprovalFold.WitnessSpec) => Prop)
+                  (RequestApprovalFold.Request.witnessing (RequestApprovalFold.RequestOutput.request o))
+                  (fun (_ : Unit) => True) fun (spec : RequestApprovalFold.WitnessSpec) =>
+                  And
+                    (@LE.le.{0} Nat instLENat (RequestApprovalFold.CageState.minimum c)
+                      (RequestApprovalFold.WitnessSpec.deposit spec))
+                    (@Exists.{1} RequestApprovalFold.Key fun (k : RequestApprovalFold.Key) =>
+                      @Exists.{1} RequestApprovalFold.Val fun (v : RequestApprovalFold.Val) =>
+                        @Eq.{1} RequestApprovalFold.Write
+                          (RequestApprovalFold.Request.write (RequestApprovalFold.RequestOutput.request o))
+                          (RequestApprovalFold.Write.set k v)))
+                (And (RequestApprovalFold.Interval.valid iv)
+                  (And
+                    (@LE.le.{0} RequestApprovalFold.Time instLENat
+                      (RequestApprovalFold.Request.deadline (RequestApprovalFold.RequestOutput.request o))
+                      (RequestApprovalFold.Interval.lower iv))
+                    (And
+                      (@LE.le.{0} RequestApprovalFold.Time instLENat (RequestApprovalFold.Interval.upper iv)
+                        (@HAdd.hAdd.{0, 0, 0} RequestApprovalFold.Time Nat RequestApprovalFold.Time
+                          (@instHAdd.{0} RequestApprovalFold.Time instAddNat)
+                          (RequestApprovalFold.Request.deadline (RequestApprovalFold.RequestOutput.request o))
+                          (RequestApprovalFold.Request.window (RequestApprovalFold.RequestOutput.request o))))
+                      (RequestApprovalFold.hasAccount c (RequestApprovalFold.RequestOutput.request o) refs e))))))))))
+```
+
 ### RequestApprovalFold.ProofHelpers.registry_refl
 
 ```lean
@@ -6141,7 +6353,10 @@ RequestApprovalFold.ProofHelpers.claim_tokens : ∀ (s : RequestApprovalFold.Sta
 
 ```lean
 RequestApprovalFold.ProofHelpers.payments_total : ∀ (c : RequestApprovalFold.CageState)
-  (folder : RequestApprovalFold.Signer) (items : List.{0} RequestApprovalFold.FoldItem),
+  (folder : RequestApprovalFold.Signer) (items : List.{0} RequestApprovalFold.FoldItem)
+  (iv : RequestApprovalFold.Interval) (refs : List.{0} RequestApprovalFold.TokenName)
+  (sigs : List.{0} RequestApprovalFold.Signer) (out : RequestApprovalFold.CageState)
+  (run : RequestApprovalFold.FoldRun iv refs sigs c items out),
   @Eq.{1} Nat (RequestApprovalFold.totalPaid (RequestApprovalFold.foldPayments c folder items))
     (@HAdd.hAdd.{0, 0, 0} Nat Nat Nat (@instHAdd.{0} Nat instAddNat)
       (@HAdd.hAdd.{0, 0, 0} Nat Nat Nat (@instHAdd.{0} Nat instAddNat)
