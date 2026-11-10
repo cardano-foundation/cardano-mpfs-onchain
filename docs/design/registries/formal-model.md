@@ -16,8 +16,8 @@ is a separate milestone ticket
 
 ```mermaid
 flowchart LR
-  decisions["Decision record<br/>specs/request-approval-fold"] -- "encoded as" --> model["Lean model<br/>states, transactions, Step"]
-  model -- "stated as" --> theorems["142 theorems"]
+  decisions["Decision records<br/>specs/"] -- "encoded as" --> model["Lean model<br/>states, transactions, Step"]
+  model -- "stated as" --> theorems["199 theorems"]
   theorems -- "proved, standard axioms only" --> proofs["Proofs"]
   theorems -- "reachable examples" --> witnesses["Witnesses"]
   audit1["Statement and proof audit"] -. "reads types against decisions" .-> theorems
@@ -29,14 +29,16 @@ flowchart LR
 
 | Part | What it captures |
 |---|---|
-| Trie, writes, conditions | The tree as a map from keys to values; `set` and `unset`; `absent`, `present` and `equals`; ordered application within a fold |
+| Trie, writes, conditions | The tree as a map from keys to entries; `set` and `unset`; `absent`, `present` and `equals`, read on the logical tree, the tree with every witness removed; ordered application within a fold |
+| Durable witness | A witnessed entry holding the attested value or absence, the deposit and the refund address, with one witness token in its own output at the registry state's address, bound to the request that issued it |
 | Registry state | Registry identity, oracle identities, protocol hash, optional rule, tree, one fee balance per key, and a value equal to the sum of the balances |
 | Request output | Registry, owner, seed, a fresh output reference, one write, conditions, a fee per oracle, deadline, window, evidence, escrow, its request token and one tag per oracle |
 | Judgment | Registry, request, oracle identity, verdict, the record of the members that signed and, for an approval, the oracle's own conditions, all bound in its name |
 | Claim | A claim token named after the registry, the claiming key, the destination address and datum of the payout, a deadline and a tip |
 | Price notice | An oracle identity's price token and its current fee, optionally per protocol |
-| Transactions | Creation, judgment, fold, owner withdrawal, claim creation, claim withdrawal, judgment burn, and price notice minting and update, each with its guard |
-| Fold items | A write request, a complete account and a claim, each applied to the state the previous item left, under one validity interval that fits every item |
+| Extraction | A request that names a key and the value or absence it wants witnessed, with its deposit, refund address, remainder, deadline and window, and no oracle fees |
+| Transactions | Creation, judgment, fold, owner withdrawal, claim creation, claim withdrawal, extraction creation, extraction withdrawal, judgment burn, and price notice minting and update, each with its guard |
+| Fold items | A write request, a complete account, a claim, an extraction and the complete account of an extraction, each applied to the state the previous item left, under one validity interval that fits every item |
 | Step | The authoritative transition relation over a global state, labelled by the exact transaction performed |
 
 Modelling choices the decisions left open, ruled before the model was
@@ -62,16 +64,37 @@ Readings of the money decisions, ruled before the fee balances were stated:
   with different signers, the folder's choice of judgment decides which of
   its keys are credited.
 
+Readings of the durable witness decisions, ruled before the witnesses were
+stated:
+
+- a witness carries a declared deposit of at least the ledger minimum, which
+  funds its output and is refunded exactly;
+- an extraction is an ordinary request: it pays the folder its remainder and
+  covers the ledger minimum at creation, declares no oracle fees, passes no
+  rule, and keeps the three windows of every request; a request that never
+  mints its witness returns the deposit to its owner;
+- a witness is burned only by a fold item that changes its key's value, and
+  then its deposit goes to its refund address; a write of the value already
+  held keeps it, and a witnessing `set` of the value already witnessed is not
+  folded;
+- the issuer has no exit: no signature, deadline or withdrawal releases a
+  live witness or its deposit;
+- items are applied in order, so a fold that changes a key and changes it
+  back burns the witness at the first change; a witness minted and burned
+  inside one fold nets out on the transaction, and its issuer is still
+  refunded;
+- a witness of presence is a witness of an exact value read as presence: an
+  extraction names the value it wants witnessed, and any value change burns
+  it.
+
 !!! note "Decisions not yet in the registry model"
-    Durable witnesses
-    ([#128](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/128))
-    and slots
+    Slots
     ([#129](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/129))
-    were decided or drafted after this model was audited.
+    were drafted after this model was audited.
 
 ## What is proved
 
-All 142 theorems are proved; `#print axioms` lists only `propext`,
+All 199 theorems are proved; `#print axioms` lists only `propext`,
 `Classical.choice` and `Quot.sound` for each.
 
 | Guarantee | Proved by |
@@ -103,6 +126,15 @@ All 142 theorems are proved; `#print axioms` lists only `propext`,
 | A fold applies a request only if its own conditions and every approving oracle's conditions hold on the tree at its turn; an approval cannot be shown with other conditions, and one whose conditions no longer hold cannot be used | `present_condition_semantics`, `foldRun_oracle_conditions`, `fold_all_conditions_hold`, `approval_conditions_cannot_change`, `stale_approval_unusable`, `fold_evidence_binds_conditions` |
 | A folder that lists a registry's live requests and the authentic judgment outputs finds exactly the foldable requests | `expected_approval_lookup`, `folder_discovery_exact`, `folder_discovery_executable` |
 | An empty fold is allowed and earns nothing | `empty_fold_allowed`, `empty_fold_earns_nothing` |
+| Witnesses are invisible to meaning: conditions, the root and every earlier theorem read the logical tree, the tree with every witness removed | `logical_tree_stripped`, `conditions_read_logical` |
+| In every reachable state the live witness tokens match the witnessed entries one to one, fact, deposit and refund address included; each live witness's fact holds; a key has at most one witness | `reachable_witness_bijection`, `live_witness_fact`, `live_witness_presence`, `live_witness_absence`, `one_live_witness_per_key`, `witness_reference_sound`, `witness_origin_on_trace`, `witness_token_issuance_bound` |
+| A witness is burned exactly by a fold item that changes its key's value; a write of the value already held, writes to other keys and every other transaction leave it, its token, its output and its deposit untouched | `item_burn_iff_value_change`, `witness_durability`, `untouched_witness_survives`, `plain_noop_preserves_witness`, `witness_spent_only_at_own_key`, `only_fold_changes_witnesses`, `touched_old_witness_burned` |
+| A live witness's deposit leaves its output only in a fold changing its key's value, and only to exactly its refund address, whatever the issuer signs | `witness_deposit_lock`, `witnessed_write_obligation`, `plain_write_clears_witness`, `witness_output_custody`, `live_outputs_hold_deposits` |
+| An extraction needs no rule and no oracle, pays the folder like any request, is folded only when its key holds exactly the named value or absence and has no witness, and its witness attests exactly that | `extraction_item_inversion`, `extraction_attests_requested`, `extraction_normal_request_money`, `extraction_permissionless_creation`, `extraction_permissionless_fold`, `extraction_witnessed_refused`, `extraction_stale_refused`, `extraction_creation_inversion` |
+| An extraction has the three windows of every request, one exit each; a consumed extraction leaves for good, and folders find a registry's extractions | `extraction_account_inversion`, `extraction_withdrawal_inversion`, `extraction_exit_window`, `extraction_exit_exclusive`, `extraction_windows_cover`, `extraction_windows_disjoint`, `extraction_later_exits_available`, `extraction_removal_legal`, `extraction_exits_remove_consumed`, `extraction_fold_removes_consumed`, `extraction_never_reappears`, `extraction_consumption_terminal`, `extraction_discovery_exact` |
+| A witnessing `set` is funded at creation, replaces a witness only by changing the value, refunding the old issuer and leaving one witness of the value written; a same-value witnessing `set` on a witnessed key is not folded; an unused deposit returns to the owner | `witnessing_creation_funded`, `witnessing_set_replaces`, `witnessing_noop_refused`, `witnessing_blind_write_availability`, `unused_witnessing_deposit_returned` |
+| Inside a fold witness events follow item order, a witness minted and burned in the same fold nets out on the transaction with its refund paid, and the fold's witness inputs are authentic and unique | `fold_witness_events_in_item_order`, `fold_witness_boundary_exact`, `transient_witness_nets`, `fold_witness_inputs_authentic`, `reachable_input_refs_unique` |
+| Deposits are conserved, separately from fees, remainders and owner refunds; every fold item and every request on the trace has an exact inversion and is unique | `fold_deposits_conserved`, `write_item_inversion`, `account_item_inversion`, `requests_unique_on_trace` |
 
 ## How it was checked
 
@@ -212,6 +244,41 @@ independent proof audit confirmed the elaborated types identical to the
 audited statements, no escape hatch, only the standard axioms, and read the
 money proofs against reachable examples.
 
+### Durable witnesses
+
+```mermaid
+flowchart TB
+  c1["193 statements"] --> a1["Statement audit:<br/>false helper,<br/>extractions could repeat"]
+  a1 --> c2["Repair: 198 statements"]
+  c2 --> a2["Statement audit:<br/>witness event order free"]
+  a2 --> c3["Repair: 199 statements"]
+  c3 --> a3["Statement audit: passed,<br/>every row killed"]
+  a3 --> p["Proofs: 199 proved"]
+  p --> a4["Proof audit: passed"]
+```
+
+Adding durable witnesses kept all 142 earlier theorems, restated 21 of them
+over the new transitions and added 57. The first statement audit found a
+supporting lemma on fold payments false once an extraction met a witnessed
+key, and no statement that a consumed extraction leaves for good: a model
+that let its owner withdraw the same escrow forever satisfied every theorem.
+The repair stated extraction terminality as for ordinary requests. The second
+audit found that a model recording a fold's witness events in reverse order,
+so that a witness could be consumed before the item that minted it, also
+satisfied every theorem; the repair stated that witness events follow item
+order. The third audit read every statement blind, killed a single-edit
+mutant for each of the 199 theorems, including a burn on a same-value write,
+a burn on a write to another key, an issuer-signed burn, a refund to the
+wrong address and an extraction without its tip, and replayed all 392
+mutants in clean trees. One guard, an interval check the fold already makes,
+is an equivalent mutant.
+
+All 199 theorems were then proved without changing any statement. An
+independent proof audit confirmed the elaborated types and their dependencies
+identical to the audited statements, replayed every proof in a fresh kernel
+check, found no escape hatch and only the standard axioms, and read the
+witness and money proofs against reachable examples.
+
 ## Oracle identities
 
 The oracle identity standard has its own model, under
@@ -265,9 +332,10 @@ of signers to each judgment and credits fees by it.
 |---|---|
 | One request script per release, serving every registry in both roles: the model has no notion of a script or a release | Recorded as a model omission; implemented by [#110](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/110) |
 | The ledger queries folders run: the model proves that a folder finds exactly the foldable requests from a registry's live requests and the authentic judgment outputs, but the queries that produce them are outside it | Implemented by [#113](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/113) |
-| An executable model, codecs and a replay corpus for conformance testing | [#109](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/109) |
+| An executable model, codecs and a replay corpus for conformance testing; the payment list the model reports for a withdrawal is read by no theorem, while the withdrawal's actual amount and recipient are | [#109](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/109) |
 | Conformance of the Aiken validators with the model | [#114](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/114) |
 | Concrete encodings and hashes of names and datums | [#116](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116) |
 | Costs and transaction limits | [#115](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/115) |
-| Durable witnesses and slots, decided or drafted after this model was audited | [#128](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/128), [#129](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/129) |
+| Slots, drafted after this model was audited | [#129](https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/129) |
+| How a consumer contract reads a witness token by reference, and what a witness means outside the registry, which rests on the registry's rule and oracles | Recorded as a model omission |
 | The ledger minimum is a fixed parameter of the registry; its agreement with the ledger's own calculation, and whether a destination script accepts a payout, are outside the model | Implemented by the validators |
