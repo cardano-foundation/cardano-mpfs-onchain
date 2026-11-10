@@ -1,0 +1,1760 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://cardano-foundation.github.io/cardano-mpfs-onchain/design/registries/formal-model/">
+      
+      
+        <link rel="prev" href="../slots/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Formal model and audits - Cardano MPFS Onchain</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#formal-model-and-audits" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Cardano MPFS Onchain" class="md-header__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Cardano MPFS Onchain
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Formal model and audits
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Follow the system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Follow the system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Cardano MPFS Onchain" class="md-nav__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Cardano MPFS Onchain
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../introduction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../haskell-cage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Haskell Cage Library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types & Encodings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/proofs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proof System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/properties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Properties
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Permissionless multi-oracle registries
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Permissionless multi-oracle registries
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../open-mpfs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open MPFS design document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Request lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../economics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Economics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../oracles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Oracle identities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../slots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Oracle slots (draft)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Formal model and audits
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Formal model and audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#from-decision-to-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From decision to evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-proved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is proved
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-was-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it was checked
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it was checked">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fee-balances-complete-accounts-and-claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fee balances, complete accounts and claims
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#durable-witnesses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durable witnesses
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oracle-identities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Oracle identities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-not-covered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is not covered
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Design
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Permissionless multi-oracle registries
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="formal-model-and-audits">Formal model and audits</h1>
+<p><strong>As someone who will implement or rely on this design, I want to know
+exactly which guarantees are proved, how the proofs were checked, and what is
+not covered, so that I do not mistake a modelled property for an implemented
+one.</strong></p>
+<p>The design is modelled in Lean 4 under
+<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/tree/main/lean/MpfsCage/RequestApprovalFold"><code>lean/MpfsCage/RequestApprovalFold/</code></a>.
+The proofs establish properties <strong>of the model</strong>. They do not establish that
+the validators implement it: no validator implements it yet, and conformance
+is a separate milestone ticket
+(<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/114">#114</a>).</p>
+<h2 id="from-decision-to-evidence">From decision to evidence</h2>
+<pre class="mermaid"><code>flowchart LR
+  decisions["Decision records&lt;br/&gt;specs/"] -- "encoded as" --&gt; model["Lean model&lt;br/&gt;states, transactions, Step"]
+  model -- "stated as" --&gt; theorems["199 theorems"]
+  theorems -- "proved, standard axioms only" --&gt; proofs["Proofs"]
+  theorems -- "reachable examples" --&gt; witnesses["Witnesses"]
+  audit1["Statement and proof audit"] -. "reads types against decisions" .-&gt; theorems
+  audit2["Mutation audit"] -. "breaks the model, expects theorems to fail" .-&gt; model
+  model -. "not yet" .-&gt; validators["Aiken validators"]</code></pre>
+<h2 id="the-model">The model</h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What it captures</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trie, writes, conditions</td>
+<td>The tree as a map from keys to entries; <code>set</code> and <code>unset</code>; <code>absent</code>, <code>present</code> and <code>equals</code>, read on the logical tree, the tree with every witness removed; ordered application within a fold</td>
+</tr>
+<tr>
+<td>Durable witness</td>
+<td>A witnessed entry holding the attested value or absence, the deposit and the refund address, with one witness token in its own output at the registry state's address, bound to the request that issued it</td>
+</tr>
+<tr>
+<td>Registry state</td>
+<td>Registry identity, oracle identities, protocol hash, optional rule, tree, one fee balance per key, and a value equal to the sum of the balances</td>
+</tr>
+<tr>
+<td>Request output</td>
+<td>Registry, owner, seed, a fresh output reference, one write, conditions, a fee per oracle, deadline, window, evidence, escrow, its request token and one tag per oracle</td>
+</tr>
+<tr>
+<td>Judgment</td>
+<td>Registry, request, oracle identity, verdict, the record of the members that signed and, for an approval, the oracle's own conditions, all bound in its name</td>
+</tr>
+<tr>
+<td>Claim</td>
+<td>A claim token named after the registry, the claiming key, the destination address and datum of the payout, a deadline and a tip</td>
+</tr>
+<tr>
+<td>Price notice</td>
+<td>An oracle identity's price token and its current fee, optionally per protocol</td>
+</tr>
+<tr>
+<td>Extraction</td>
+<td>A request that names a key and the value or absence it wants witnessed, with its deposit, refund address, remainder, deadline and window, and no oracle fees</td>
+</tr>
+<tr>
+<td>Transactions</td>
+<td>Creation, judgment, fold, owner withdrawal, claim creation, claim withdrawal, extraction creation, extraction withdrawal, judgment burn, and price notice minting and update, each with its guard</td>
+</tr>
+<tr>
+<td>Fold items</td>
+<td>A write request, a complete account, a claim, an extraction and the complete account of an extraction, each applied to the state the previous item left, under one validity interval that fits every item</td>
+</tr>
+<tr>
+<td>Step</td>
+<td>The authoritative transition relation over a global state, labelled by the exact transaction performed</td>
+</tr>
+</tbody>
+</table>
+<p>Modelling choices the decisions left open, ruled before the model was
+written: a registry has at least one oracle or a rule, and no repeated oracle;
+the rule is an abstract predicate over one request and the creating
+transaction's signatures; each oracle
+has its own non-negative fee; creation requires escrow covering the sum of the
+fees plus the ledger minimum, a fixed positive parameter of the registry; time is a single observed value whose soundness against transaction
+validity intervals is assumed; names are collision-free structured values,
+standing for the hashes the implementation will use.</p>
+<p>Readings of the money decisions, ruled before the fee balances were stated:</p>
+<ul>
+<li>conservation counts the registry's value on both sides: its value before,
+  plus the request escrows and claim escrows, equals its value after, plus the
+  request remainders, claim payouts and claim tips; the registry's permanent
+  minimum reserve is outside this account;</li>
+<li>a claim output holds its tip, which goes to the folder when the claim is
+  folded and back to the claiming key on withdrawal; a claim folds strictly
+  before its deadline and is withdrawn from its deadline on, so there is no gap;</li>
+<li>a complete account pays the same total per oracle, and the same remainder to
+  the owner, whichever verdicts are shown; when a group judged more than once
+  with different signers, the folder's choice of judgment decides which of
+  its keys are credited.</li>
+</ul>
+<p>Readings of the durable witness decisions, ruled before the witnesses were
+stated:</p>
+<ul>
+<li>a witness carries a declared deposit of at least the ledger minimum, which
+  funds its output and is refunded exactly;</li>
+<li>an extraction is an ordinary request: it pays the folder its remainder and
+  covers the ledger minimum at creation, declares no oracle fees, passes no
+  rule, and keeps the three windows of every request; a request that never
+  mints its witness returns the deposit to its owner;</li>
+<li>a witness is burned only by a fold item that changes its key's value, and
+  then its deposit goes to its refund address; a write of the value already
+  held keeps it, and a witnessing <code>set</code> of the value already witnessed is not
+  folded;</li>
+<li>the issuer has no exit: no signature, deadline or withdrawal releases a
+  live witness or its deposit;</li>
+<li>items are applied in order, so a fold that changes a key and changes it
+  back burns the witness at the first change; a witness minted and burned
+  inside one fold nets out on the transaction, and its issuer is still
+  refunded;</li>
+<li>a witness of presence is a witness of an exact value read as presence: an
+  extraction names the value it wants witnessed, and any value change burns
+  it.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Decisions not yet in the registry model</p>
+<p>Slots
+(<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/129">#129</a>)
+were drafted after this model was audited.</p>
+</div>
+<h2 id="what-is-proved">What is proved</h2>
+<p>All 199 theorems are proved; <code>#print axioms</code> lists only <code>propext</code>,
+<code>Classical.choice</code> and <code>Quot.sound</code> for each.</p>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>Proved by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A registry's oracles and protocol never change, and only a fold changes its registry state: its tree or its balances</td>
+<td><code>registry_creation</code>, <code>fold_preserves_registry</code>, <code>step_preserves_registry</code>, <code>history_preserves_registry</code>, <code>only_fold_changes_tree</code>, <code>only_fold_changes_registry</code>, <code>request_withdrawal_preserves_registry</code></td>
+</tr>
+<tr>
+<td>A request is created only for a registry present in the state, with its seed spent, one tag per oracle and enough escrow; no request ever recurs</td>
+<td><code>create_tags_existing_cage</code>, <code>creation_references_source</code>, <code>creation_funds_declared_fees</code>, <code>requests_unique_in_history</code>, <code>used_seeds_monotone</code>, <code>reachable_requests_have_spent_seeds</code>, <code>spent_seed_cannot_create_again</code>, <code>request_never_reappears</code></td>
+</tr>
+<tr>
+<td>Only an oracle of the registry can judge, before the deadline, with the authorization of its identity, and a judgment binds registry, request, oracle, verdict and the members that signed, and cannot be replayed</td>
+<td><code>judgment_authorized_and_bound</code>, <code>judgment_not_replayable</code>, <code>judgment_record_cannot_change</code>, <code>token_roles_separated</code>, <code>new_judgment_is_authorized</code>, <code>judgments_do_not_consume</code></td>
+</tr>
+<tr>
+<td>A fold applies only fully approved requests, before the deadline, each at most once, with its conditions true against the tree at its turn, and the new root is exactly the writes applied in order</td>
+<td><code>fold_only_approved_before_deadline</code>, <code>fold_references_authentic</code>, <code>fold_requests_unique</code>, <code>fold_conditions_hold_when_applied</code>, <code>fold_root_is_folded_writes</code>, <code>foldRun_step_valid</code>, <code>foldRun_result</code>, <code>foldRun_conditions</code>, <code>applyAll_append</code>, <code>applyAll_keeps_present</code>, <code>absent_inserts_exclusive</code>, <code>blind_write_folds_on_any_tree</code></td>
+</tr>
+<tr>
+<td>Anyone may fold, and one oracle signature on the fold stands for that oracle's approval</td>
+<td><code>fold_permissionless</code>, <code>one_oracle_signature_suffices</code></td>
+</tr>
+<tr>
+<td>Exact payments: every oracle's fee credited to the balances of its keys, the remainder to the folder or the owner, and the fold's outputs exactly those payments</td>
+<td><code>fold_payments_concrete</code>, <code>account_payments_concrete</code>, <code>fold_pays_and_keeps_rest</code>, <code>allocation_conserves_value</code>, <code>fold_payments_exact</code></td>
+</tr>
+<tr>
+<td>Nothing is created or lost: the registry's value always equals the sum of its balances, and across a fold the value in equals the value out, per request and per balance</td>
+<td><code>reachable_balances_backed</code>, <code>fold_value_conservation</code>, <code>fold_request_conservation</code>, <code>fold_balance_conservation</code></td>
+</tr>
+<tr>
+<td>A group oracle's fee reaches only the members recorded in the judgment shown, split by their shares, in each item and across a whole fold</td>
+<td><code>group_credits_only_recorded_signers</code>, <code>group_credits_exact_split</code>, <code>fold_group_credits_only_recorded_signers</code></td>
+</tr>
+<tr>
+<td>A claim exists only if its key signed it, on the state's own history; at its turn it pays the key's whole balance to exactly the destination and datum fixed at creation, resets the balance and burns its token; a balance below the ledger minimum waits</td>
+<td><code>reachable_claim_authorization</code>, <code>trace_reachability</code>, <code>claim_creation_inversion</code>, <code>claim_item_inversion</code>, <code>claim_turn_balance</code>, <code>claim_payout_fixed</code>, <code>claim_payout_in_actual_outputs</code>, <code>claim_consumed_and_burned</code>, <code>claim_below_minimum_refused</code></td>
+</tr>
+<tr>
+<td>A claim folds before its deadline and is withdrawn by its key from the deadline on, with every moment in exactly one of the two; folders find a registry's claims by its claim token</td>
+<td><code>claim_windows_cover</code>, <code>claim_windows_disjoint</code>, <code>claim_withdrawal_inversion</code>, <code>claim_withdrawal_available</code>, <code>claim_discovery_exact</code></td>
+</tr>
+<tr>
+<td>A fold's validity interval fits every item in it, and every transition has an exact inversion</td>
+<td><code>fold_interval_fits_every_item</code>, <code>step_inversion</code>, <code>foldRun_inversion</code></td>
+</tr>
+<tr>
+<td>A settlement needs a verdict from every oracle, is open to anyone inside its window, accepts any mix of verdicts, and pays the same whichever verdicts are shown</td>
+<td><code>account_complete_and_pays</code>, <code>account_anyone_in_window</code>, <code>account_accepts_any_verdicts</code>, <code>account_references_authentic</code>, <code>account_fee_neutral</code></td>
+</tr>
+<tr>
+<td>Only the owner withdraws, only after the window, and takes everything</td>
+<td><code>withdraw_only_owner_after_window</code>, <code>owner_can_withdraw_everything</code></td>
+</tr>
+<tr>
+<td>Exactly one exit per moment: each exit lies in its window, the windows cover all time and never overlap, and two allowed spends at the same time are the same exit</td>
+<td><code>exit_time_window</code>, <code>exit_windows_cover</code>, <code>exit_windows_disjoint</code>, <code>exit_kind_unique</code></td>
+</tr>
+<tr>
+<td>A request leaves only through a legal exit bound to the transaction that removed it, every exit burns its tag, and before the window ends every oracle has judged and is paid</td>
+<td><code>live_removal_is_legal_exit</code>, <code>request_spent_only_by_lifecycle</code>, <code>every_exit_burns_tag</code>, <code>exits_remove_consumed</code>, <code>fold_removes_consumed</code>, <code>early_exit_requires_all_judgments</code>, <code>early_exit_pays_every_oracle</code>, <code>before_deadline_only_approvals</code></td>
+</tr>
+<tr>
+<td>An oracle answering both ways on a live request is reachable and changes no payment; dead judgments can always be burned, and a burn removes exactly the token burned</td>
+<td><code>equivocation_reachable</code>, <code>dead_judgment_can_burn</code>, <code>burn_removes_one</code>, <code>burn_keeps_history</code></td>
+</tr>
+<tr>
+<td>The shipped <code>Insert</code>, <code>Delete</code> and <code>Update</code> are writes with a condition on their own key, with the same effect on the tree</td>
+<td><code>old_operations_correspond</code></td>
+</tr>
+<tr>
+<td>An oracle's tag is in a live request exactly when that oracle judges the request's registry, across all registries; each live request holds one tag per oracle, none repeated, and every removal burns them</td>
+<td><code>discovery_iff</code>, <code>discovery_across_registries</code>, <code>reachable_live_tags</code>, <code>reachable_tags_unique</code>, <code>reachable_registry_valid</code>, <code>live_removal_burns_oracle_tags</code></td>
+</tr>
+<tr>
+<td>Only an oracle identity's authorization can mint or update its price notice; notices change no registry, request, judgment or payment, and bind nothing</td>
+<td><code>price_mint_inversion</code>, <code>price_update_inversion</code>, <code>price_mint_available</code>, <code>price_update_available</code>, <code>reachable_notice_names</code>, <code>notice_change_authorized</code>, <code>price_notice_noninterference</code>, <code>notices_do_not_bind_protocol</code></td>
+</tr>
+<tr>
+<td>Every hashed name is led by its role; names are injective and names of different roles never coincide</td>
+<td><code>tag_name_injective</code>, <code>price_name_injective</code>, <code>different_roles_never_coincide</code>, <code>names_have_leading_roles</code>, <code>request_name_injective</code></td>
+</tr>
+<tr>
+<td>A registry's rule is fixed at creation and judges exactly the request created and the creating transaction's signatures; it is never consulted again, so every exit and every judgment burn works whatever the rule says</td>
+<td><code>creation_rule_and_token</code>, <code>creation_rule_input_binding</code>, <code>step_rule_immutable</code>, <code>history_rule_immutable</code>, <code>reachable_rule_admitted</code>, <code>fold_rule_predicate_independent</code>, <code>every_rule_allows_burn</code></td>
+</tr>
+<tr>
+<td>Each live request holds its registry's request token, minted by the rule's policy when the registry has a rule and by the release policy otherwise; the fold needs it and every exit burns it</td>
+<td><code>creation_request_policy</code>, <code>reachable_request_tokens</code>, <code>fold_requires_request_token</code>, <code>every_exit_burns_request_token</code>, <code>live_removal_burns_request_token</code></td>
+</tr>
+<tr>
+<td>The request token of a registry is held exactly by its live requests, across all registries; output references are fresh and never repeat</td>
+<td><code>request_token_discovery</code>, <code>request_token_discovery_across_registries</code>, <code>output_refs_monotone</code>, <code>reachable_output_refs</code>, <code>reachable_output_refs_unique</code></td>
+</tr>
+<tr>
+<td>A registry needs at least one oracle or a rule; with no oracles it needs no seed, no approvals to fold and no verdicts to settle</td>
+<td><code>unguarded_registry_impossible</code>, <code>zero_oracle_needs_rule</code>, <code>zero_oracle_evidence_empty</code>, <code>zero_oracle_creation_without_seed</code>, <code>zero_oracle_fold_without_approvals</code>, <code>zero_oracle_account_without_verdicts</code></td>
+</tr>
+<tr>
+<td>A fold applies a request only if its own conditions and every approving oracle's conditions hold on the tree at its turn; an approval cannot be shown with other conditions, and one whose conditions no longer hold cannot be used</td>
+<td><code>present_condition_semantics</code>, <code>foldRun_oracle_conditions</code>, <code>fold_all_conditions_hold</code>, <code>approval_conditions_cannot_change</code>, <code>stale_approval_unusable</code>, <code>fold_evidence_binds_conditions</code></td>
+</tr>
+<tr>
+<td>A folder that lists a registry's live requests and the authentic judgment outputs finds exactly the foldable requests</td>
+<td><code>expected_approval_lookup</code>, <code>folder_discovery_exact</code>, <code>folder_discovery_executable</code></td>
+</tr>
+<tr>
+<td>An empty fold is allowed and earns nothing</td>
+<td><code>empty_fold_allowed</code>, <code>empty_fold_earns_nothing</code></td>
+</tr>
+<tr>
+<td>Witnesses are invisible to meaning: conditions, the root and every earlier theorem read the logical tree, the tree with every witness removed</td>
+<td><code>logical_tree_stripped</code>, <code>conditions_read_logical</code></td>
+</tr>
+<tr>
+<td>In every reachable state the live witness tokens match the witnessed entries one to one, fact, deposit and refund address included; each live witness's fact holds; a key has at most one witness</td>
+<td><code>reachable_witness_bijection</code>, <code>live_witness_fact</code>, <code>live_witness_presence</code>, <code>live_witness_absence</code>, <code>one_live_witness_per_key</code>, <code>witness_reference_sound</code>, <code>witness_origin_on_trace</code>, <code>witness_token_issuance_bound</code></td>
+</tr>
+<tr>
+<td>A witness is burned exactly by a fold item that changes its key's value; a write of the value already held, writes to other keys and every other transaction leave it, its token, its output and its deposit untouched</td>
+<td><code>item_burn_iff_value_change</code>, <code>witness_durability</code>, <code>untouched_witness_survives</code>, <code>plain_noop_preserves_witness</code>, <code>witness_spent_only_at_own_key</code>, <code>only_fold_changes_witnesses</code>, <code>touched_old_witness_burned</code></td>
+</tr>
+<tr>
+<td>A live witness's deposit leaves its output only in a fold changing its key's value, and only to exactly its refund address, whatever the issuer signs</td>
+<td><code>witness_deposit_lock</code>, <code>witnessed_write_obligation</code>, <code>plain_write_clears_witness</code>, <code>witness_output_custody</code>, <code>live_outputs_hold_deposits</code></td>
+</tr>
+<tr>
+<td>An extraction needs no rule and no oracle, pays the folder like any request, is folded only when its key holds exactly the named value or absence and has no witness, and its witness attests exactly that</td>
+<td><code>extraction_item_inversion</code>, <code>extraction_attests_requested</code>, <code>extraction_normal_request_money</code>, <code>extraction_permissionless_creation</code>, <code>extraction_permissionless_fold</code>, <code>extraction_witnessed_refused</code>, <code>extraction_stale_refused</code>, <code>extraction_creation_inversion</code></td>
+</tr>
+<tr>
+<td>An extraction has the three windows of every request, one exit each; a consumed extraction leaves for good, and folders find a registry's extractions</td>
+<td><code>extraction_account_inversion</code>, <code>extraction_withdrawal_inversion</code>, <code>extraction_exit_window</code>, <code>extraction_exit_exclusive</code>, <code>extraction_windows_cover</code>, <code>extraction_windows_disjoint</code>, <code>extraction_later_exits_available</code>, <code>extraction_removal_legal</code>, <code>extraction_exits_remove_consumed</code>, <code>extraction_fold_removes_consumed</code>, <code>extraction_never_reappears</code>, <code>extraction_consumption_terminal</code>, <code>extraction_discovery_exact</code></td>
+</tr>
+<tr>
+<td>A witnessing <code>set</code> is funded at creation, replaces a witness only by changing the value, refunding the old issuer and leaving one witness of the value written; a same-value witnessing <code>set</code> on a witnessed key is not folded; an unused deposit returns to the owner</td>
+<td><code>witnessing_creation_funded</code>, <code>witnessing_set_replaces</code>, <code>witnessing_noop_refused</code>, <code>witnessing_blind_write_availability</code>, <code>unused_witnessing_deposit_returned</code></td>
+</tr>
+<tr>
+<td>Inside a fold witness events follow item order, a witness minted and burned in the same fold nets out on the transaction with its refund paid, and the fold's witness inputs are authentic and unique</td>
+<td><code>fold_witness_events_in_item_order</code>, <code>fold_witness_boundary_exact</code>, <code>transient_witness_nets</code>, <code>fold_witness_inputs_authentic</code>, <code>reachable_input_refs_unique</code></td>
+</tr>
+<tr>
+<td>Deposits are conserved, separately from fees, remainders and owner refunds; every fold item and every request on the trace has an exact inversion and is unique</td>
+<td><code>fold_deposits_conserved</code>, <code>write_item_inversion</code>, <code>account_item_inversion</code>, <code>requests_unique_on_trace</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-it-was-checked">How it was checked</h2>
+<p>Two independent audits ran on the first candidate, and fresh ones on the
+repair. Each auditor worked on a frozen copy with a sealed list of inputs and
+never contacted the author.</p>
+<pre class="mermaid"><code>flowchart LR
+  c1["First candidate&lt;br/&gt;46 theorems"] --&gt; a1["Statement audit:&lt;br/&gt;two theorems weaker than the decisions"]
+  c1 --&gt; m1["Mutation audit:&lt;br/&gt;six guards no theorem protected"]
+  a1 --&gt; d["New rulings:&lt;br/&gt;one exit per window,&lt;br/&gt;equivocation accepted"]
+  m1 --&gt; r["Repair:&lt;br/&gt;60 theorems"]
+  d --&gt; r
+  r --&gt; a2["Statement audit: passed"]
+  r --&gt; m2["Mutation audit:&lt;br/&gt;no surviving mutant"]
+  a2 --&gt; x["Extension: tags per oracle,&lt;br/&gt;price notices, role-led names&lt;br/&gt;78 theorems"]
+  m2 --&gt; x
+  x --&gt; a3["Statement audit: passed"]
+  x --&gt; m3["Mutation audit:&lt;br/&gt;no surviving mutant"]</code></pre>
+<table>
+<thead>
+<tr>
+<th>Audit</th>
+<th>First candidate</th>
+<th>Repaired candidate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Statements and proofs: does each theorem say what the decisions promise, is it reachable, is it proved?</td>
+<td>Two failures: the legal-exit theorem did not bind the exit to the actual removal, and the approval-disclosure theorem relied on an assumption no decision granted</td>
+<td>Passed on every row except the independent blind reading of the statements, which was not commissioned</td>
+</tr>
+<tr>
+<td>Mutations: does breaking the model make a theorem fail?</td>
+<td>Six model changes passed every theorem: forged judgment references at the fold and at settlement, a request for a foreign registry, a diverted remainder, swapped fees, a burn that kept the token, a duplicate request in a fold</td>
+<td>98 single-edit mutants; none passes the full build; 59 of 60 theorems are each killed by a relevant mutant</td>
+</tr>
+</tbody>
+</table>
+<p>The extension for tags per oracle, price notices and role-led names was audited the same way: the statement and proof audit passed every row except the uncommissioned blind reading, and the mutation audit ran 100 single-edit mutants, none of which passes the full build; 75 of 78 theorems are each killed by a relevant mutant.</p>
+<pre class="mermaid"><code>flowchart LR
+  y["Extension: rules, request tokens,&lt;br/&gt;oracle conditions&lt;br/&gt;111 theorems"] --&gt; a4["Statement audit:&lt;br/&gt;two theorems too weak"]
+  y --&gt; m4["Mutation audit:&lt;br/&gt;rule input and policy unprotected"]
+  a4 --&gt; z["Repair:&lt;br/&gt;113 theorems"]
+  m4 --&gt; z
+  z --&gt; a5["Statement audit: passed"]
+  z --&gt; m5["Mutation audit:&lt;br/&gt;no surviving mutant"]</code></pre>
+<p>The extension for registry rules, request tokens, registries without oracles,
+the <code>present</code> condition and oracle conditions needed one repair. The statement
+audit found the dead-judgment burn theorem limited to approvals without
+conditions, and the rule-burn theorem true by definition. The mutation audit
+found that a rule fed a different request or different signatures, or a
+request token minted by the release policy despite a rule, broke no theorem.
+The repair restated the first two theorems over the actual transitions and
+added theorems binding the rule to the created request and the creating
+signatures, and the request token to the rule's policy. On the repair, the
+statement and proof audit passed every row except the uncommissioned blind
+reading, and the mutation audit ran 145 single-edit mutants, none of which
+passes the full build; 105 of 113 theorems are each killed by a relevant
+mutant.</p>
+<p>What the mutation audit could not count as killed, none of it a defect:</p>
+<ul>
+<li>the theorem that the windows cover all time is arithmetic over time alone,
+  so no change to the model can falsify it; the timing of each exit is
+  protected separately;</li>
+<li>a mutant that forbids an oracle from answering both ways does falsify the
+  equivocation theorem, as a separate proof shows, but the build fails first
+  in the examples, so the strict rule of the audit leaves it uncounted.</li>
+<li>the theorems that tags are unique per request and that discovery works
+  across registries are each guarded by an earlier theorem that the
+  relevant mutant breaks first (registry validity, and discovery itself), so
+  the fault is caught but not credited to them;</li>
+<li>in the same way, discovery of requests across registries, the burn of the
+  request token on every removal, the need for a rule in a registry without
+  oracles, and the uselessness of a stale approval are each guarded by an
+  earlier theorem (request-token discovery, the burn of tags on every exit,
+  the impossibility of a registry with neither oracles nor rule, and the fold
+  proving every condition) that the relevant mutant breaks first.</li>
+</ul>
+<h3 id="fee-balances-complete-accounts-and-claims">Fee balances, complete accounts and claims</h3>
+<pre class="mermaid"><code>flowchart TB
+  c1["138 statements"] --&gt; a1["Statement audit:&lt;br/&gt;claim history unbound,&lt;br/&gt;approval lookup weakened"]
+  a1 --&gt; c2["Repair: 141 statements"]
+  c2 --&gt; a2["Statement audit:&lt;br/&gt;equivocation weakened"]
+  a2 --&gt; c3["Repair: 142 statements"]
+  c3 --&gt; a3["Statement audit: passed,&lt;br/&gt;every row killed"]
+  a3 --&gt; p["Proofs: 142 proved"]
+  p --&gt; a4["Proof audit: passed"]</code></pre>
+<p>Wiring oracle identities, fee balances, complete accounts and claims into the
+registry model restated 90 of the 113 earlier theorems and added 29. Every
+audit read the statements blind before comparing them with the decisions, and
+compared each restated theorem with its earlier form, so that no guarantee was
+weakened under a kept name.</p>
+<p>The first statement audit found that the theorem on claim signatures did not
+tie a live claim to its own history: a model that created claims unsigned, or
+changed a claim's payout after creation, satisfied every statement. It also
+found the approval lookup reduced to a list membership true by definition, and
+fifteen earlier theorems weaker than before. The repair bound every live claim
+to a signed creation on the state's own history and restored the rest. The
+second audit found the equivocation theorem no longer tied to a live request
+of the state's registry, and no statement that the exit windows do not overlap.
+After that repair the third audit found every statement exact, each of the 142
+falsified by at least one single-edit mutant, and 155 of 157 listed guards and
+effects killed. The other two are equivalent mutants: an interval check that
+the fold already makes.</p>
+<p>All 142 theorems were then proved without changing any statement. An
+independent proof audit confirmed the elaborated types identical to the
+audited statements, no escape hatch, only the standard axioms, and read the
+money proofs against reachable examples.</p>
+<h3 id="durable-witnesses">Durable witnesses</h3>
+<pre class="mermaid"><code>flowchart TB
+  c1["193 statements"] --&gt; a1["Statement audit:&lt;br/&gt;false helper,&lt;br/&gt;extractions could repeat"]
+  a1 --&gt; c2["Repair: 198 statements"]
+  c2 --&gt; a2["Statement audit:&lt;br/&gt;witness event order free"]
+  a2 --&gt; c3["Repair: 199 statements"]
+  c3 --&gt; a3["Statement audit: passed,&lt;br/&gt;every row killed"]
+  a3 --&gt; p["Proofs: 199 proved"]
+  p --&gt; a4["Proof audit: passed"]</code></pre>
+<p>Adding durable witnesses kept all 142 earlier theorems, restated 21 of them
+over the new transitions and added 57. The first statement audit found a
+supporting lemma on fold payments false once an extraction met a witnessed
+key, and no statement that a consumed extraction leaves for good: a model
+that let its owner withdraw the same escrow forever satisfied every theorem.
+The repair stated extraction terminality as for ordinary requests. The second
+audit found that a model recording a fold's witness events in reverse order,
+so that a witness could be consumed before the item that minted it, also
+satisfied every theorem; the repair stated that witness events follow item
+order. The third audit read every statement blind, killed a single-edit
+mutant for each of the 199 theorems, including a burn on a same-value write,
+a burn on a write to another key, an issuer-signed burn, a refund to the
+wrong address and an extraction without its tip, and replayed all 392
+mutants in clean trees. One guard, an interval check the fold already makes,
+is an equivalent mutant.</p>
+<p>All 199 theorems were then proved without changing any statement. An
+independent proof audit confirmed the elaborated types and their dependencies
+identical to the audited statements, replayed every proof in a fresh kernel
+check, found no escape hatch and only the standard axioms, and read the
+witness and money proofs against reachable examples.</p>
+<h2 id="oracle-identities">Oracle identities</h2>
+<p>The oracle identity standard has its own model, under
+<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/tree/main/lean/MpfsCage/OracleIdentity"><code>lean/MpfsCage/OracleIdentity/</code></a>,
+independent of any registry. It follows
+<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-identity/decisions.md"><code>specs/oracle-identity/decisions.md</code></a>;
+its theorem and mutant ledger is
+<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-identity/ledgers.md"><code>specs/oracle-identity/ledgers.md</code></a>.
+All 31 theorems are proved with only the standard axioms.</p>
+<table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>Proved by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An identity names exactly one description, and authorization binds the description supplied to the identity expected</td>
+<td><code>identity_injective</code>, <code>authorization_binds_identity</code>, <code>authorization_inversion</code></td>
+</tr>
+<tr>
+<td>A group is valid exactly when its threshold is between one and its number of members, every share is positive, its members are valid and no key appears twice anywhere in it; invalid descriptions authorize nothing and are paid nothing</td>
+<td><code>group_valid_iff</code>, <code>repeated_key_invalid</code>, <code>invalid_description_refused</code>, <code>split_refusal_iff</code></td>
+</tr>
+<tr>
+<td>A key authorizes exactly when it signs; a group exactly when its threshold of members authorize; adding signers never revokes authorization, and only the set of signers matters</td>
+<td><code>key_authorizes_iff</code>, <code>group_authorizes_iff</code>, <code>below_threshold_refused</code>, <code>authorization_monotone</code>, <code>signer_set_extensional</code></td>
+</tr>
+<tr>
+<td>A threshold of <code>m</code> needs <code>m</code> distinct signing keys, because a key belongs to at most one member of a group</td>
+<td><code>key_contributes_to_at_most_one_member</code>, <code>threshold_needs_distinct_signing_keys</code></td>
+</tr>
+<tr>
+<td>The record of signers is canonical: every authorizing member, in order, with its share, down to keys; it names only keys that signed, each once</td>
+<td><code>group_record_exact</code>, <code>key_record_exact</code>, <code>recorded_keys_are_signers</code>, <code>record_keys_unique</code>, <code>recorded_keys_exact</code>, <code>successful_record_keys_exact</code>, <code>signing_keys_exact</code></td>
+</tr>
+<tr>
+<td>The split pays exactly the fee: each member its floor share, the remainder to the first signed member, recursively; a key oracle receives the whole fee, as a one-member group would</td>
+<td><code>split_conserves_fee</code>, <code>group_split_exact</code>, <code>key_receives_whole_fee</code>, <code>key_is_single_member_case</code>, <code>recorded_split_replay</code></td>
+</tr>
+<tr>
+<td>Nobody is paid for work it did not do: a key that did not sign, and every key of a member or subgroup below its threshold at any depth, receives nothing</td>
+<td><code>unsigned_key_receives_nothing</code>, <code>nonauthorizing_member_receives_nothing</code>, <code>nonauthorizing_subgroup_at_any_depth_receives_nothing</code></td>
+</tr>
+<tr>
+<td>What a key receives is exactly the sum of its payments, and the amounts received sum to the total paid</td>
+<td><code>paid_to_exact</code>, <code>paid_to_partition</code></td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid"><code>flowchart TB
+  s1["24 statements"] --&gt; a1["Statement audit:&lt;br/&gt;key records not fixed"]
+  a1 --&gt; s2["Repair: 26 statements"]
+  s2 --&gt; a2["Statement audit: passed"]
+  a2 --&gt; p1["Proofs"]
+  p1 --&gt; a3["Proof and mutation audit:&lt;br/&gt;passed, three observation&lt;br/&gt;mutants survived"]
+  a3 --&gt; s3["Repair: 31 theorems"]
+  s3 --&gt; a4["Statement, proof and&lt;br/&gt;mutation audit: passed,&lt;br/&gt;no surviving mutant"]</code></pre>
+<p>Every audit ran in a fresh context on a frozen commit, with no contact with
+the author. The first statement audit found that no statement fixed the
+record of a single key: a model recording each key as an invented
+one-member group satisfied all 24 statements. The repair fixed the key
+record exactly and extended the unpaid-subgroup guarantee to any depth. The
+proof audit then found three changes it could not catch, all in the
+functions the theorems use to read payments and signers: the payment to a
+key forced to zero, the keys of a key record emptied, and the signer filter
+removed. Five more theorems pin those functions exactly, and the final audit
+killed all 53 mutants of its operator set, those three included.</p>
+<p>What this model does not cover: the hash and encoding of a description, and
+the cost of authorization and splitting. The registry model binds the record
+of signers to each judgment and credits fees by it.</p>
+<h2 id="what-is-not-covered">What is not covered</h2>
+<table>
+<thead>
+<tr>
+<th>Not covered</th>
+<th>Where it is tracked</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One request script per release, serving every registry in both roles: the model has no notion of a script or a release</td>
+<td>Recorded as a model omission; implemented by <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/110">#110</a></td>
+</tr>
+<tr>
+<td>The ledger queries folders run: the model proves that a folder finds exactly the foldable requests from a registry's live requests and the authentic judgment outputs, but the queries that produce them are outside it</td>
+<td>Implemented by <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/113">#113</a></td>
+</tr>
+<tr>
+<td>An executable model, codecs and a replay corpus for conformance testing; the payment list the model reports for a withdrawal is read by no theorem, while the withdrawal's actual amount and recipient are</td>
+<td><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/109">#109</a></td>
+</tr>
+<tr>
+<td>Conformance of the Aiken validators with the model</td>
+<td><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/114">#114</a></td>
+</tr>
+<tr>
+<td>Concrete encodings and hashes of names and datums</td>
+<td><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/116">#116</a></td>
+</tr>
+<tr>
+<td>Costs and transaction limits</td>
+<td><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/115">#115</a></td>
+</tr>
+<tr>
+<td>Slots, drafted after this model was audited</td>
+<td><a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/issues/129">#129</a></td>
+</tr>
+<tr>
+<td>How a consumer contract reads a witness token by reference, and what a witness means outside the registry, which rests on the registry's rule and oracles</td>
+<td>Recorded as a model omission</td>
+</tr>
+<tr>
+<td>The ledger minimum is a fixed parameter of the registry; its agreement with the ledger's own calculation, and whether a destination script accepts a payout, are outside the model</td>
+<td>Implemented by the validators</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.indexes", "navigation.sections", "navigation.path", "toc.integrate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

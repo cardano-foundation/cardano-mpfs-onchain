@@ -1,0 +1,1525 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://cardano-foundation.github.io/cardano-mpfs-onchain/design/registries/slots/">
+      
+      
+        <link rel="prev" href="../oracles/">
+      
+      
+        <link rel="next" href="../formal-model/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Oracle slots (draft) - Cardano MPFS Onchain</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#oracle-slots-and-check-protocols" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Cardano MPFS Onchain" class="md-header__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Cardano MPFS Onchain
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Oracle slots (draft)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Follow the system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Follow the system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Cardano MPFS Onchain" class="md-nav__button md-logo" aria-label="Cardano MPFS Onchain" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Cardano MPFS Onchain
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/cardano-foundation/cardano-mpfs-onchain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../introduction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../haskell-cage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Haskell Cage Library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types & Encodings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/proofs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proof System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/properties/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Properties
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Permissionless multi-oracle registries
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_1" id="__nav_6_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Permissionless multi-oracle registries
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../open-mpfs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open MPFS design document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Request lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../economics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Economics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../oracles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Oracle identities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Oracle slots (draft)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Oracle slots (draft)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-example-a-registry-for-moog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The example: a registry for moog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slots
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check protocols
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Check protocols">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#is-the-registry-engaging-its-checks-correctly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Is the registry engaging its checks correctly?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-an-oracle-engages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How an oracle engages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-game" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The game
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#liveness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liveness
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../formal-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Formal model and audits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Design
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Permissionless multi-oracle registries
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="oracle-slots-and-check-protocols">Oracle slots and check protocols</h1>
+<p><strong>As someone creating a registry, I want to say which oracle judges which part
+of my keys, and under which published check, so that I can combine
+independent providers, keep parts of the registry gated by my rule alone, and
+compare the providers of one check by price.</strong></p>
+<div class="admonition warning">
+<p class="admonition-title">Draft</p>
+<p>This page works through a proposal, using the moog test-run registry as
+the example. Nothing on it is decided yet; the draft and its open points
+are in
+<a href="https://github.com/cardano-foundation/cardano-mpfs-onchain/blob/main/specs/oracle-slots/decisions.md"><code>specs/oracle-slots/decisions.md</code></a>.</p>
+</div>
+<h2 id="the-example-a-registry-for-moog">The example: a registry for moog</h2>
+<p>Moog lets GitHub users request test runs on Antithesis. Its registry holds
+users, roles, white-listed repositories, test runs and their states. Today one
+oracle checks every write. Sorting those checks by what they need shows that
+most of them need no oracle at all:</p>
+<table>
+<thead>
+<tr>
+<th>Write</th>
+<th>What must be true</th>
+<th>Who checks it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Register a user</td>
+<td>GitHub user <code>alice</code> publishes this key</td>
+<td>an oracle, reading GitHub</td>
+</tr>
+<tr>
+<td>Register a role</td>
+<td>the repository's code owners file names <code>alice</code></td>
+<td>an oracle, reading GitHub</td>
+</tr>
+<tr>
+<td>White-list a repository</td>
+<td>the moog agent asks for it</td>
+<td>the rule: the agent signs</td>
+</tr>
+<tr>
+<td>Request a test run</td>
+<td>the commit and its compose file exist</td>
+<td>an oracle, reading GitHub</td>
+</tr>
+<tr>
+<td></td>
+<td>duration within the allowed range</td>
+<td>the rule</td>
+</tr>
+<tr>
+<td></td>
+<td>the requester holds the role, the repository is white-listed</td>
+<td>conditions: keys present</td>
+</tr>
+<tr>
+<td></td>
+<td>the requester's registered key signed</td>
+<td>the rule, with the condition that the user's key equals the signer</td>
+</tr>
+<tr>
+<td></td>
+<td>runs are numbered in order</td>
+<td>conditions: the previous run present, this one absent</td>
+</tr>
+<tr>
+<td>Accept, reject or finish a run</td>
+<td>the moog agent says so, after the previous state</td>
+<td>the rule: the agent signs; a condition: the state equals the previous one</td>
+</tr>
+</tbody>
+</table>
+<p>The chain sees signatures, so they go to the rule, which runs when a request
+is created. The fold sees the tree, so facts about earlier writes become
+conditions. Only GitHub is out of sight, so only GitHub needs an oracle. The
+Antithesis results need none: the registry trusts the agent's signature, as
+moog does today, and adds only that the agent can write nowhere else and can
+never overwrite a result.</p>
+<pre class="mermaid"><code>flowchart LR
+  write([A write to a key]) --&gt; match{"Key under&lt;br/&gt;a slot prefix?"}
+  match -- "user/github/" --&gt; s1["Slot: GitHub oracle&lt;br/&gt;check: key file"]
+  match -- "role/github/" --&gt; s2["Slot: GitHub oracle&lt;br/&gt;check: code owners role"]
+  match -- "run/github/" --&gt; s3["Slot: GitHub oracle&lt;br/&gt;check: compose assets"]
+  match -- "white/github/, state/github/" --&gt; rule["No slot:&lt;br/&gt;the rule alone"]
+  s1 &amp; s2 &amp; s3 -- "approval needed" --&gt; fold[(Fold)]
+  rule -- "checked at creation" --&gt; fold</code></pre>
+<h2 id="slots">Slots</h2>
+<p>A registry names its oracles in <strong>slots</strong>. A slot is an oracle identity, the
+hash of a check protocol, a key prefix and parameters for that check. A write
+needs the approval of every slot whose prefix matches its key, and no other.
+Keys under no slot are gated by the rule alone, and a registry without a rule
+refuses them.</p>
+<div class="language-cddl highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nc">slot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="s">oracle</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">bytes</span><span class="w"> </span><span class="ow">.size</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w">  </span><span class="c1">; identity: hash of the oracle description</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="s">check</span><span class="w">  </span><span class="p">:</span><span class="w"> </span><span class="nb">bytes</span><span class="w"> </span><span class="ow">.size</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w">  </span><span class="c1">; hash of the check protocol document</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="s">prefix</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">bytes</span><span class="p">,</span><span class="w">           </span><span class="c1">; the slot judges every write whose key starts with this</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="s">params</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">bytes</span><span class="p">,</span><span class="w">           </span><span class="c1">; settings for this registry, read with the check&#39;s params rule</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">]</span>
+</span></code></pre></div>
+<h2 id="check-protocols">Check protocols</h2>
+<p>A <strong>check protocol</strong> is published by whoever writes the checking software. It
+fixes what is checked, the parameters a registry may set, and the shape of the
+key after the slot's prefix and of the value. The registry chooses the prefix
+and the parameters; the check defines the rest. Moog's three GitHub checks
+would read:</p>
+<div class="language-cddl highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">; check: github-file-key, version 1</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1">; set   prefix ++ user = vkey  approved when GitHub serves file `params.file`</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1">;                                in repository user/user, default branch, equal to hex(vkey)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1">; unset prefix ++ user         approved when that file no longer holds the registered vkey</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nc">params</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s">file</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">tstr</span><span class="w"> </span><span class="p">]</span><span class="w">                        </span><span class="c1">; moog: [&quot;moog.vkey&quot;]</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nc">suffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">tstr</span><span class="w"> </span><span class="ow">.regexp</span><span class="w"> </span><span class="s2">&quot;[A-Za-z0-9-]{1,39}&quot;</span><span class="w">      </span><span class="c1">; a GitHub username</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nc">value</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nb">bytes</span><span class="w"> </span><span class="ow">.size</span><span class="w"> </span><span class="mi">32</span><span class="w">                         </span><span class="c1">; ed25519 verification key</span>
+</span></code></pre></div>
+<div class="language-cddl highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">; check: github-codeowners-role, version 1</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1">; set   prefix ++ org/repo/user = role  approved when the code owners file of org/repo,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1">;                                       default branch, has a line `&lt;role&gt;:` naming @user</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1">; unset                                  approved when it no longer does</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nc">params</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s">roles</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="o">+</span><span class="w"> </span><span class="nb">tstr</span><span class="p">]</span><span class="w"> </span><span class="p">]</span><span class="w">                   </span><span class="c1">; moog: [[&quot;antithesis&quot;]]</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nc">suffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">tstr</span><span class="w"> </span><span class="ow">.regexp</span><span class="w"> </span><span class="s2">&quot;[A-Za-z0-9-]+/[A-Za-z0-9._-]+/[A-Za-z0-9-]+&quot;</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nc">value</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nb">tstr</span><span class="w">                                   </span><span class="c1">; one of params.roles</span>
+</span></code></pre></div>
+<div class="language-cddl highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">; check: github-compose-assets, version 1</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">; set prefix ++ org/repo/commit/dir/try  approved when the commit exists and dir, at that</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1">;                                        commit, holds a compose file that `docker compose config` accepts</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1">; unset or overwrite                     always refused: these keys are insert-only</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nc">params</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nc">suffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">tstr</span><span class="w"> </span><span class="ow">.regexp</span><span class="w"> </span><span class="s2">&quot;[^/]+/[^/]+/[0-9a-f]{40}/[^/]+/[0-9]+&quot;</span><span class="w">   </span><span class="c1">; dir percent-encoded</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nc">value</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nb">any</span><span class="w">                                    </span><span class="c1">; not read by this check</span>
+</span></code></pre></div>
+<p>The moog registry protocol is then the composition: its slots, and the
+prefixes it gates with its rule.</p>
+<div class="language-cddl highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">; registry protocol: moog, version 1</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="err">;</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">; slots (copied into the registry datum):</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1">;   &quot;user/github/&quot;  github-file-key         params [&quot;moog.vkey&quot;]</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">;   &quot;role/github/&quot;  github-codeowners-role  params [[&quot;antithesis&quot;]]</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">;   &quot;run/github/&quot;   github-compose-assets   params []</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="err">;</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1">; prefixes gated by the rule only (agent key and durations fixed in it):</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">;   &quot;white/github/&quot; org/repo                          set by the agent</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1">;   &quot;state/github/&quot; org/repo/commit/dir/try = state   set by the agent</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="nc">run-value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s">requester</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">tstr</span><span class="p">,</span><span class="w"> </span><span class="s">duration</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">uint</span><span class="p">,</span><span class="w"> </span><span class="s">faults</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">bool</span><span class="w"> </span><span class="p">]</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">  </span><span class="c1">; rule: min &lt;= duration &lt;= max; the requester&#39;s key signs</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">  </span><span class="c1">; rule demands these conditions:</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">  </span><span class="c1">;   role/github/org/repo/&lt;requester&gt;   present</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">  </span><span class="c1">;   white/github/org/repo              present</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">  </span><span class="c1">;   user/github/&lt;requester&gt;            equals the signing key</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">  </span><span class="c1">;   run/github/.../&lt;try&gt;               absent</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">  </span><span class="c1">;   run/github/.../&lt;try - 1&gt;           present, when try &gt; 0</span>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="nc">state</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nc">accepted</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nc">rejected</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nc">finished</span>
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="nc">accepted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="nc">rejected</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">reasons</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="o">*</span><span class="w"> </span><span class="nb">uint</span><span class="p">]]</span>
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="nc">finished</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s">outcome</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">bool</span><span class="p">,</span><span class="w"> </span><span class="s">duration</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">uint</span><span class="p">,</span><span class="w"> </span><span class="s">url</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb">bytes</span><span class="p">]</span><span class="w">   </span><span class="c1">; url encrypted to the requester</span>
+</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">  </span><span class="c1">; rule: the agent signs; condition: the state key equals the previous state</span>
+</span></code></pre></div>
+<p>The run and its state live under different prefixes on purpose. Creating a
+run needs the GitHub check; moving its state needs only the agent. Under one
+prefix the GitHub oracle would be asked to judge results it cannot see.</p>
+<h3 id="is-the-registry-engaging-its-checks-correctly">Is the registry engaging its checks correctly?</h3>
+<p>Both sides are CDDL, so this is checked before anything goes on chain. Under a
+slot's prefix the registry does not define keys or values: it imports the
+check's <code>suffix</code> and <code>value</code>, and the rule may only narrow them. What is left
+to check:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Question</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Parameters</td>
+<td>Do the slot's <code>params</code> fit the check's <code>params</code> rule?</td>
+<td>CDDL validation</td>
+</tr>
+<tr>
+<td>Rule against check</td>
+<td>Could the rule admit a request the check can only refuse?</td>
+<td>The rule's shapes must fit inside the check's, or requesters pay for certain refusals</td>
+</tr>
+<tr>
+<td>Cross-references</td>
+<td>Do the conditions the rule demands name keys in the right shape?</td>
+<td>A field naming a key under another slot uses that slot's suffix type: moog's <code>requester</code> is a GitHub username, the suffix of the key-file check</td>
+</tr>
+<tr>
+<td>Samples</td>
+<td>Does every kind of request pass?</td>
+<td>The registry protocol ships a request zoo, one sample per kind; a tool runs each through its slot's check, the parameters and the rule, and a provider may offer a free dry run</td>
+</tr>
+</tbody>
+</table>
+<p>A zoo that passes means the registry engages its checks correctly. The probe
+after creation then only confirms that the providers are live and the fees are
+right.</p>
+<h2 id="how-an-oracle-engages">How an oracle engages</h2>
+<p>The oracle never reads the moog document. It reads slots, and the checks are
+its own code.</p>
+<pre class="mermaid"><code>sequenceDiagram
+  participant G as GitHub oracle
+  participant C as Registry state
+  participant R as Request
+  participant H as GitHub
+  G-&gt;&gt;G: publishes an offer per check it implements, with its price
+  R--&gt;&gt;G: tag named after G marks a new request
+  G-&gt;&gt;C: reads the registry's slots
+  Note over G: keeps slots naming G whose check it implements, whose params it accepts
+  G-&gt;&gt;R: reads the key, value and fee
+  Note over G: key under the slot's prefix, fee at least its price
+  G-&gt;&gt;H: looks up the file, the code owners or the commit
+  G-&gt;&gt;R: mints an approval or a refusal, paid alike</code></pre>
+<p>Engaging needs no transaction. An oracle that does not implement a slot's
+check, or does not accept its parameters, never answers it, and writes under
+that prefix stop. A key or value that does not parse under the check is
+refused, and the refusal is paid.</p>
+<h2 id="the-game">The game</h2>
+<p>Each player chooses once or repeatedly, and the registry's immutability fixes
+what can be undone:</p>
+<table>
+<thead>
+<tr>
+<th>Player</th>
+<th>Chooses</th>
+<th>Gains</th>
+<th>Can hurt the others by</th>
+<th>Limited by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Check author</td>
+<td>What a check verifies and its parameters</td>
+<td>Providers adopt the check</td>
+<td>A vague check whose verdicts nobody can audit</td>
+<td>Verdicts and, if the protocol stores it, evidence are public</td>
+</tr>
+<tr>
+<td>Provider</td>
+<td>Which checks to implement and at what price</td>
+<td>Fees for every judgment</td>
+<td>Stopping, which stalls every prefix it holds alone</td>
+<td>The creator can name a group of competing providers with threshold one</td>
+</tr>
+<tr>
+<td>Registry creator</td>
+<td>Prefixes, checks, parameters, providers, rule</td>
+<td>A registry fixed forever</td>
+<td>Choosing a provider that never engages</td>
+<td>Probing each slot with one request of each kind after creating, and abandoning a silent registry</td>
+</tr>
+<tr>
+<td>Requester</td>
+<td>When to write and what fee to offer</td>
+<td>The write applied</td>
+<td>Nothing: a write is judged as written</td>
+<td>Fees below the price are never judged</td>
+</tr>
+<tr>
+<td>Agent named in the rule</td>
+<td>What it writes under its own prefix</td>
+<td>Trust it already had</td>
+<td>False results, permanently signed by it</td>
+<td>Its prefix, its group of keys, and conditions on the previous state</td>
+</tr>
+</tbody>
+</table>
+<p>Competition happens at two moments. When a registry is created, the creator
+picks the cheapest or most trusted provider of each check. Inside a registry,
+a slot whose oracle is a threshold-one group of providers of the same check
+lets them race for each request; only the signer is paid, and any one of them
+can approve alone.</p>
+<h2 id="liveness">Liveness</h2>
+<p>Liveness is incentivized, not enforced. An oracle that stops answering stalls
+every write under its slots, and nothing on chain replaces it, because a
+fallback judge would reintroduce an owner. Oracles are paid for every
+judgment, approving or refusing, so answering is what earns. A creator
+protects a registry by choosing providers, and by naming a group of competing
+providers of the same check, whose threshold trades liveness against how many
+must agree. A registry whose oracles are gone is dead, and its users create a
+new one.</p>
+<p>Creating a registry is a challenge to its oracles. Nothing is negotiated
+before creation: the creator names providers, checks and parameters, and the
+providers answer or stay silent. Whether a slot is served is known only when
+its kinds of request have been judged, so a creator probes each slot with one
+request of each kind it expects, and abandons the registry, at the cost of its
+creation, if a slot stays silent.</p>
+<h2 id="open-questions">Open questions</h2>
+<ul>
+<li>Whether prices are announced per check protocol, listing every provider of
+  a check in one query, instead of per oracle.</li>
+<li>Whether the fee is declared per matching slot, and whether a judgment's
+  name binds the slot.</li>
+<li>The cost of the prefix comparisons in the fold, and the Lean model's change
+  from a fixed oracle set to slots.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.indexes", "navigation.sections", "navigation.path", "toc.integrate", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>
